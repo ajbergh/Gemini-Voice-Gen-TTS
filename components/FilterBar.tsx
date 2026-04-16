@@ -1,11 +1,20 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
-*/
+ */
+
+/**
+ * FilterBar.tsx — Top Navigation & Filter Bar
+ *
+ * Renders the primary navigation bar with search input, gender/pitch dropdown
+ * filters, view mode toggle (carousel/grid), theme switch (dark/light), and
+ * action buttons for AI Casting, Script Reader, Settings, and History.
+ * On screens below xl breakpoint, filter dropdowns move to a secondary row.
+ */
 
 import React from 'react';
 import { FilterState } from '../types';
-import { Search, Sparkles, ChevronDown, Mic, LayoutGrid, GalleryHorizontalEnd, Sun, Moon, FileText } from 'lucide-react';
+import { Search, Sparkles, ChevronDown, Mic, LayoutGrid, GalleryHorizontalEnd, Sun, Moon, FileText, Settings, Clock, User } from 'lucide-react';
 
 interface FilterBarProps {
   filters: FilterState;
@@ -14,10 +23,15 @@ interface FilterBarProps {
   uniquePitches: string[];
   onOpenAiCasting: () => void;
   onOpenScriptReader: () => void;
+  onOpenSettings: () => void;
+  onOpenHistory: () => void;
   viewMode: 'carousel' | 'grid';
   onViewModeChange: (mode: 'carousel' | 'grid') => void;
   isDarkMode: boolean;
   toggleTheme: () => void;
+  voiceTab: 'stock' | 'custom';
+  onVoiceTabChange: (tab: 'stock' | 'custom') => void;
+  customPresetCount: number;
 }
 
 const FilterBar: React.FC<FilterBarProps> = ({ 
@@ -27,10 +41,15 @@ const FilterBar: React.FC<FilterBarProps> = ({
   uniquePitches,
   onOpenAiCasting,
   onOpenScriptReader,
+  onOpenSettings,
+  onOpenHistory,
   viewMode,
   onViewModeChange,
   isDarkMode,
-  toggleTheme
+  toggleTheme,
+  voiceTab,
+  onVoiceTabChange,
+  customPresetCount
 }) => {
   
   const handleGenderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -78,6 +97,29 @@ const FilterBar: React.FC<FilterBarProps> = ({
                         <span className="tracking-wide hidden sm:inline">Test Script</span>
                         <span className="tracking-wide sm:hidden">Script</span>
                     </button>
+
+                    {/* Voice Tab Switcher */}
+                    <div className="flex bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700 shrink-0">
+                        <button
+                            onClick={() => onVoiceTabChange('stock')}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${voiceTab === 'stock' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'}`}
+                        >
+                            <Mic size={12} />
+                            <span className="hidden sm:inline">Stock</span>
+                        </button>
+                        <button
+                            onClick={() => onVoiceTabChange('custom')}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${voiceTab === 'custom' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'}`}
+                        >
+                            <User size={12} />
+                            <span className="hidden sm:inline">My Voices</span>
+                            {customPresetCount > 0 && (
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${voiceTab === 'custom' ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300' : 'bg-zinc-200 dark:bg-zinc-600 text-zinc-600 dark:text-zinc-300'}`}>
+                                    {customPresetCount}
+                                </span>
+                            )}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Right: Search, Filters & Actions */}
@@ -157,6 +199,24 @@ const FilterBar: React.FC<FilterBarProps> = ({
                             title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
                         >
                             {isDarkMode ? <Sun size={14} /> : <Moon size={14} />}
+                        </button>
+
+                        {/* History */}
+                        <button
+                            onClick={onOpenHistory}
+                            className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                            title="History"
+                        >
+                            <Clock size={14} />
+                        </button>
+
+                        {/* Settings */}
+                        <button
+                            onClick={onOpenSettings}
+                            className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                            title="Settings"
+                        >
+                            <Settings size={14} />
                         </button>
                     </div>
 

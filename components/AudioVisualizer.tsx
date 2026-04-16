@@ -1,7 +1,16 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
-*/
+ */
+
+/**
+ * AudioVisualizer.tsx — Canvas Waveform Visualizer
+ *
+ * Renders an animated waveform on a <canvas> element using requestAnimationFrame.
+ * Combines multiple sine waves with envelope modulation, cycling through Google
+ * brand colors (blue, red, yellow, green). The animation activates when
+ * isPlaying is true and gracefully fades out when stopped.
+ */
 
 import React, { useEffect, useRef } from 'react';
 

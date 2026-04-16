@@ -1,19 +1,34 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
-*/
+ */
+
+/**
+ * AiTtsPreview.tsx — TTS Generation, Playback & Download
+ *
+ * Generates speech from text using a selected Gemini TTS voice via the backend
+ * proxy (/api/voices/tts). Audio is returned as base64-encoded raw PCM
+ * (24kHz, 16-bit, mono), decoded with Web Audio API for playback, and can be
+ * downloaded as a proper WAV file with RIFF headers. Includes an
+ * AudioVisualizer canvas and a voice selector dropdown.
+ */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI, Modality } from "@google/genai";
-import { Play, Square, Loader2, Volume2, AlertCircle, ChevronDown, Download } from 'lucide-react';
+import { Play, Square, Loader2, Volume2, AlertCircle, ChevronDown, Download, Save } from 'lucide-react';
+import { generateTts } from '../api';
 import { Voice } from '../types';
 import AudioVisualizer from './AudioVisualizer';
 
 interface AiTtsPreviewProps {
   text: string;
   voices: Voice[];
+  systemInstruction?: string;
+  sourceQuery?: string;
+  hideVoiceSelector?: boolean;
+  onSavePreset?: (data: { voiceName: string; text: string; systemInstruction: string; audioBase64: string | null; sourceQuery: string }) => void;
 }
 
+/** Decode a base64 string into a raw Uint8Array of bytes. */
 function decodeBase64(base64: string): Uint8Array {
   const binaryString = atob(base64);
   const len = binaryString.length;
@@ -24,6 +39,10 @@ function decodeBase64(base64: string): Uint8Array {
   return bytes;
 }
 
+/**
+ * Decode raw PCM bytes (16-bit signed, little-endian) into a Web Audio API
+ * AudioBuffer at the specified sample rate.
+ */
 async function decodeAudioData(
   data: Uint8Array,
   ctx: AudioContext,
@@ -43,6 +62,10 @@ async function decodeAudioData(
   return buffer;
 }
 
+/**
+ * Build a WAV file (RIFF header + raw PCM data) from PCM bytes.
+ * Returns a downloadable Blob with audio/wav MIME type.
+ */
 function createWavFile(pcmData: Uint8Array, sampleRate: number = 24000, numChannels: number = 1): Blob {
   const buffer = new ArrayBuffer(44 + pcmData.length);
   const view = new DataView(buffer);
@@ -73,7 +96,7 @@ function createWavFile(pcmData: Uint8Array, sampleRate: number = 24000, numChann
   return new Blob([buffer], { type: 'audio/wav' });
 }
 
-const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices }) => {
+const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruction, sourceQuery, hideVoiceSelector, onSavePreset }) => {
   const [selectedVoiceName, setSelectedVoiceName] = useState(voices[0]?.name || '');
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -107,6 +130,7 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices }) => {
     stopAudio();
   }, [text, selectedVoiceName]);
 
+  /** Stop any currently playing audio source and reset playback state. */
   const stopAudio = () => {
     if (sourceNodeRef.current) {
       try { sourceNodeRef.current.stop(); } catch (e) {}
@@ -117,25 +141,13 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices }) => {
     }
   };
 
+  /** Generate TTS audio via the backend and cache the base64 result. */
   const generateAudio = async (): Promise<string | null> => {
     setError(null);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-pro-preview-tts",
-        contents: { parts: [{ text: text }] },
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: selectedVoiceName } },
-          },
-        },
-      });
+      const audioDataBase64 = await generateTts(text, selectedVoiceName, systemInstruction);
       
       if (!isMountedRef.current) return null;
-
-      const audioDataBase64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (!audioDataBase64) throw new Error("No audio data received from API");
 
       setAudioData(audioDataBase64);
       return audioDataBase64;
@@ -146,6 +158,7 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices }) => {
     }
   };
 
+  /** Play/pause toggle: generates audio if not cached, then plays via Web Audio API. */
   const handlePlay = async (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (isLoading || isDownloading || !text.trim()) return;
@@ -197,6 +210,7 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices }) => {
     }
   };
 
+  /** Download audio as a WAV file; generates if not cached. */
   const handleDownload = async (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (isLoading || isDownloading || !text.trim()) return;
@@ -238,6 +252,7 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices }) => {
         <div className="p-4 flex flex-col sm:flex-row gap-4 items-center justify-between bg-white dark:bg-zinc-800 border-b border-zinc-100 dark:border-zinc-700">
             
             {/* Voice Selector */}
+            {!hideVoiceSelector && (
             <div className="relative group w-full sm:w-auto">
                 <select
                     value={selectedVoiceName}
@@ -255,9 +270,30 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices }) => {
                     <ChevronDown size={14} />
                 </div>
             </div>
+            )}
 
             {/* Actions */}
             <div className="flex items-center gap-2">
+                {onSavePreset && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onSavePreset({
+                                voiceName: selectedVoiceName,
+                                text,
+                                systemInstruction: systemInstruction || '',
+                                audioBase64: audioData,
+                                sourceQuery: sourceQuery || '',
+                            });
+                        }}
+                        disabled={isLoading || isDownloading}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 rounded-full text-xs font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors border border-indigo-200 dark:border-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Save as Custom Preset"
+                    >
+                        <Save size={14} />
+                        <span className="hidden sm:inline">Save Preset</span>
+                    </button>
+                )}
                 <button
                     onClick={handleDownload}
                     disabled={isLoading || isDownloading || !text.trim()}

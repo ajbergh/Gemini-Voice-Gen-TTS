@@ -1,12 +1,22 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
-*/
+ */
+
+/**
+ * VoiceFinder.tsx — AI Casting Director Modal
+ *
+ * Modal dialog that lets users describe their ideal voice in natural language.
+ * Sends the query plus the full voice catalogue to the Go backend, which
+ * proxies it to Gemini (gemini-3-flash-preview) for structured JSON output.
+ * Returns voice recommendations with a system instruction and sample text.
+ * Implements focus trap and Escape-to-close for accessibility.
+ */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI, Type } from "@google/genai";
 import { Sparkles, Loader2, X, ArrowRight, Wand2 } from 'lucide-react';
 import { Voice, AiRecommendation } from '../types';
+import { recommendVoices } from '../api';
 
 interface VoiceFinderProps {
   voices: Voice[];
@@ -63,6 +73,10 @@ const VoiceFinder: React.FC<VoiceFinderProps> = ({ voices, onRecommendation, onC
     { label: "Singaporean female", text: "An energetic Singaporean female with a strong Singlish accent." }
   ];
 
+  /**
+   * Send the user's voice description to the backend for AI-powered matching.
+   * Includes simplified voice data so Gemini can select from the catalogue.
+   */
   const handleAnalyze = async () => {
     if (!query.trim()) return;
     
@@ -70,8 +84,6 @@ const VoiceFinder: React.FC<VoiceFinderProps> = ({ voices, onRecommendation, onC
     setError(null);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      
       const simplifiedVoices = voices.map(v => ({
         name: v.name,
         gender: v.analysis.gender,
@@ -79,74 +91,10 @@ const VoiceFinder: React.FC<VoiceFinderProps> = ({ voices, onRecommendation, onC
         characteristics: v.analysis.characteristics,
       }));
 
-      const prompt = `
-        You are an expert voice casting director.
-        
-        Available Voices Data:
-        ${JSON.stringify(simplifiedVoices)}
-
-        User Request: "${query}"
-
-        IMPORTANT: any voice can do any accent by simply prompting for it in the director's note.
-
-        Task:
-        1. Select the top 3 voices from the available list that best match the user's request.
-        2. Create a detailed System Instruction that defines the persona/character.
-        3. Write a brief sample text paragraph (2-3 sentences).
-
-        PROMPT STRUCTURE (Markdown):
-        Ensure you use double newlines (\\n\\n) between sections so it renders correctly as markdown headers.
-
-        ## Audio Profile
-        Establishes a persona for the voice, defining a character identity, archetype and any other characteristics like age, background etc.
-        
-        ## Scene
-        Sets the stage. Describes both the physical environment and the "vibe".
-        
-        ## Director's Notes
-        Performance guidance where you can break down which instructions are important for your virtual talent to take note of. Examples are style, breathing, pacing, articulation and accent.
-        
-        ## Sample context
-        Gives the model a contextual starting point, so your virtual actor enters the scene you set up naturally.
-        
-        ## Transcript
-        The text that the model will speak out.
-      `;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              recommendedVoices: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description: "Array of exactly 3 voice names"
-              },
-              systemInstruction: {
-                type: Type.STRING,
-                description: "System prompt. Formatted as Markdown with newlines."
-              },
-              sampleText: {
-                type: Type.STRING,
-                description: "Sample text"
-              }
-            }
-          }
-        }
-      });
-
-      const result = JSON.parse(response.text || '{}');
+      const result = await recommendVoices(query, simplifiedVoices);
       
-      if (result.recommendedVoices && result.recommendedVoices.length > 0) {
-        onRecommendation({
-          voiceNames: result.recommendedVoices,
-          systemInstruction: result.systemInstruction,
-          sampleText: result.sampleText
-        });
+      if (result.voiceNames && result.voiceNames.length > 0) {
+        onRecommendation({ ...result, sourceQuery: query });
       } else {
         setError("No matching voices found.");
       }

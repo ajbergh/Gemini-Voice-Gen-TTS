@@ -1,7 +1,20 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
-*/
+ */
+
+/**
+ * constants.ts — Voice Library Data
+ *
+ * Contains the full catalogue of 30 Gemini TTS voices with metadata including
+ * name, pitch, characteristics, audio sample URLs (Google AI Studio hosted WAV),
+ * Generative Language API file URIs, and detailed analysis (gender, pitch,
+ * characteristics, visual description). Each voice also gets a computed imageUrl
+ * from gstatic.com.
+ *
+ * This data is the single source of truth for the frontend voice browser and
+ * is sent to the backend during AI recommendation requests.
+ */
 
 import { Voice } from './types';
 

@@ -1,7 +1,17 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
-*/
+ */
+
+/**
+ * Carousel3D.tsx — 3D Perspective Voice Carousel
+ *
+ * Displays voices in a 3D perspective carousel powered by Framer Motion.
+ * Supports keyboard navigation (ArrowLeft/ArrowRight, Enter/Space to play),
+ * drag gestures for swiping between cards, and responsive card spacing that
+ * adapts to viewport width. Each card shows the voice image, name, metadata,
+ * a play/pause button, and an AudioVisualizer when active.
+ */
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';

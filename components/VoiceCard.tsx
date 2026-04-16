@@ -1,7 +1,16 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
-*/
+ */
+
+/**
+ * VoiceCard.tsx — Individual Voice Card (Grid View)
+ *
+ * Renders a single voice as a card in the grid layout. Shows the voice image,
+ * name, gender, pitch, characteristics badges, and a play/pause button with
+ * an AudioVisualizer overlay. Uses a standard HTML <audio> element with
+ * preload="none" for sample playback.
+ */
 
 import React, { useRef, useEffect } from 'react';
 import { Play, Pause, Activity } from 'lucide-react';

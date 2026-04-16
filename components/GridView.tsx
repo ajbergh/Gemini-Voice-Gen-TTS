@@ -1,7 +1,15 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
-*/
+ */
+
+/**
+ * GridView.tsx — Responsive Voice Grid Layout
+ *
+ * Renders voices in a responsive CSS grid (1→2→3→4 columns across breakpoints)
+ * using VoiceCard components. Provides a scrollable alternative to the 3D
+ * carousel view with a consistent card layout.
+ */
 
 import React from 'react';
 import { Voice } from '../types';

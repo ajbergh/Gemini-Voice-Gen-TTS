@@ -1,7 +1,16 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
-*/
+ */
+
+/**
+ * AiResultCard.tsx — AI Recommendation Result Display
+ *
+ * Renders the result of an AI voice recommendation as a styled card overlay.
+ * Shows the system instruction (rendered as Markdown via react-markdown),
+ * the sample text with copy-to-clipboard, and an embedded AiTtsPreview for
+ * each recommended voice so the user can instantly hear the suggestion.
+ */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { AiRecommendation, Voice } from '../types';
@@ -13,9 +22,10 @@ interface AiResultCardProps {
   result: AiRecommendation;
   voices: Voice[];
   onClose: () => void;
+  onSavePreset?: (data: { voiceName: string; text: string; systemInstruction: string; audioBase64: string | null; sourceQuery: string }) => void;
 }
 
-const AiResultCard: React.FC<AiResultCardProps> = ({ result, voices, onClose }) => {
+const AiResultCard: React.FC<AiResultCardProps> = ({ result, voices, onClose, onSavePreset }) => {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -136,7 +146,13 @@ const AiResultCard: React.FC<AiResultCardProps> = ({ result, voices, onClose }) 
                  </div>
                  
                  <div className="bg-white dark:bg-zinc-800 p-1 rounded-2xl shadow-sm border border-zinc-100 dark:border-zinc-700">
-                    <AiTtsPreview text={result.sampleText} voices={voices} />
+                    <AiTtsPreview
+                      text={result.sampleText}
+                      voices={voices}
+                      systemInstruction={result.systemInstruction}
+                      sourceQuery={result.sourceQuery}
+                      onSavePreset={onSavePreset}
+                    />
                  </div>
             </div>
         </div>

@@ -1,23 +1,31 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
+ * vite.config.ts — Vite Build & Dev Server Configuration
+ *
+ * Configures the React plugin, development server (port 3000, localhost-only),
+ * API proxy to the Go backend (port 8080), and path aliases.
+ */
+
 import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
-    return {
-      server: {
-        port: 3000,
-        host: '0.0.0.0',
+export default defineConfig({
+    server: {
+      port: 3000,
+      host: 'localhost',
+      proxy: {
+        '/api': 'http://localhost:8080',
       },
-      plugins: [react()],
-      define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
-      },
-      resolve: {
-        alias: {
-          '@': path.resolve(__dirname, '.'),
-        }
+    },
+    plugins: [react()],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, '.'),
       }
-    };
+    }
 });

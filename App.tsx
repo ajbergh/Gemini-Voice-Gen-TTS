@@ -1,30 +1,63 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
-*/
+ */
 
-import React, { useState, useMemo, useEffect } from 'react';
+/**
+ * App.tsx — Root Application Component
+ *
+ * Owns all top-level state: active voice, AI results, filter criteria, view mode,
+ * theme (dark/light), carousel index, and modal visibility flags. Delegates
+ * rendering to Carousel3D or GridView based on viewMode, and conditionally
+ * renders modals (VoiceFinder, ScriptReader, Settings, History, AiResultCard).
+ *
+ * Theme preference is persisted to the Go backend via /api/config so it survives
+ * across sessions. Filtering logic is memoized with useMemo; when an AI result
+ * is active, the voice list is narrowed to only recommended voices.
+ */
+
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { VOICE_DATA } from './constants';
 import Carousel3D from './components/Carousel3D';
 import GridView from './components/GridView';
+import PresetCarousel3D from './components/PresetCarousel3D';
+import PresetGrid from './components/PresetGrid';
+import PresetEditModal from './components/PresetEditModal';
 import FilterBar from './components/FilterBar';
 import VoiceFinder from './components/VoiceFinder';
 import AiResultCard from './components/AiResultCard';
 import ScriptReaderModal from './components/ScriptReaderModal';
-import { FilterState, AiRecommendation } from './types';
+import SettingsModal from './components/SettingsModal';
+import HistoryPanel from './components/HistoryPanel';
+import { FilterState, AiRecommendation, CustomPreset } from './types';
 import { Info } from 'lucide-react';
+import { getConfig, updateConfig, listPresets, deletePreset as apiDeletePreset, createPreset as apiCreatePreset, updatePreset as apiUpdatePreset } from './api';
 
 const App: React.FC = () => {
+  // --- Core playback and AI state ---
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
   const [aiResult, setAiResult] = useState<AiRecommendation | null>(null);
   const [isAiCardVisible, setIsAiCardVisible] = useState(false);
+
+  // --- Modal visibility flags ---
   const [showVoiceFinder, setShowVoiceFinder] = useState(false);
   const [showScriptReader, setShowScriptReader] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // --- View and theme state ---
   const [viewMode, setViewMode] = useState<'carousel' | 'grid'>('carousel');
   const [isDarkMode, setIsDarkMode] = useState(false);
   
   // Carousel state
   const [activeIndex, setActiveIndex] = useState(0);
+
+  // Voice tab and custom presets state
+  const [voiceTab, setVoiceTab] = useState<'stock' | 'custom'>('stock');
+  const [customPresets, setCustomPresets] = useState<CustomPreset[]>([]);
+  const [playingPresetId, setPlayingPresetId] = useState<number | null>(null);
+  const [editingPreset, setEditingPreset] = useState<CustomPreset | null>(null);
+  const [activePresetIndex, setActivePresetIndex] = useState(0);
 
   const [filters, setFilters] = useState<FilterState>({
     gender: 'All',
@@ -32,7 +65,14 @@ const App: React.FC = () => {
     search: '',
   });
 
-  // Theme Management
+  // Load saved theme preference from backend config on first mount
+  useEffect(() => {
+    getConfig().then(cfg => {
+      if (cfg.theme === 'dark') setIsDarkMode(true);
+    }).catch(() => {}); // ignore if backend not available
+  }, []);
+
+  // Apply dark mode class to document root whenever isDarkMode changes
   useEffect(() => {
     if (isDarkMode) {
         document.documentElement.classList.add('dark');
@@ -41,11 +81,33 @@ const App: React.FC = () => {
     }
   }, [isDarkMode]);
 
-  const toggleTheme = () => setIsDarkMode(!isDarkMode);
+  /** Fetch custom presets from the backend. */
+  const refreshPresets = useCallback(() => {
+    listPresets().then(setCustomPresets).catch(() => {});
+  }, []);
 
+  // Load custom presets on mount
+  useEffect(() => {
+    refreshPresets();
+  }, [refreshPresets]);
+
+  /** Toggle dark/light theme and persist the preference to the backend. */
+  const toggleTheme = useCallback(() => {
+    setIsDarkMode(prev => {
+      const next = !prev;
+      updateConfig({ theme: next ? 'dark' : 'light' }).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  // Extract unique gender and pitch values for the filter dropdowns
   const uniqueGenders = useMemo(() => Array.from(new Set(VOICE_DATA.map(v => v.analysis.gender))).sort(), []);
   const uniquePitches = useMemo(() => Array.from(new Set(VOICE_DATA.map(v => v.analysis.pitch))).sort(), []);
 
+  /**
+   * Compute the filtered voice list. When an AI result is active, show only
+   * the recommended voices. Otherwise apply gender/pitch/search filters.
+   */
   const filteredVoices = useMemo(() => {
     let baseData = VOICE_DATA;
     if (aiResult) {
@@ -76,17 +138,72 @@ const App: React.FC = () => {
     setActiveIndex(0);
   }, [filteredVoices.length]);
 
+  // Reset preset carousel index when presets list changes
+  useEffect(() => {
+    setActivePresetIndex(0);
+  }, [customPresets.length]);
+
+  /** Toggle playback of a voice sample; stops current if same voice clicked again. */
   const handlePlayToggle = (voiceName: string) => {
     setPlayingVoice(current => current === voiceName ? null : voiceName);
   };
 
+  /** Dismiss the AI result card and reset filters. */
   const clearAiResult = () => {
     setAiResult(null);
     setIsAiCardVisible(false);
     setFilters({ ...filters, search: '' });
   };
 
-  const isModalOpen = showVoiceFinder || showScriptReader || (aiResult && isAiCardVisible);
+  /** Toggle preset audio playback. */
+  const handlePresetPlayToggle = (presetId: number) => {
+    setPlayingPresetId(current => current === presetId ? null : presetId);
+  };
+
+  /** Handle preset deletion with confirmation. */
+  const handlePresetDelete = async (preset: CustomPreset) => {
+    if (!confirm(`Delete preset "${preset.name}"?`)) return;
+    try {
+      await apiDeletePreset(preset.id);
+      refreshPresets();
+    } catch (err) {
+      console.error('Failed to delete preset:', err);
+    }
+  };
+
+  /** Open the edit modal for a preset. */
+  const handlePresetEdit = (preset: CustomPreset) => {
+    setEditingPreset(preset);
+  };
+
+  /** Save edited preset to the backend. */
+  const handlePresetEditSave = async (id: number, data: { name?: string; system_instruction?: string }) => {
+    await apiUpdatePreset(id, data);
+    refreshPresets();
+  };
+
+  /** Save a new custom voice preset from the AI result TTS preview. */
+  const handleSavePreset = async (data: { voiceName: string; text: string; systemInstruction: string; audioBase64: string | null; sourceQuery: string }) => {
+    const name = prompt(`Name this voice preset (e.g., "Friendly Narrator"):`)?.trim();
+    if (!name) return;
+    try {
+      await apiCreatePreset({
+        name,
+        voice_name: data.voiceName,
+        system_instruction: data.systemInstruction,
+        sample_text: data.text,
+        audio_base64: data.audioBase64 || undefined,
+        source_query: data.sourceQuery,
+      });
+      refreshPresets();
+      setVoiceTab('custom');
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to save preset.';
+      alert(msg.includes('UNIQUE') ? `A preset named "${name}" already exists. Please choose a different name.` : msg);
+    }
+  };
+
+  const isModalOpen = showVoiceFinder || showScriptReader || showSettings || showHistory || (aiResult && isAiCardVisible) || !!editingPreset;
 
   return (
     <div className="h-screen w-screen bg-[#FDFDFD] dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 font-sans overflow-hidden flex flex-col relative transition-colors duration-300">
@@ -112,14 +229,58 @@ const App: React.FC = () => {
           uniquePitches={uniquePitches}
           onOpenAiCasting={() => setShowVoiceFinder(true)}
           onOpenScriptReader={() => setShowScriptReader(true)}
+          onOpenSettings={() => setShowSettings(true)}
+          onOpenHistory={() => setShowHistory(true)}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           isDarkMode={isDarkMode}
           toggleTheme={toggleTheme}
+          voiceTab={voiceTab}
+          onVoiceTabChange={setVoiceTab}
+          customPresetCount={customPresets.length}
         />
 
         <main className="flex-1 relative flex flex-col overflow-hidden">
-              {filteredVoices.length > 0 ? (
+              {voiceTab === 'custom' ? (
+                customPresets.length > 0 ? (
+                  viewMode === 'carousel' ? (
+                    <div className="w-full flex-1 flex items-center justify-center pb-8 min-h-0">
+                      <PresetCarousel3D
+                        presets={customPresets}
+                        activeIndex={activePresetIndex}
+                        onChange={setActivePresetIndex}
+                        playingPresetId={playingPresetId}
+                        onPlayToggle={handlePresetPlayToggle}
+                        onEdit={handlePresetEdit}
+                        onDelete={handlePresetDelete}
+                        disabled={isModalOpen}
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex-1 overflow-y-auto">
+                      <PresetGrid
+                        presets={customPresets}
+                        playingPresetId={playingPresetId}
+                        onPlayToggle={handlePresetPlayToggle}
+                        onEdit={handlePresetEdit}
+                        onDelete={handlePresetDelete}
+                        onOpenAiCasting={() => setShowVoiceFinder(true)}
+                      />
+                    </div>
+                  )
+                ) : (
+                  <div className="flex-1 overflow-y-auto">
+                    <PresetGrid
+                      presets={customPresets}
+                      playingPresetId={playingPresetId}
+                      onPlayToggle={handlePresetPlayToggle}
+                      onEdit={handlePresetEdit}
+                      onDelete={handlePresetDelete}
+                      onOpenAiCasting={() => setShowVoiceFinder(true)}
+                    />
+                  </div>
+                )
+              ) : filteredVoices.length > 0 ? (
                   viewMode === 'carousel' ? (
                     <div className="w-full flex-1 flex items-center justify-center pb-8 min-h-0">
                          <Carousel3D 
@@ -158,10 +319,18 @@ const App: React.FC = () => {
                   </div>
               )}
               
-              {!aiResult && filteredVoices.length > 0 && viewMode === 'carousel' && (
+              {voiceTab === 'stock' && !aiResult && filteredVoices.length > 0 && viewMode === 'carousel' && (
                   <div className="absolute bottom-6 left-0 right-0 text-center pointer-events-none">
                       <p className="text-xs text-zinc-400 dark:text-zinc-500 font-medium tracking-widest uppercase bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm inline-block px-3 py-1 rounded-full border border-white/50 dark:border-zinc-800">
                           {activeIndex + 1} / {filteredVoices.length}
+                      </p>
+                  </div>
+              )}
+
+              {voiceTab === 'custom' && customPresets.length > 0 && viewMode === 'carousel' && (
+                  <div className="absolute bottom-6 left-0 right-0 text-center pointer-events-none">
+                      <p className="text-xs text-zinc-400 dark:text-zinc-500 font-medium tracking-widest uppercase bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm inline-block px-3 py-1 rounded-full border border-white/50 dark:border-zinc-800">
+                          {activePresetIndex + 1} / {customPresets.length}
                       </p>
                   </div>
               )}
@@ -187,9 +356,18 @@ const App: React.FC = () => {
       {showScriptReader && (
         <ScriptReaderModal
             voices={VOICE_DATA}
+            customPresets={customPresets}
             initialVoiceName={playingVoice || filteredVoices[activeIndex]?.name}
             onClose={() => setShowScriptReader(false)}
         />
+      )}
+
+      {showSettings && (
+        <SettingsModal onClose={() => setShowSettings(false)} />
+      )}
+
+      {showHistory && (
+        <HistoryPanel onClose={() => setShowHistory(false)} />
       )}
 
       {aiResult && isAiCardVisible && (
@@ -204,10 +382,19 @@ const App: React.FC = () => {
                  <AiResultCard 
                     result={aiResult} 
                     voices={filteredVoices} 
-                    onClose={clearAiResult} 
+                    onClose={clearAiResult}
+                    onSavePreset={handleSavePreset}
                  />
              </div>
           </div>
+      )}
+
+      {editingPreset && (
+        <PresetEditModal
+          preset={editingPreset}
+          onSave={handlePresetEditSave}
+          onClose={() => setEditingPreset(null)}
+        />
       )}
 
     </div>

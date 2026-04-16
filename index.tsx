@@ -1,7 +1,14 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
-*/
+ */
+
+/**
+ * index.tsx — Application Entry Point
+ *
+ * Mounts the root React component into the DOM using React 19's createRoot API.
+ * Wrapped in StrictMode for development warnings and future-proofing.
+ */
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';

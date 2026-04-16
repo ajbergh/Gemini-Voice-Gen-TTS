@@ -1,7 +1,16 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
-*/
+ */
+
+/**
+ * ControlBar.tsx — Additional Controls Component
+ *
+ * An alternative control bar with search, AI search input, filter toggles,
+ * and view mode switching. Includes animated slide-down filter panel via
+ * Framer Motion's AnimatePresence. Currently available as an optional
+ * layout component alongside FilterBar.
+ */
 
 import React, { useState } from 'react';
 import { Search, Sparkles, SlidersHorizontal, Loader2, X, Check, LayoutGrid, GalleryHorizontalEnd } from 'lucide-react';
