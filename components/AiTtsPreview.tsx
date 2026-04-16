@@ -14,10 +14,50 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Square, Loader2, Volume2, AlertCircle, ChevronDown, Download, Save } from 'lucide-react';
+import { Play, Square, Loader2, Volume2, AlertCircle, ChevronDown, Download, Save, Globe } from 'lucide-react';
 import { generateTts } from '../api';
 import { Voice } from '../types';
 import AudioVisualizer from './AudioVisualizer';
+
+/** Supported languages for Gemini 3.1 Flash TTS. */
+const TTS_LANGUAGES: { code: string; label: string }[] = [
+  { code: '', label: 'Auto-detect' },
+  { code: 'ar-XA', label: 'Arabic' },
+  { code: 'bn-IN', label: 'Bengali' },
+  { code: 'zh-CN', label: 'Chinese (Mandarin)' },
+  { code: 'cs-CZ', label: 'Czech' },
+  { code: 'da-DK', label: 'Danish' },
+  { code: 'nl-NL', label: 'Dutch' },
+  { code: 'en-US', label: 'English' },
+  { code: 'fi-FI', label: 'Finnish' },
+  { code: 'fr-FR', label: 'French' },
+  { code: 'de-DE', label: 'German' },
+  { code: 'el-GR', label: 'Greek' },
+  { code: 'gu-IN', label: 'Gujarati' },
+  { code: 'hi-IN', label: 'Hindi' },
+  { code: 'hu-HU', label: 'Hungarian' },
+  { code: 'id-ID', label: 'Indonesian' },
+  { code: 'it-IT', label: 'Italian' },
+  { code: 'ja-JP', label: 'Japanese' },
+  { code: 'kn-IN', label: 'Kannada' },
+  { code: 'ko-KR', label: 'Korean' },
+  { code: 'ml-IN', label: 'Malayalam' },
+  { code: 'mr-IN', label: 'Marathi' },
+  { code: 'nb-NO', label: 'Norwegian' },
+  { code: 'pl-PL', label: 'Polish' },
+  { code: 'pt-BR', label: 'Portuguese (BR)' },
+  { code: 'ro-RO', label: 'Romanian' },
+  { code: 'ru-RU', label: 'Russian' },
+  { code: 'sk-SK', label: 'Slovak' },
+  { code: 'es-ES', label: 'Spanish' },
+  { code: 'sv-SE', label: 'Swedish' },
+  { code: 'ta-IN', label: 'Tamil' },
+  { code: 'te-IN', label: 'Telugu' },
+  { code: 'th-TH', label: 'Thai' },
+  { code: 'tr-TR', label: 'Turkish' },
+  { code: 'uk-UA', label: 'Ukrainian' },
+  { code: 'vi-VN', label: 'Vietnamese' },
+];
 
 interface AiTtsPreviewProps {
   text: string;
@@ -98,6 +138,7 @@ function createWavFile(pcmData: Uint8Array, sampleRate: number = 24000, numChann
 
 const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruction, sourceQuery, hideVoiceSelector, onSavePreset }) => {
   const [selectedVoiceName, setSelectedVoiceName] = useState(voices[0]?.name || '');
+  const [languageCode, setLanguageCode] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -128,7 +169,7 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
   useEffect(() => {
     setAudioData(null);
     stopAudio();
-  }, [text, selectedVoiceName]);
+  }, [text, selectedVoiceName, languageCode]);
 
   /** Stop any currently playing audio source and reset playback state. */
   const stopAudio = () => {
@@ -145,7 +186,7 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
   const generateAudio = async (): Promise<string | null> => {
     setError(null);
     try {
-      const audioDataBase64 = await generateTts(text, selectedVoiceName, systemInstruction);
+      const audioDataBase64 = await generateTts(text, selectedVoiceName, systemInstruction, languageCode || undefined);
       
       if (!isMountedRef.current) return null;
 
@@ -271,6 +312,28 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
                 </div>
             </div>
             )}
+
+            {/* Language Selector */}
+            <div className="relative group w-full sm:w-auto">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-zinc-400 dark:text-zinc-500">
+                    <Globe size={14} />
+                </div>
+                <select
+                    value={languageCode}
+                    onChange={(e) => setLanguageCode(e.target.value)}
+                    className="appearance-none w-full sm:w-44 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 py-2 pl-8 pr-10 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-600 cursor-pointer transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    disabled={isLoading || isDownloading || isPlaying}
+                >
+                    {TTS_LANGUAGES.map(lang => (
+                        <option key={lang.code} value={lang.code}>
+                            {lang.label}
+                        </option>
+                    ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-zinc-400">
+                    <ChevronDown size={14} />
+                </div>
+            </div>
 
             {/* Actions */}
             <div className="flex items-center gap-2">

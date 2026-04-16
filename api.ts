@@ -63,11 +63,31 @@ export async function recommendVoices(query: string, voices: { name: string; gen
  * Generate TTS audio via the Gemini backend proxy.
  * Returns base64-encoded raw PCM audio (24kHz, 16-bit, mono).
  * An optional systemInstruction shapes the voice's delivery style.
+ * An optional languageCode (e.g. "en", "es") overrides automatic language detection.
  */
-export async function generateTts(text: string, voiceName: string, systemInstruction?: string): Promise<string> {
+export async function generateTts(text: string, voiceName: string, systemInstruction?: string, languageCode?: string): Promise<string> {
   const body: Record<string, string> = { text, voiceName };
   if (systemInstruction) body.systemInstruction = systemInstruction;
+  if (languageCode) body.languageCode = languageCode;
   const data = await request<{ audioBase64: string }>('/voices/tts', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  return data.audioBase64;
+}
+
+/**
+ * Generate multi-speaker dialogue TTS audio via the Gemini backend proxy.
+ * Returns base64-encoded raw PCM audio (24kHz, 16-bit, mono).
+ */
+export async function generateMultiSpeakerTts(
+  text: string,
+  speakers: { speaker: string; voiceName: string }[],
+  languageCode?: string
+): Promise<string> {
+  const body: Record<string, any> = { text, speakers };
+  if (languageCode) body.languageCode = languageCode;
+  const data = await request<{ audioBase64: string }>('/voices/tts/multi', {
     method: 'POST',
     body: JSON.stringify(body),
   });

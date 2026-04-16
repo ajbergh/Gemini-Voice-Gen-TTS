@@ -60,3 +60,9 @@ export interface CustomPreset {
   created_at: string;
   updated_at: string;
 }
+
+/** Maps a speaker label to a Gemini TTS voice name for multi-speaker dialogue. */
+export interface SpeakerConfig {
+  speaker: string;
+  voiceName: string;
+}

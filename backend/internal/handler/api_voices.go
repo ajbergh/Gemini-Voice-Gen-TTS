@@ -98,7 +98,7 @@ func (h *VoicesHandler) GenerateTTS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := gemini.NewClient(apiKey)
-	audioBase64, err := client.GenerateTTS(req.Text, req.VoiceName, req.SystemInstruction)
+	audioBase64, err := client.GenerateTTS(req.Text, req.VoiceName, req.SystemInstruction, req.LanguageCode)
 	if err != nil {
 		slog.Error("gemini TTS failed", "error", err, "voice", req.VoiceName, "hasSystemInstruction", req.SystemInstruction != "")
 		writeError(w, http.StatusBadGateway, "TTS generation failed: "+err.Error())
@@ -129,6 +129,71 @@ func (h *VoicesHandler) GenerateTTS(w http.ResponseWriter, r *http.Request) {
 	h.Store.InsertHistory(store.HistoryEntry{
 		Type:      "tts",
 		VoiceName: &voiceName,
+		InputText: req.Text,
+		AudioPath: audioPath,
+	})
+
+	writeJSON(w, http.StatusOK, gemini.TTSResponse{AudioBase64: audioBase64})
+}
+
+// GenerateMultiSpeakerTTS proxies multi-speaker dialogue TTS requests to Gemini.
+func (h *VoicesHandler) GenerateMultiSpeakerTTS(w http.ResponseWriter, r *http.Request) {
+	apiKey, err := h.KeysHandler.GetDecryptedKey("gemini")
+	if err != nil {
+		writeError(w, http.StatusPreconditionFailed, "no Gemini API key configured — add one via Settings")
+		return
+	}
+
+	var req gemini.MultiSpeakerTTSRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	if req.Text == "" {
+		writeError(w, http.StatusBadRequest, "text is required")
+		return
+	}
+	if len(req.Speakers) < 1 || len(req.Speakers) > 2 {
+		writeError(w, http.StatusBadRequest, "1 or 2 speakers are required")
+		return
+	}
+	for _, s := range req.Speakers {
+		if s.Speaker == "" || s.VoiceName == "" {
+			writeError(w, http.StatusBadRequest, "each speaker must have a speaker name and voiceName")
+			return
+		}
+	}
+
+	client := gemini.NewClient(apiKey)
+	audioBase64, err := client.GenerateMultiSpeakerTTS(req.Text, req.Speakers, req.LanguageCode)
+	if err != nil {
+		slog.Error("gemini multi-speaker TTS failed", "error", err, "speakerCount", len(req.Speakers))
+		writeError(w, http.StatusBadGateway, "Multi-speaker TTS generation failed: "+err.Error())
+		return
+	}
+
+	// Save audio to cache and history
+	var audioPath *string
+	if h.AudioCacheDir != "" {
+		filename := fmt.Sprintf("tts_multi_%d.raw", time.Now().UnixMilli())
+		cachePath, ok := safeCachePath(h.AudioCacheDir, filename)
+		if !ok {
+			slog.Warn("invalid cache path computed for multi-speaker")
+		} else {
+			audioBytes, decErr := base64.StdEncoding.DecodeString(audioBase64)
+			if decErr == nil {
+				if writeErr := os.WriteFile(cachePath, audioBytes, 0o600); writeErr == nil {
+					audioPath = &cachePath
+				} else {
+					slog.Warn("failed to cache multi-speaker audio", "error", writeErr)
+				}
+			}
+		}
+	}
+
+	h.Store.InsertHistory(store.HistoryEntry{
+		Type:      "tts_multi",
 		InputText: req.Text,
 		AudioPath: audioPath,
 	})

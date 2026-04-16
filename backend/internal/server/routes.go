@@ -37,6 +37,7 @@ func RegisterRoutes(mux *http.ServeMux, configH *handler.ConfigHandler, keysH *h
 	mux.HandleFunc("GET /api/voices", voicesH.ListVoices)
 	mux.HandleFunc("POST /api/voices/recommend", voicesH.Recommend)
 	mux.HandleFunc("POST /api/voices/tts", voicesH.GenerateTTS)
+	mux.HandleFunc("POST /api/voices/tts/multi", voicesH.GenerateMultiSpeakerTTS)
 
 	// Custom Presets
 	mux.HandleFunc("GET /api/presets", presetsH.ListPresets)

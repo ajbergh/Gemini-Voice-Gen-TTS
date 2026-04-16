@@ -418,3 +418,43 @@ export const VOICE_DATA: Voice[] = rawData.map((voice) => ({
   ...voice,
   imageUrl: `https://www.gstatic.com/aistudio/starter-apps/voice-library/${voice.name}.jpeg`
 }));
+
+/** Audio tag categories for Gemini 3.1 Flash TTS inline delivery annotations. */
+export type AudioTagCategory = 'emotion' | 'action' | 'style';
+
+export interface AudioTag {
+  tag: string;
+  label: string;
+  category: AudioTagCategory;
+}
+
+/** Available audio tags that can be inserted inline into TTS transcript text. */
+export const AUDIO_TAGS: AudioTag[] = [
+  // Style
+  { tag: '[whispers]', label: 'Whisper', category: 'style' },
+  { tag: '[shouting]', label: 'Shout', category: 'style' },
+  { tag: '[sarcastic]', label: 'Sarcastic', category: 'style' },
+  { tag: '[mischievously]', label: 'Mischievous', category: 'style' },
+  { tag: '[serious]', label: 'Serious', category: 'style' },
+
+  // Emotion
+  { tag: '[excited]', label: 'Excited', category: 'emotion' },
+  { tag: '[happy]', label: 'Happy', category: 'emotion' },
+  { tag: '[curious]', label: 'Curious', category: 'emotion' },
+  { tag: '[amazed]', label: 'Amazed', category: 'emotion' },
+  { tag: '[panicked]', label: 'Panicked', category: 'emotion' },
+  { tag: '[tired]', label: 'Tired', category: 'emotion' },
+  { tag: '[trembling]', label: 'Trembling', category: 'emotion' },
+  { tag: '[crying]', label: 'Crying', category: 'emotion' },
+  { tag: '[frustration]', label: 'Frustrated', category: 'emotion' },
+  { tag: '[confidence]', label: 'Confident', category: 'emotion' },
+
+  // Actions / Interjections
+  { tag: '[sighs]', label: 'Sigh', category: 'action' },
+  { tag: '[laughs]', label: 'Laugh', category: 'action' },
+  { tag: '[giggles]', label: 'Giggle', category: 'action' },
+  { tag: '[gasp]', label: 'Gasp', category: 'action' },
+  { tag: '[cough]', label: 'Cough', category: 'action' },
+  { tag: '[yawn]', label: 'Yawn', category: 'action' },
+  { tag: '[short pause]', label: 'Pause', category: 'action' },
+];

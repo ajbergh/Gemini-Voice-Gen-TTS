@@ -1,12 +1,14 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="Gemini Voice Library — Discover, Cast & Generate AI Voices with Google Gemini TTS" width="100%">
+  <img src="assets/banner.svg" alt="Gemini Voice Library — Powered by Gemini 3.1 Flash TTS — 70+ Languages — Multi-Speaker Dialogue" width="100%">
 </p>
 
 # Gemini Voice Library
 
-An interactive web application for discovering, previewing, and casting AI voices using Google's Gemini Text-to-Speech API. Browse 30 curated voices, get AI-powered voice recommendations, generate speech from custom scripts, and download audio — all in a polished, accessible interface.
+An interactive web application for discovering, previewing, and casting AI voices using Google's Gemini Text-to-Speech API. Browse 30 curated voices, get AI-powered voice recommendations, generate speech from custom scripts in 70+ languages, create multi-speaker dialogues, and download audio — all in a polished, accessible interface.
 
 Ships as a **single cross-platform binary** (Windows, macOS, Linux) with a pure Go backend, embedded frontend, SQLite persistence, and encrypted API key storage.
+
+> **Powered by [Gemini 3.1 Flash TTS](https://ai.google.dev/gemini-api/docs/speech-generation)** — Google's latest dedicated speech synthesis model with improved quality, lower latency, and a free tier.
 
 ## Features
 
@@ -14,7 +16,10 @@ Ships as a **single cross-platform binary** (Windows, macOS, Linux) with a pure 
 - **Custom Voice Presets ("My Voices")** — Save AI-recommended voices as custom presets with cached sample audio, then switch between Stock and My Voices tabs to browse them in the same carousel / grid UI
 - **AI Casting Director** — Describe your ideal voice in natural language and let Gemini analyze the library to recommend the top 3 matches, complete with a structured system prompt (Audio Profile, Scene, Director's Notes, Sample Context, Transcript)
 - **Script Reader** — Enter custom text and preview it with any stock or custom voice using real-time TTS generation, with a Stock / My Voices toggle
-- **Audio Playback & Download** — Listen to voice samples, generate speech via Gemini 2.5 Pro TTS, and export as WAV files
+- **Multi-Language TTS** — Generate speech in 70+ languages with an explicit language selector (Arabic, Chinese, French, German, Hindi, Japanese, Korean, Spanish, and many more), or let the model auto-detect
+- **Audio Tags** — Insert inline delivery annotations like `[whispers]`, `[excited]`, `[laughs]`, `[sighs]` via a collapsible toolbar grouped by Style, Emotion, and Sound categories
+- **Multi-Speaker Dialogue** — Switch to Dialogue mode in the Script Reader to assign two distinct voices to speaker labels and generate natural two-voice conversations
+- **Audio Playback & Download** — Listen to voice samples, generate speech via Gemini 3.1 Flash TTS, and export as WAV files
 - **Smart Filtering** — Filter voices by gender, pitch, or free-text search across names and characteristics
 - **Settings & API Key Management** — Store your Gemini API key securely with AES-256-GCM encryption
 - **Generation History** — Browse, filter, and manage past TTS and recommendation history
@@ -42,7 +47,7 @@ Ships as a **single cross-platform binary** (Windows, macOS, Linux) with a pure 
 | Model | Purpose |
 |-------|---------|
 | `gemini-3-flash-preview` | AI voice recommendations (structured JSON output) |
-| `gemini-2.5-pro-preview-tts` | Text-to-Speech audio generation |
+| `gemini-3.1-flash-tts-preview` | Text-to-Speech audio generation (single & multi-speaker) |
 
 ## Prerequisites
 
@@ -165,7 +170,8 @@ All scripts output to `bin/`. Run the binary:
 │   ├── AiResultCard.tsx     # AI recommendation result display
 │   ├── AiTtsPreview.tsx     # TTS generation, playback & download controls
 │   ├── AudioVisualizer.tsx  # Canvas-based waveform with Google color cycling
-│   ├── ScriptReaderModal.tsx # Custom script input with TTS preview (stock + custom)
+│   ├── AudioTagsToolbar.tsx # Collapsible audio tag insertion toolbar (whispers, excited, etc.)
+│   ├── ScriptReaderModal.tsx # Custom script input with TTS preview (stock + custom + dialogue)
 │   ├── SettingsModal.tsx    # API key management (save, test, delete)
 │   ├── HistoryPanel.tsx     # Generation history browser
 │   ├── ControlBar.tsx       # Additional controls component
@@ -205,8 +211,8 @@ Browser (React SPA)
 ├── SettingsModal  API key management (via /api/keys)
 ├── HistoryPanel   History browser (via /api/history)
 ├── PresetEditModal  Edit preset name & system instruction
-└── ScriptReaderModal ── Custom script testing (stock + custom voices)
-    └── AiTtsPreview
+└── ScriptReaderModal ── Custom script testing (stock + custom voices + dialogue mode)
+    └── AiTtsPreview / Multi-Speaker TTS
 
 Go Backend (net/http)
 ├── /api/health              GET    Health check
@@ -223,7 +229,8 @@ Go Backend (net/http)
 ├── /api/history             DELETE Clear all history
 ├── /api/voices              GET    List voices from DB
 ├── /api/voices/recommend    POST   AI voice recommendations (Gemini 3 Flash)
-├── /api/voices/tts          POST   TTS generation (Gemini 2.5 Pro TTS)
+├── /api/voices/tts          POST   TTS generation (Gemini 3.1 Flash TTS)
+├── /api/voices/tts/multi    POST   Multi-speaker dialogue TTS generation
 ├── /api/presets             GET    List custom voice presets
 ├── /api/presets             POST   Create a new preset
 ├── /api/presets/{id}        PUT    Update preset (name, system instruction)

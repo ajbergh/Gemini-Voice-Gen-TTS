@@ -5,7 +5,7 @@
 //
 // It supports two operations: voice recommendation (using gemini-3-flash-preview
 // with structured JSON output) and text-to-speech generation (using
-// gemini-2.5-pro-preview-tts with AUDIO response modality). API key
+// gemini-3.1-flash-tts-preview with AUDIO response modality). API key
 // validation is provided via a lightweight models.list call.
 package gemini
 
@@ -14,10 +14,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 )
+
+// maxTTSRetries is the number of attempts for TTS generation. The Gemini docs
+// note the model occasionally returns text tokens instead of audio, causing a
+// 500 error in a small percentage of requests.
+const maxTTSRetries = 3
 
 const baseURL = "https://generativelanguage.googleapis.com/v1beta"
 
@@ -157,7 +163,8 @@ The text that the model will speak out.`, string(voicesJSON), query)
 // it to the spoken text (TTS models only accept text content, not a separate
 // systemInstruction field). Any existing Transcript section in the system
 // instruction is stripped and replaced with the user's text.
-func (c *Client) GenerateTTS(text, voiceName, systemInstruction string) (string, error) {
+// An optional languageCode (e.g. "en", "es") overrides automatic language detection.
+func (c *Client) GenerateTTS(text, voiceName, systemInstruction, languageCode string) (string, error) {
 	spokenText := text
 	if systemInstruction != "" {
 		// Strip existing Transcript section from the system instruction
@@ -172,6 +179,17 @@ func (c *Client) GenerateTTS(text, voiceName, systemInstruction string) (string,
 		spokenText = directions + "\n\n## Transcript\n" + text
 	}
 
+	speechConfig := map[string]any{
+		"voiceConfig": map[string]any{
+			"prebuiltVoiceConfig": map[string]any{
+				"voiceName": voiceName,
+			},
+		},
+	}
+	if languageCode != "" {
+		speechConfig["languageCode"] = languageCode
+	}
+
 	reqBody := map[string]any{
 		"contents": []map[string]any{
 			{
@@ -182,13 +200,7 @@ func (c *Client) GenerateTTS(text, voiceName, systemInstruction string) (string,
 		},
 		"generationConfig": map[string]any{
 			"responseModalities": []string{"AUDIO"},
-			"speechConfig": map[string]any{
-				"voiceConfig": map[string]any{
-					"prebuiltVoiceConfig": map[string]any{
-						"voiceName": voiceName,
-					},
-				},
-			},
+			"speechConfig":       speechConfig,
 		},
 	}
 
@@ -197,48 +209,170 @@ func (c *Client) GenerateTTS(text, voiceName, systemInstruction string) (string,
 		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/models/gemini-2.5-pro-preview-tts:generateContent?key=%s", baseURL, c.apiKey)
-	resp, err := c.httpClient.Post(url, "application/json", bytes.NewReader(data))
+	url := fmt.Sprintf("%s/models/gemini-3.1-flash-tts-preview:generateContent?key=%s", baseURL, c.apiKey)
+
+	var lastErr error
+	for attempt := range maxTTSRetries {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * 500 * time.Millisecond)
+			slog.Warn("retrying TTS request", "attempt", attempt+1, "lastError", lastErr)
+		}
+
+		resp, err := c.httpClient.Post(url, "application/json", bytes.NewReader(data))
+		if err != nil {
+			lastErr = fmt.Errorf("http request: %w", err)
+			continue
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			lastErr = fmt.Errorf("read response: %w", err)
+			continue
+		}
+
+		// Retry on 500 — the model occasionally returns text tokens instead of audio.
+		if resp.StatusCode == http.StatusInternalServerError && attempt < maxTTSRetries-1 {
+			lastErr = fmt.Errorf("gemini TTS API error (status 500): %s", string(body))
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("gemini TTS API error (status %d): %s", resp.StatusCode, string(body))
+		}
+
+		var envelope struct {
+			Candidates []struct {
+				Content struct {
+					Parts []struct {
+						InlineData *struct {
+							Data     string `json:"data"`
+							MimeType string `json:"mimeType"`
+						} `json:"inlineData"`
+					} `json:"parts"`
+				} `json:"content"`
+			} `json:"candidates"`
+		}
+		if err := json.Unmarshal(body, &envelope); err != nil {
+			return "", fmt.Errorf("parse response: %w", err)
+		}
+
+		if len(envelope.Candidates) == 0 || len(envelope.Candidates[0].Content.Parts) == 0 {
+			return "", fmt.Errorf("empty TTS response from Gemini")
+		}
+
+		inlineData := envelope.Candidates[0].Content.Parts[0].InlineData
+		if inlineData == nil || inlineData.Data == "" {
+			return "", fmt.Errorf("no audio data in TTS response")
+		}
+
+		return inlineData.Data, nil
+	}
+	return "", fmt.Errorf("TTS failed after %d retries: %w", maxTTSRetries, lastErr)
+}
+
+// GenerateMultiSpeakerTTS calls Gemini TTS to generate multi-speaker dialogue audio.
+// Each SpeakerConfig maps a speaker label (e.g. "Speaker1") to a Gemini voice name.
+// The text should contain speaker labels like "Speaker1: Hello\nSpeaker2: Hi there".
+func (c *Client) GenerateMultiSpeakerTTS(text string, speakers []SpeakerConfig, languageCode string) (string, error) {
+	speakerVoiceConfigs := make([]map[string]any, len(speakers))
+	for i, s := range speakers {
+		speakerVoiceConfigs[i] = map[string]any{
+			"speaker": s.Speaker,
+			"voiceConfig": map[string]any{
+				"prebuiltVoiceConfig": map[string]any{
+					"voiceName": s.VoiceName,
+				},
+			},
+		}
+	}
+
+	speechConfig := map[string]any{
+		"multiSpeakerVoiceConfig": map[string]any{
+			"speakerVoiceConfigs": speakerVoiceConfigs,
+		},
+	}
+	if languageCode != "" {
+		speechConfig["languageCode"] = languageCode
+	}
+
+	reqBody := map[string]any{
+		"contents": []map[string]any{
+			{
+				"parts": []map[string]any{
+					{"text": text},
+				},
+			},
+		},
+		"generationConfig": map[string]any{
+			"responseModalities": []string{"AUDIO"},
+			"speechConfig":       speechConfig,
+		},
+	}
+
+	data, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("read response: %w", err)
+		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("gemini TTS API error (status %d): %s", resp.StatusCode, string(body))
-	}
+	url := fmt.Sprintf("%s/models/gemini-3.1-flash-tts-preview:generateContent?key=%s", baseURL, c.apiKey)
 
-	var envelope struct {
-		Candidates []struct {
-			Content struct {
-				Parts []struct {
-					InlineData *struct {
-						Data     string `json:"data"`
-						MimeType string `json:"mimeType"`
-					} `json:"inlineData"`
-				} `json:"parts"`
-			} `json:"content"`
-		} `json:"candidates"`
-	}
-	if err := json.Unmarshal(body, &envelope); err != nil {
-		return "", fmt.Errorf("parse response: %w", err)
-	}
+	var lastErr error
+	for attempt := range maxTTSRetries {
+		if attempt > 0 {
+			slog.Warn("retrying multi-speaker TTS request", "attempt", attempt+1, "maxRetries", maxTTSRetries)
+			time.Sleep(time.Duration(attempt) * 500 * time.Millisecond)
+		}
 
-	if len(envelope.Candidates) == 0 || len(envelope.Candidates[0].Content.Parts) == 0 {
-		return "", fmt.Errorf("empty TTS response from Gemini")
-	}
+		resp, err := c.httpClient.Post(url, "application/json", bytes.NewReader(data))
+		if err != nil {
+			lastErr = fmt.Errorf("http request: %w", err)
+			continue
+		}
 
-	inlineData := envelope.Candidates[0].Content.Parts[0].InlineData
-	if inlineData == nil || inlineData.Data == "" {
-		return "", fmt.Errorf("no audio data in TTS response")
-	}
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			lastErr = fmt.Errorf("read response: %w", err)
+			continue
+		}
 
-	return inlineData.Data, nil
+		if resp.StatusCode == http.StatusInternalServerError {
+			lastErr = fmt.Errorf("gemini TTS API error (status 500): %s", string(body))
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("gemini TTS API error (status %d): %s", resp.StatusCode, string(body))
+		}
+
+		var envelope struct {
+			Candidates []struct {
+				Content struct {
+					Parts []struct {
+						InlineData *struct {
+							Data     string `json:"data"`
+							MimeType string `json:"mimeType"`
+						} `json:"inlineData"`
+					} `json:"parts"`
+				} `json:"content"`
+			} `json:"candidates"`
+		}
+		if err := json.Unmarshal(body, &envelope); err != nil {
+			return "", fmt.Errorf("parse response: %w", err)
+		}
+
+		if len(envelope.Candidates) == 0 || len(envelope.Candidates[0].Content.Parts) == 0 {
+			return "", fmt.Errorf("empty TTS response from Gemini")
+		}
+
+		inlineData := envelope.Candidates[0].Content.Parts[0].InlineData
+		if inlineData == nil || inlineData.Data == "" {
+			return "", fmt.Errorf("no audio data in TTS response")
+		}
+
+		return inlineData.Data, nil
+	}
+	return "", fmt.Errorf("multi-speaker TTS failed after %d retries: %w", maxTTSRetries, lastErr)
 }
 
 // TestKey makes a lightweight API call to validate the key.
