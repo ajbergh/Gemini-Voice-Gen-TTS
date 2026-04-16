@@ -29,11 +29,15 @@ import AiResultCard from './components/AiResultCard';
 import ScriptReaderModal from './components/ScriptReaderModal';
 import SettingsModal from './components/SettingsModal';
 import HistoryPanel from './components/HistoryPanel';
+import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import { FilterState, AiRecommendation, CustomPreset } from './types';
-import { Info } from 'lucide-react';
-import { getConfig, updateConfig, listPresets, deletePreset as apiDeletePreset, createPreset as apiCreatePreset, updatePreset as apiUpdatePreset } from './api';
+import { Info, Sparkles, X } from 'lucide-react';
+import { getConfig, updateConfig, listPresets, deletePreset as apiDeletePreset, createPreset as apiCreatePreset, updatePreset as apiUpdatePreset, listFavorites, toggleFavorite as apiToggleFavorite, exportPresets as apiExportPresets, importPresets as apiImportPresets, reorderPresets as apiReorderPresets } from './api';
+import { useToast } from './components/ToastProvider';
 
 const App: React.FC = () => {
+  const { showToast } = useToast();
+
   // --- Core playback and AI state ---
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
   const [aiResult, setAiResult] = useState<AiRecommendation | null>(null);
@@ -44,6 +48,7 @@ const App: React.FC = () => {
   const [showScriptReader, setShowScriptReader] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   // --- View and theme state ---
   const [viewMode, setViewMode] = useState<'carousel' | 'grid'>('carousel');
@@ -58,6 +63,9 @@ const App: React.FC = () => {
   const [playingPresetId, setPlayingPresetId] = useState<number | null>(null);
   const [editingPreset, setEditingPreset] = useState<CustomPreset | null>(null);
   const [activePresetIndex, setActivePresetIndex] = useState(0);
+  const [favoriteVoices, setFavoriteVoices] = useState<Set<string>>(new Set());
+  const [similarTo, setSimilarTo] = useState<string | null>(null);
+  const [presetTagFilter, setPresetTagFilter] = useState<string | null>(null);
 
   const [filters, setFilters] = useState<FilterState>({
     gender: 'All',
@@ -91,6 +99,11 @@ const App: React.FC = () => {
     refreshPresets();
   }, [refreshPresets]);
 
+  // Load favorites on mount
+  useEffect(() => {
+    listFavorites().then(names => setFavoriteVoices(new Set(names))).catch(() => {});
+  }, []);
+
   /** Toggle dark/light theme and persist the preference to the backend. */
   const toggleTheme = useCallback(() => {
     setIsDarkMode(prev => {
@@ -104,6 +117,20 @@ const App: React.FC = () => {
   const uniqueGenders = useMemo(() => Array.from(new Set(VOICE_DATA.map(v => v.analysis.gender))).sort(), []);
   const uniquePitches = useMemo(() => Array.from(new Set(VOICE_DATA.map(v => v.analysis.pitch))).sort(), []);
 
+  // Global keyboard shortcut: "?" to toggle shortcuts overlay
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (e.key === '?') {
+        e.preventDefault();
+        setShowShortcuts(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   /**
    * Compute the filtered voice list. When an AI result is active, show only
    * the recommended voices. Otherwise apply gender/pitch/search filters.
@@ -115,6 +142,27 @@ const App: React.FC = () => {
           .map(name => VOICE_DATA.find(v => v.name === name))
           .filter((v): v is typeof VOICE_DATA[0] => !!v);
        return recommended.length > 0 ? recommended : baseData;
+    }
+
+    if (similarTo) {
+      const source = VOICE_DATA.find(v => v.name === similarTo);
+      if (source) {
+        const srcChars = new Set(source.analysis.characteristics.map(c => c.toLowerCase()));
+        const scored = VOICE_DATA
+          .filter(v => v.name !== similarTo)
+          .map(v => {
+            const tgtChars = new Set(v.analysis.characteristics.map(c => c.toLowerCase()));
+            const intersection = [...srcChars].filter(c => tgtChars.has(c)).length;
+            const union = new Set([...srcChars, ...tgtChars]).size;
+            let score = union > 0 ? intersection / union : 0;
+            if (v.analysis.gender === source.analysis.gender) score += 0.15;
+            if (v.analysis.pitch === source.analysis.pitch) score += 0.1;
+            return { voice: v, score };
+          })
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 8);
+        return [source, ...scored.map(s => s.voice)];
+      }
     }
 
     return baseData.filter(voice => {
@@ -132,11 +180,26 @@ const App: React.FC = () => {
 
       return matchGender && matchPitch && matchSearch;
     });
-  }, [filters, aiResult]);
+  }, [filters, aiResult, similarTo]);
 
   useEffect(() => {
     setActiveIndex(0);
   }, [filteredVoices.length]);
+
+  const filteredPresets = useMemo(() => {
+    if (!presetTagFilter) return customPresets;
+    return customPresets.filter(p => p.tags?.some(t => t.tag === presetTagFilter));
+  }, [customPresets, presetTagFilter]);
+
+  const allPresetTags = useMemo(() => {
+    const tagMap = new Map<string, string>();
+    for (const p of customPresets) {
+      for (const t of (p.tags || [])) {
+        if (!tagMap.has(t.tag)) tagMap.set(t.tag, t.color);
+      }
+    }
+    return Array.from(tagMap.entries()).map(([tag, color]) => ({ tag, color }));
+  }, [customPresets]);
 
   // Reset preset carousel index when presets list changes
   useEffect(() => {
@@ -147,6 +210,34 @@ const App: React.FC = () => {
   const handlePlayToggle = (voiceName: string) => {
     setPlayingVoice(current => current === voiceName ? null : voiceName);
   };
+
+  /** Toggle a voice's favorite status. */
+  const handleFavoriteToggle = useCallback(async (voiceName: string) => {
+    const isFav = favoriteVoices.has(voiceName);
+    // Optimistic update
+    setFavoriteVoices(prev => {
+      const next = new Set(prev);
+      if (isFav) next.delete(voiceName); else next.add(voiceName);
+      return next;
+    });
+    try {
+      await apiToggleFavorite(voiceName, !isFav);
+      showToast(isFav ? `Removed ${voiceName} from favorites` : `Added ${voiceName} to favorites`, 'success');
+    } catch {
+      // Revert on error
+      setFavoriteVoices(prev => {
+        const next = new Set(prev);
+        if (isFav) next.add(voiceName); else next.delete(voiceName);
+        return next;
+      });
+      showToast('Failed to update favorite', 'error');
+    }
+  }, [favoriteVoices, showToast]);
+
+  const handleFindSimilar = useCallback((voiceName: string) => {
+    setSimilarTo(prev => prev === voiceName ? null : voiceName);
+    setActiveIndex(0);
+  }, []);
 
   /** Dismiss the AI result card and reset filters. */
   const clearAiResult = () => {
@@ -166,8 +257,10 @@ const App: React.FC = () => {
     try {
       await apiDeletePreset(preset.id);
       refreshPresets();
+      showToast(`Preset "${preset.name}" deleted`, 'success');
     } catch (err) {
       console.error('Failed to delete preset:', err);
+      showToast('Failed to delete preset', 'error');
     }
   };
 
@@ -176,10 +269,35 @@ const App: React.FC = () => {
     setEditingPreset(preset);
   };
 
+  /** Duplicate an existing preset. */
+  const handlePresetDuplicate = async (preset: CustomPreset) => {
+    try {
+      await apiCreatePreset({
+        name: `${preset.name} (Copy)`,
+        voice_name: preset.voice_name,
+        system_instruction: preset.system_instruction ?? undefined,
+        sample_text: preset.sample_text ?? undefined,
+        source_query: preset.source_query ?? undefined,
+      });
+      refreshPresets();
+      showToast(`Duplicated "${preset.name}"`, 'success');
+    } catch (err) {
+      console.error('Failed to duplicate preset:', err);
+      showToast('Failed to duplicate preset', 'error');
+    }
+  };
+
   /** Save edited preset to the backend. */
-  const handlePresetEditSave = async (id: number, data: { name?: string; system_instruction?: string }) => {
+  const handlePresetEditSave = async (id: number, data: { name?: string; system_instruction?: string; color?: string }) => {
     await apiUpdatePreset(id, data);
     refreshPresets();
+    showToast('Preset updated', 'success');
+  };
+
+  const handlePresetInlineEdit = async (id: number, data: { name?: string; system_instruction?: string }) => {
+    await apiUpdatePreset(id, data);
+    refreshPresets();
+    showToast('Preset updated', 'success');
   };
 
   /** Save a new custom voice preset from the AI result TTS preview. */
@@ -197,13 +315,53 @@ const App: React.FC = () => {
       });
       refreshPresets();
       setVoiceTab('custom');
+      showToast(`Preset "${name}" saved`, 'success');
     } catch (err: any) {
       const msg = err?.message || 'Failed to save preset.';
-      alert(msg.includes('UNIQUE') ? `A preset named "${name}" already exists. Please choose a different name.` : msg);
+      if (msg.includes('UNIQUE')) {
+        showToast(`A preset named "${name}" already exists`, 'warning');
+      } else {
+        showToast(msg, 'error');
+      }
     }
   };
 
-  const isModalOpen = showVoiceFinder || showScriptReader || showSettings || showHistory || (aiResult && isAiCardVisible) || !!editingPreset;
+  const handleExportPresets = async () => {
+    try {
+      await apiExportPresets();
+      showToast('Presets exported', 'success');
+    } catch {
+      showToast('Failed to export presets', 'error');
+    }
+  };
+
+  const handleImportPresets = async (file: File) => {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!Array.isArray(data)) throw new Error('Invalid file format');
+      const result = await apiImportPresets(data);
+      refreshPresets();
+      showToast(`Imported ${result.imported} preset(s)${result.skipped ? `, ${result.skipped} skipped` : ''}`, 'success');
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to import presets', 'error');
+    }
+  };
+
+  const handleReorderPresets = async (orderedIds: number[]) => {
+    // Optimistic update: reorder local state immediately
+    const reordered = orderedIds.map(id => customPresets.find(p => p.id === id)).filter(Boolean) as CustomPreset[];
+    setCustomPresets(reordered);
+    try {
+      await apiReorderPresets(orderedIds);
+    } catch (err: any) {
+      // Revert on failure
+      refreshPresets();
+      showToast('Failed to reorder presets', 'error');
+    }
+  };
+
+  const isModalOpen = showVoiceFinder || showScriptReader || showSettings || showHistory || showShortcuts || (aiResult && isAiCardVisible) || !!editingPreset;
 
   return (
     <div className="h-screen w-screen bg-[#FDFDFD] dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 font-sans overflow-hidden flex flex-col relative transition-colors duration-300">
@@ -246,25 +404,57 @@ const App: React.FC = () => {
                   viewMode === 'carousel' ? (
                     <div className="w-full flex-1 flex items-center justify-center pb-8 min-h-0">
                       <PresetCarousel3D
-                        presets={customPresets}
+                        presets={filteredPresets}
                         activeIndex={activePresetIndex}
                         onChange={setActivePresetIndex}
                         playingPresetId={playingPresetId}
                         onPlayToggle={handlePresetPlayToggle}
                         onEdit={handlePresetEdit}
                         onDelete={handlePresetDelete}
+                        onDuplicate={handlePresetDuplicate}
                         disabled={isModalOpen}
                       />
                     </div>
                   ) : (
                     <div className="flex-1 overflow-y-auto">
+                      {/* Tag filter bar */}
+                      {allPresetTags.length > 0 && (
+                        <div className="sticky top-0 z-10 flex items-center gap-2 py-2 px-4 sm:px-6 lg:px-8 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-sm border-b border-zinc-100 dark:border-zinc-800">
+                          <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider shrink-0">Tags</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {allPresetTags.map(t => (
+                              <button
+                                key={t.tag}
+                                onClick={() => setPresetTagFilter(presetTagFilter === t.tag ? null : t.tag)}
+                                className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full transition-all ${presetTagFilter === t.tag ? 'text-white ring-2 ring-offset-1 ring-zinc-400 dark:ring-zinc-500' : 'text-white opacity-60 hover:opacity-100'}`}
+                                style={{ backgroundColor: t.color }}
+                              >
+                                {t.tag}
+                              </button>
+                            ))}
+                            {presetTagFilter && (
+                              <button
+                                onClick={() => setPresetTagFilter(null)}
+                                className="text-[10px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       <PresetGrid
-                        presets={customPresets}
+                        presets={filteredPresets}
                         playingPresetId={playingPresetId}
                         onPlayToggle={handlePresetPlayToggle}
                         onEdit={handlePresetEdit}
                         onDelete={handlePresetDelete}
+                        onDuplicate={handlePresetDuplicate}
                         onOpenAiCasting={() => setShowVoiceFinder(true)}
+                        onExport={handleExportPresets}
+                        onImport={handleImportPresets}
+                        onInlineEdit={handlePresetInlineEdit}
+                        onReorder={handleReorderPresets}
                       />
                     </div>
                   )
@@ -276,7 +466,12 @@ const App: React.FC = () => {
                       onPlayToggle={handlePresetPlayToggle}
                       onEdit={handlePresetEdit}
                       onDelete={handlePresetDelete}
+                      onDuplicate={handlePresetDuplicate}
                       onOpenAiCasting={() => setShowVoiceFinder(true)}
+                      onExport={handleExportPresets}
+                      onImport={handleImportPresets}
+                      onInlineEdit={handlePresetInlineEdit}
+                      onReorder={handleReorderPresets}
                     />
                   </div>
                 )
@@ -294,10 +489,28 @@ const App: React.FC = () => {
                     </div>
                   ) : (
                     <div className="flex-1 overflow-y-auto">
+                      {similarTo && (
+                        <div className="sticky top-0 z-10 flex items-center justify-center gap-2 py-2 px-4 bg-indigo-50/80 dark:bg-indigo-950/50 backdrop-blur-sm border-b border-indigo-100 dark:border-indigo-900/50">
+                          <Sparkles size={14} className="text-indigo-500" />
+                          <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                            Showing voices similar to <span className="font-semibold">{similarTo}</span>
+                          </span>
+                          <button
+                            onClick={() => setSimilarTo(null)}
+                            className="ml-2 p-0.5 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
+                            aria-label="Clear similar voices filter"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      )}
                       <GridView 
                           voices={filteredVoices}
                           playingVoice={playingVoice}
                           onPlayToggle={handlePlayToggle}
+                          favoriteVoices={favoriteVoices}
+                          onFavoriteToggle={handleFavoriteToggle}
+                          onFindSimilar={handleFindSimilar}
                       />
                     </div>
                   )
@@ -345,6 +558,7 @@ const App: React.FC = () => {
                 if (rec) {
                     setAiResult(rec);
                     setIsAiCardVisible(true);
+                    setSimilarTo(null);
                     setFilters(prev => ({ ...prev, search: '' })); 
                 }
                 setShowVoiceFinder(false);
@@ -395,6 +609,10 @@ const App: React.FC = () => {
           onSave={handlePresetEditSave}
           onClose={() => setEditingPreset(null)}
         />
+      )}
+
+      {showShortcuts && (
+        <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />
       )}
 
     </div>

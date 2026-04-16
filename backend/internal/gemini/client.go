@@ -10,6 +10,7 @@
 package gemini
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -26,6 +27,23 @@ import (
 const maxTTSRetries = 3
 
 const baseURL = "https://generativelanguage.googleapis.com/v1beta"
+
+// defaultTTSModel is the default model for TTS generation.
+const defaultTTSModel = "gemini-3.1-flash-tts-preview"
+
+// allowedTTSModels is the set of models the frontend is permitted to request.
+var allowedTTSModels = map[string]bool{
+	"gemini-3.1-flash-tts-preview": true,
+	"gemini-2.5-flash-preview-tts": true,
+}
+
+// resolveTTSModel returns a validated TTS model name or the default.
+func resolveTTSModel(model string) string {
+	if model != "" && allowedTTSModels[model] {
+		return model
+	}
+	return defaultTTSModel
+}
 
 // Client interacts with the Gemini API.
 type Client struct {
@@ -164,7 +182,7 @@ The text that the model will speak out.`, string(voicesJSON), query)
 // systemInstruction field). Any existing Transcript section in the system
 // instruction is stripped and replaced with the user's text.
 // An optional languageCode (e.g. "en", "es") overrides automatic language detection.
-func (c *Client) GenerateTTS(text, voiceName, systemInstruction, languageCode string) (string, error) {
+func (c *Client) GenerateTTS(text, voiceName, systemInstruction, languageCode, model string) (string, error) {
 	spokenText := text
 	if systemInstruction != "" {
 		// Strip existing Transcript section from the system instruction
@@ -209,7 +227,7 @@ func (c *Client) GenerateTTS(text, voiceName, systemInstruction, languageCode st
 		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/models/gemini-3.1-flash-tts-preview:generateContent?key=%s", baseURL, c.apiKey)
+	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", baseURL, resolveTTSModel(model), c.apiKey)
 
 	var lastErr error
 	for attempt := range maxTTSRetries {
@@ -271,10 +289,129 @@ func (c *Client) GenerateTTS(text, voiceName, systemInstruction, languageCode st
 	return "", fmt.Errorf("TTS failed after %d retries: %w", maxTTSRetries, lastErr)
 }
 
+// StreamTTSChunk represents a single audio chunk from streaming TTS.
+type StreamTTSChunk struct {
+	AudioBase64 string `json:"audioBase64"`
+	Index       int    `json:"index"`
+	Done        bool   `json:"done"`
+}
+
+// GenerateTTSStream calls the Gemini streaming TTS endpoint and sends audio
+// chunks to the provided channel as they arrive. The channel is closed when done.
+func (c *Client) GenerateTTSStream(text, voiceName, systemInstruction, languageCode, model string, chunks chan<- StreamTTSChunk) error {
+	defer close(chunks)
+
+	spokenText := text
+	if systemInstruction != "" {
+		directions := systemInstruction
+		for _, marker := range []string{"## Transcript", "## TRANSCRIPT", "##Transcript"} {
+			if idx := strings.Index(strings.ToLower(directions), strings.ToLower(marker)); idx >= 0 {
+				directions = strings.TrimRight(directions[:idx], "\n\r ")
+				break
+			}
+		}
+		spokenText = directions + "\n\n## Transcript\n" + text
+	}
+
+	speechConfig := map[string]any{
+		"voiceConfig": map[string]any{
+			"prebuiltVoiceConfig": map[string]any{
+				"voiceName": voiceName,
+			},
+		},
+	}
+	if languageCode != "" {
+		speechConfig["languageCode"] = languageCode
+	}
+
+	reqBody := map[string]any{
+		"contents": []map[string]any{
+			{
+				"parts": []map[string]any{
+					{"text": spokenText},
+				},
+			},
+		},
+		"generationConfig": map[string]any{
+			"responseModalities": []string{"AUDIO"},
+			"speechConfig":       speechConfig,
+		},
+	}
+
+	data, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("marshal request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/models/%s:streamGenerateContent?alt=sse&key=%s", baseURL, resolveTTSModel(model), c.apiKey)
+	resp, err := c.httpClient.Post(url, "application/json", bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("gemini streaming TTS API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	// Read SSE events from Gemini
+	scanner := bufio.NewScanner(resp.Body)
+	// Increase buffer size for large audio chunks
+	scanner.Buffer(make([]byte, 0, 1024*1024), 10*1024*1024)
+	idx := 0
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		jsonData := strings.TrimPrefix(line, "data: ")
+		if jsonData == "" {
+			continue
+		}
+
+		var chunk struct {
+			Candidates []struct {
+				Content struct {
+					Parts []struct {
+						InlineData *struct {
+							Data     string `json:"data"`
+							MimeType string `json:"mimeType"`
+						} `json:"inlineData"`
+					} `json:"parts"`
+				} `json:"content"`
+			} `json:"candidates"`
+		}
+		if err := json.Unmarshal([]byte(jsonData), &chunk); err != nil {
+			slog.Warn("skip unparseable streaming chunk", "error", err)
+			continue
+		}
+
+		if len(chunk.Candidates) == 0 || len(chunk.Candidates[0].Content.Parts) == 0 {
+			continue
+		}
+		inlineData := chunk.Candidates[0].Content.Parts[0].InlineData
+		if inlineData == nil || inlineData.Data == "" {
+			continue
+		}
+
+		chunks <- StreamTTSChunk{AudioBase64: inlineData.Data, Index: idx, Done: false}
+		idx++
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("reading stream: %w", err)
+	}
+
+	chunks <- StreamTTSChunk{Done: true, Index: idx}
+	return nil
+}
+
 // GenerateMultiSpeakerTTS calls Gemini TTS to generate multi-speaker dialogue audio.
 // Each SpeakerConfig maps a speaker label (e.g. "Speaker1") to a Gemini voice name.
 // The text should contain speaker labels like "Speaker1: Hello\nSpeaker2: Hi there".
-func (c *Client) GenerateMultiSpeakerTTS(text string, speakers []SpeakerConfig, languageCode string) (string, error) {
+func (c *Client) GenerateMultiSpeakerTTS(text string, speakers []SpeakerConfig, languageCode, model string) (string, error) {
 	speakerVoiceConfigs := make([]map[string]any, len(speakers))
 	for i, s := range speakers {
 		speakerVoiceConfigs[i] = map[string]any{
@@ -315,7 +452,7 @@ func (c *Client) GenerateMultiSpeakerTTS(text string, speakers []SpeakerConfig, 
 		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/models/gemini-3.1-flash-tts-preview:generateContent?key=%s", baseURL, c.apiKey)
+	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", baseURL, resolveTTSModel(model), c.apiKey)
 
 	var lastErr error
 	for attempt := range maxTTSRetries {
@@ -405,4 +542,81 @@ func (c *Client) TestKey() error {
 	}
 
 	return nil
+}
+
+// FormatScript uses Gemini to reformat raw script text into optimised TTS
+// prompt structure (Audio Profile → Scene → Director's Notes → Transcript).
+func (c *Client) FormatScript(rawScript string) (string, error) {
+	systemInstruction := `You are a professional TTS script formatter. Your task is to restructure raw text into an optimised prompt for a text-to-speech model.
+
+Rules:
+1. Keep all original content — do NOT add new sentences or remove existing ones.
+2. Use this structure when appropriate:
+   ## Audio Profile
+   (voice description if implied by the text, otherwise omit)
+   ## Scene
+   (setting/context if applicable)
+   ## Director's Notes
+   (delivery guidance: tone, pacing, emphasis)
+   ## Transcript
+   (the actual words to speak, with audio tags where natural)
+3. Insert audio tags like [whispers], [excited], [pause: 1s], [softly] where they naturally fit.
+4. For very short or simple text, just return the text with minimal formatting — don't force structure.
+5. Return ONLY the formatted script, no explanations or meta-commentary.`
+
+	reqBody := map[string]any{
+		"system_instruction": map[string]any{
+			"parts": []map[string]any{
+				{"text": systemInstruction},
+			},
+		},
+		"contents": []map[string]any{
+			{
+				"parts": []map[string]any{
+					{"text": rawScript},
+				},
+			},
+		},
+		"generationConfig": map[string]any{
+			"temperature":     0.3,
+			"maxOutputTokens": 4096,
+		},
+	}
+
+	data, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("marshal request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/models/gemini-3-flash-preview:generateContent?key=%s", baseURL, c.apiKey)
+	resp, err := c.httpClient.Post(url, "application/json", bytes.NewReader(data))
+	if err != nil {
+		return "", fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		slog.Error("FormatScript API error", "status", resp.StatusCode, "body", string(body))
+		return "", fmt.Errorf("Gemini API error (status %d)", resp.StatusCode)
+	}
+
+	var geminiResp struct {
+		Candidates []struct {
+			Content struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"content"`
+		} `json:"candidates"`
+	}
+	if err := json.Unmarshal(body, &geminiResp); err != nil {
+		return "", fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	if len(geminiResp.Candidates) == 0 || len(geminiResp.Candidates[0].Content.Parts) == 0 {
+		return "", fmt.Errorf("empty response from Gemini")
+	}
+
+	return geminiResp.Candidates[0].Content.Parts[0].Text, nil
 }

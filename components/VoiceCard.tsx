@@ -13,7 +13,7 @@
  */
 
 import React, { useRef, useEffect } from 'react';
-import { Play, Pause, Activity } from 'lucide-react';
+import { Play, Pause, Activity, Star, Sparkles } from 'lucide-react';
 import { Voice } from '../types';
 import AudioVisualizer from './AudioVisualizer';
 
@@ -21,9 +21,12 @@ interface VoiceCardProps {
   voice: Voice;
   isPlaying: boolean;
   onPlayToggle: (voiceName: string) => void;
+  isFavorite?: boolean;
+  onFavoriteToggle?: (voiceName: string) => void;
+  onFindSimilar?: (voiceName: string) => void;
 }
 
-const VoiceCard: React.FC<VoiceCardProps> = ({ voice, isPlaying, onPlayToggle }) => {
+const VoiceCard: React.FC<VoiceCardProps> = ({ voice, isPlaying, onPlayToggle, isFavorite, onFavoriteToggle, onFindSimilar }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -97,7 +100,16 @@ const VoiceCard: React.FC<VoiceCardProps> = ({ voice, isPlaying, onPlayToggle })
         {/* Header */}
         <div className="flex items-center justify-between mb-1">
             <h3 className="text-lg font-medium text-zinc-900 dark:text-white tracking-tight">{voice.name}</h3>
-            <div className="flex gap-1">
+            <div className="flex items-center gap-1">
+                {onFavoriteToggle && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onFavoriteToggle(voice.name); }}
+                    className={`p-1 rounded-full transition-colors ${isFavorite ? 'text-amber-400 hover:text-amber-500' : 'text-zinc-300 dark:text-zinc-600 hover:text-amber-400 opacity-0 group-hover:opacity-100'}`}
+                    aria-label={isFavorite ? `Remove ${voice.name} from favorites` : `Add ${voice.name} to favorites`}
+                  >
+                    <Star size={14} className={isFavorite ? 'fill-current' : ''} />
+                  </button>
+                )}
                 <span className="inline-flex items-center px-2 py-0.5 border border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 text-[10px] font-medium text-zinc-500 dark:text-zinc-400 rounded-full">
                     {voice.analysis.gender}
                 </span>
@@ -111,6 +123,15 @@ const VoiceCard: React.FC<VoiceCardProps> = ({ voice, isPlaying, onPlayToggle })
         <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed line-clamp-2 font-light">
             {voice.analysis.characteristics.join(', ')}
         </p>
+        {onFindSimilar && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onFindSimilar(voice.name); }}
+            className="mt-1 flex items-center gap-1 text-[10px] font-medium text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <Sparkles size={10} />
+            Find similar
+          </button>
+        )}
       </div>
 
       <audio ref={audioRef} src={voice.audioSampleUrl} onEnded={handleAudioEnded} preload="none" />

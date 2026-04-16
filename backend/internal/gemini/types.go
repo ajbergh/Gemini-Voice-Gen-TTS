@@ -23,6 +23,8 @@ type TTSRequest struct {
 	VoiceName         string `json:"voiceName"`
 	SystemInstruction string `json:"systemInstruction,omitempty"`
 	LanguageCode      string `json:"languageCode,omitempty"`
+	Model             string `json:"model,omitempty"`
+	Provider          string `json:"provider,omitempty"` // "gemini" (default) or "openai"
 }
 
 // TTSResponse is the response back to the frontend.
@@ -43,6 +45,7 @@ type MultiSpeakerTTSRequest struct {
 	Text         string          `json:"text"`
 	Speakers     []SpeakerConfig `json:"speakers"`
 	LanguageCode string          `json:"languageCode,omitempty"`
+	Model        string          `json:"model,omitempty"`
 }
 
 // SpeakerConfig maps a speaker label to a voice name.

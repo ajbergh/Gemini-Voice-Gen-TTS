@@ -48,6 +48,14 @@ export interface AiRecommendation {
 }
 
 /** A user-saved voice preset created from an AI recommendation. */
+/** A tag attached to a custom preset for categorization. */
+export interface PresetTag {
+  id?: number;
+  preset_id?: number;
+  tag: string;
+  color: string;
+}
+
 export interface CustomPreset {
   id: number;
   name: string;
@@ -57,6 +65,9 @@ export interface CustomPreset {
   audio_path: string | null;
   source_query: string | null;
   metadata_json: string | null;
+  color: string;
+  sort_order: number;
+  tags: PresetTag[];
   created_at: string;
   updated_at: string;
 }

@@ -14,11 +14,57 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Voice, CustomPreset } from '../types';
-import { X, FileText, Mic, User, ChevronDown, Users, Play, Square, Loader2, Download } from 'lucide-react';
+import { X, FileText, Mic, User, ChevronDown, Users, Play, Square, Loader2, Download, BookOpen, Clock, Wand2 } from 'lucide-react';
 import { VOICE_DATA } from '../constants';
-import { generateMultiSpeakerTts } from '../api';
+import { generateMultiSpeakerTts, formatScript } from '../api';
 import AiTtsPreview from './AiTtsPreview';
 import AudioTagsToolbar from './AudioTagsToolbar';
+import ScriptHighlighter from './ScriptHighlighter';
+import VoiceCompare from './VoiceCompare';
+
+/** Pre-loaded script templates for common use cases. */
+const SCRIPT_TEMPLATES: { label: string; category: string; content: string }[] = [
+  {
+    label: 'Podcast Intro',
+    category: 'Podcast',
+    content: `## Audio Profile\nWarm, conversational podcast host with a welcoming tone\n\n## Scene\nRecording studio — relaxed morning energy\n\n## Transcript\nHey everyone, welcome back to the show! I'm so glad you're here today. We've got an incredible episode lined up — we're diving deep into a topic that I know a lot of you have been asking about. So grab your coffee, get comfortable, and let's get into it.`,
+  },
+  {
+    label: 'Audiobook Narration',
+    category: 'Audiobook',
+    content: `## Audio Profile\nCalm, measured narrator with rich storytelling presence\n\n## Scene\nQuiet library atmosphere — intimate narration\n\n## Transcript\nThe morning light filtered through the curtains, casting long golden shadows across the wooden floor. She sat at the kitchen table, her hands wrapped around a mug of tea that had long since gone cold. Outside, the world carried on — birds sang, cars hummed in the distance — but in here, time had stopped.`,
+  },
+  {
+    label: 'Commercial / Ad Read',
+    category: 'Commercial',
+    content: `## Audio Profile\nUpbeat, energetic announcer with clear enunciation\n\n## Scene\nBright, modern ad break\n\n## Transcript\nIntroducing the all-new SmartHome Pro — the only smart home system that learns your routine and adapts to your lifestyle. From adjusting the lights to brewing your morning coffee, SmartHome Pro does it all. Visit smarthomepro.com today and get 30% off your first setup. SmartHome Pro — living made effortless.`,
+  },
+  {
+    label: 'News Broadcast',
+    category: 'News',
+    content: `## Audio Profile\nAuthoritative, clear news anchor with steady pacing\n\n## Scene\nProfessional newsroom — breaking news energy\n\n## Transcript\nGood evening. Tonight's top story — researchers at the Global Institute of Technology have announced a breakthrough in renewable energy storage that could revolutionize how we power our cities. The new battery technology, developed over five years of intensive research, stores three times more energy than current lithium-ion cells at half the cost. We'll have a full report coming up.`,
+  },
+  {
+    label: 'Meditation Guide',
+    category: 'Wellness',
+    content: `## Audio Profile\nSoft, gentle, soothing voice with slow deliberate pacing\n\n## Scene\nPeaceful garden — birds and gentle breeze\n\n## Director's Notes\nSpeak slowly. Leave natural pauses between sentences. Use a warm, calming tone throughout.\n\n## Transcript\n[softly] Welcome. [pause: 2s] Find a comfortable position and gently close your eyes. [pause: 3s] Take a deep breath in through your nose... [pause: 2s] and slowly release it through your mouth. [pause: 3s] With each breath, feel your body becoming lighter, more relaxed. You are safe. You are present. You are here.`,
+  },
+  {
+    label: 'Tutorial / How-To',
+    category: 'Education',
+    content: `## Audio Profile\nFriendly, patient instructor with clear step-by-step delivery\n\n## Scene\nOnline course — screen recording narration\n\n## Transcript\nAlright, let's walk through this step by step. First, open your terminal and navigate to your project directory. You should see a file called config.json — go ahead and open that up. Now, look for the line that says "apiKey" — this is where we'll paste in the key we generated in the previous step. Make sure you save the file when you're done. Perfect — you're all set!`,
+  },
+  {
+    label: 'Character Voice (Villain)',
+    category: 'Character',
+    content: `## Audio Profile\nDeep, menacing voice with slow, deliberate delivery\n\n## Scene\nDark throne room — echoing stone walls\n\n## Director's Notes\nSpeak with calculated confidence. Each word should feel deliberate and weighted.\n\n## Transcript\n[in a low, menacing tone] You really thought you could stop me? How... [chuckles darkly] ...delightfully naive. I've been planning this for longer than you can possibly imagine. Every move you've made, every ally you've gathered — all part of my design. And now, here we are. At the end.`,
+  },
+  {
+    label: 'Dialogue Example',
+    category: 'Dialogue',
+    content: `Speaker1: Hey, did you hear about the new restaurant that opened downtown?\nSpeaker2: Oh yeah! I've been meaning to check it out. Is it any good?\nSpeaker1: It's amazing. The pasta is incredible and the atmosphere is so cozy.\nSpeaker2: We should go this weekend! I'll make a reservation.\nSpeaker1: Perfect, let's do Saturday evening. I'll text the group.`,
+  },
+];
 
 interface ScriptReaderModalProps {
   voices: Voice[];
@@ -29,9 +75,16 @@ interface ScriptReaderModalProps {
 
 const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPresets = [], initialVoiceName, onClose }) => {
   const [script, setScript] = useState('Hello! I am ready to read your script. Type something here and click Listen.');
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [recentScripts, setRecentScripts] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('recentScripts') || '[]'); } catch { return []; }
+  });
+  const [showRecents, setShowRecents] = useState(false);
+  const [isFormatting, setIsFormatting] = useState(false);
   const [voiceSource, setVoiceSource] = useState<'stock' | 'custom'>('stock');
   const [selectedPresetId, setSelectedPresetId] = useState<number | null>(customPresets[0]?.id ?? null);
-  const [mode, setMode] = useState<'single' | 'dialogue'>('single');
+  const [mode, setMode] = useState<'single' | 'dialogue' | 'compare'>('single');
   const [speaker1Name, setSpeaker1Name] = useState('Speaker1');
   const [speaker2Name, setSpeaker2Name] = useState('Speaker2');
   const [speaker1Voice, setSpeaker1Voice] = useState(voices[0]?.name || '');
@@ -97,12 +150,38 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
     if (isMountedRef.current) setDialoguePlaying(false);
   }, []);
 
+  /** Save current script to recents (max 5, deduplicated). */
+  const saveToRecents = useCallback((text: string) => {
+    if (text.trim().length < 10) return;
+    setRecentScripts(prev => {
+      const trimmed = text.trim();
+      const next = [trimmed, ...prev.filter(s => s !== trimmed)].slice(0, 5);
+      try { localStorage.setItem('recentScripts', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
+
+  /** Send current script to Gemini for TTS-optimised formatting. */
+  const handleFormatScript = async () => {
+    if (!script.trim() || isFormatting) return;
+    setIsFormatting(true);
+    try {
+      const formatted = await formatScript(script);
+      if (isMountedRef.current) setScript(formatted);
+    } catch (err) {
+      console.error('Format script error:', err);
+    } finally {
+      if (isMountedRef.current) setIsFormatting(false);
+    }
+  };
+
   const handleDialoguePlay = async () => {
     if (dialogueLoading || !script.trim()) return;
     if (dialoguePlaying) { stopDialogueAudio(); return; }
 
     setDialogueLoading(true);
     setDialogueError(null);
+    saveToRecents(script);
 
     try {
       let audioData = dialogueAudio;
@@ -251,6 +330,13 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
               <Users size={12} />
               Dialogue (2 Speakers)
             </button>
+            <button
+              onClick={() => setMode('compare')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${mode === 'compare' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'}`}
+            >
+              <FileText size={12} />
+              Compare A/B
+            </button>
           </div>
 
           {/* Dialogue Speaker Config — shown only in dialogue mode */}
@@ -300,18 +386,116 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
           )}
 
           <div className="space-y-2">
-            <label htmlFor="script-input" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              {mode === 'dialogue' ? `Enter dialogue (prefix lines with "${speaker1Name}:" or "${speaker2Name}:")` : 'Enter your script'}
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="script-input" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                {mode === 'dialogue' ? `Enter dialogue (prefix lines with "${speaker1Name}:" or "${speaker2Name}:")` : 'Enter your script'}
+              </label>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={handleFormatScript}
+                  disabled={!script.trim() || isFormatting}
+                  className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg text-xs font-medium text-indigo-600 dark:text-indigo-400 transition-colors border border-indigo-200 dark:border-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="AI-format script for optimal TTS output"
+                >
+                  {isFormatting ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+                  Format
+                </button>
+                {recentScripts.length > 0 && (
+                  <div className="relative">
+                    <button
+                      onClick={() => { setShowRecents(!showRecents); setShowTemplates(false); }}
+                      className="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 transition-colors border border-zinc-200 dark:border-zinc-700"
+                    >
+                      <Clock size={12} />
+                      Recent
+                    </button>
+                    {showRecents && (
+                      <div className="absolute right-0 top-full mt-1 w-72 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl z-50 overflow-hidden animate-slide-down">
+                        <div className="max-h-48 overflow-y-auto">
+                          {recentScripts.map((s, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => { setScript(s); setShowRecents(false); }}
+                              className="w-full text-left px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors border-b border-zinc-100 dark:border-zinc-700 last:border-0"
+                            >
+                              <span className="text-xs text-zinc-700 dark:text-zinc-300 line-clamp-2">{s.slice(0, 120)}{s.length > 120 ? '...' : ''}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="relative">
+                  <button
+                    onClick={() => { setShowTemplates(!showTemplates); setShowRecents(false); }}
+                    className="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 transition-colors border border-zinc-200 dark:border-zinc-700"
+                  >
+                    <BookOpen size={12} />
+                    Templates
+                    <ChevronDown size={10} className={`transition-transform ${showTemplates ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showTemplates && (
+                    <div className="absolute right-0 top-full mt-1 w-64 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl z-50 overflow-hidden animate-slide-down">
+                      <div className="max-h-60 overflow-y-auto">
+                        {SCRIPT_TEMPLATES.map((tmpl, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              setScript(tmpl.content);
+                              setShowTemplates(false);
+                              if (tmpl.category === 'Dialogue' && mode !== 'dialogue') setMode('dialogue');
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors border-b border-zinc-100 dark:border-zinc-700 last:border-0"
+                          >
+                            <span className="text-sm font-medium text-zinc-900 dark:text-white">{tmpl.label}</span>
+                            <span className="block text-[10px] text-zinc-400 dark:text-zinc-500">{tmpl.category}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
             <AudioTagsToolbar onInsertTag={handleInsertTag} />
-            <textarea
-              id="script-input"
-              ref={textareaRef}
-              value={script}
-              onChange={(e) => setScript(e.target.value)}
-              className="w-full h-32 p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
-              placeholder="Type the script you want the voice to read..."
-            />
+            <div
+              className={`relative rounded-xl transition-colors bg-zinc-50 dark:bg-zinc-800/50 ${isDragOver ? 'ring-2 ring-indigo-400 dark:ring-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20' : ''}`}
+              onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+              onDragLeave={() => setIsDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragOver(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file && (file.type === 'text/plain' || file.name.endsWith('.txt') || file.name.endsWith('.md'))) {
+                  const reader = new FileReader();
+                  reader.onload = (ev) => {
+                    const text = ev.target?.result;
+                    if (typeof text === 'string') setScript(text);
+                  };
+                  reader.readAsText(file);
+                }
+              }}
+            >
+              {isDragOver && (
+                <div className="absolute inset-0 flex items-center justify-center bg-indigo-50/80 dark:bg-indigo-900/40 rounded-xl z-10 pointer-events-none">
+                  <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">Drop file to import</span>
+                </div>
+              )}
+              <ScriptHighlighter text={script} />
+              <textarea
+                id="script-input"
+                ref={textareaRef}
+                value={script}
+                onChange={(e) => setScript(e.target.value)}
+                className="relative w-full h-32 p-3 bg-transparent border border-zinc-200 dark:border-zinc-700 rounded-xl text-transparent caret-zinc-900 dark:caret-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none z-[1]"
+                placeholder="Type the script you want the voice to read, or drop a .txt / .md file..."
+              />
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500 px-1">
+              <span>{script.length.toLocaleString()} character{script.length !== 1 ? 's' : ''}</span>
+              <span>~{Math.max(1, Math.round(script.trim().split(/\s+/).filter(Boolean).length / 150 * 60))}s estimated</span>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -417,6 +601,11 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Voice comparison A/B mode */}
+            {mode === 'compare' && (
+              <VoiceCompare text={script} voices={sortedVoices} />
             )}
           </div>
         </div>

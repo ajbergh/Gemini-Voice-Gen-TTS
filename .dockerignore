@@ -1,0 +1,7 @@
+node_modules
+dist
+.git
+.github
+*.md
+!README.md
+backend/internal/embed/dist
