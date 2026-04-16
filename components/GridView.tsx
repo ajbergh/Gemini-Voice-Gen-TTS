@@ -13,7 +13,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Voice } from '../types';
+import { Voice, GridDensity } from '../types';
 import VoiceCard from './VoiceCard';
 
 interface GridViewProps {
@@ -23,13 +23,22 @@ interface GridViewProps {
   favoriteVoices?: Set<string>;
   onFavoriteToggle?: (voiceName: string) => void;
   onFindSimilar?: (voiceName: string) => void;
+  gridDensity?: GridDensity;
+  voiceBadges?: Map<string, string[]>;
+  hoverPreview?: boolean;
 }
 
-const GridView: React.FC<GridViewProps> = ({ voices, playingVoice, onPlayToggle, favoriteVoices, onFavoriteToggle, onFindSimilar }) => {
+const gridClasses: Record<GridDensity, string> = {
+  compact: 'grid-cols-2 sm:grid-cols-3 md:landscape:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-3',
+  comfortable: 'grid-cols-1 sm:grid-cols-2 md:landscape:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6',
+  spacious: 'grid-cols-1 sm:grid-cols-2 md:landscape:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-8',
+};
+
+const GridView: React.FC<GridViewProps> = ({ voices, playingVoice, onPlayToggle, favoriteVoices, onFavoriteToggle, onFindSimilar, gridDensity = 'comfortable', voiceBadges, hoverPreview }) => {
   return (
     <div className="w-full h-full overflow-y-auto scrollbar-hide">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32 md:landscape:py-20">
+            <div className={`grid ${gridClasses[gridDensity]}`}>
                 <AnimatePresence mode="popLayout">
                   {voices.map((voice) => (
                     <motion.div
@@ -47,6 +56,8 @@ const GridView: React.FC<GridViewProps> = ({ voices, playingVoice, onPlayToggle,
                           isFavorite={favoriteVoices?.has(voice.name) ?? false}
                           onFavoriteToggle={onFavoriteToggle}
                           onFindSimilar={onFindSimilar}
+                          badges={voiceBadges?.get(voice.name)}
+                          hoverPreview={hoverPreview}
                       />
                     </motion.div>
                   ))}

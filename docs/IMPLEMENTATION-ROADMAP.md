@@ -12,8 +12,8 @@ A phased plan for implementing the remaining improvements from [IMPROVEMENTS.md]
 | 2 | Script Reader & TTS Workflow | 9 | ✅ Complete |
 | 3 | Preset & Data Management | 10 | ✅ Complete |
 | 4 | Backend Infrastructure | 7 | ✅ Complete |
-| 5 | Navigation & Layout Overhaul | 6 | 🔲 Not Started |
-| 6 | Advanced Features & Mobile | 22 | 🔲 Not Started |
+| 5 | Navigation & Layout Overhaul | 6 | ✅ Complete |
+| 6 | Advanced Features & Mobile | 22 | 🔶 In Progress |
 
 ---
 
@@ -125,20 +125,20 @@ A phased plan for implementing the remaining improvements from [IMPROVEMENTS.md]
 
 ---
 
-## Phase 5 — Navigation & Layout Overhaul
+## Phase 5 — Navigation & Layout Overhaul ✅ COMPLETE
 
 **Goal:** Restructure the app layout for better navigation, persistent playback, and power-user workflows.
 
 **Prerequisites:** Phase 1 (toast notifications), Phase 3 (history/preset management improvements benefit from new layout).
 
-| # | Ref | Feature | Scope | Complexity |
-|---|-----|---------|-------|------------|
-| 5.1 | U2 | **Persistent tab bar** — Replace modal-based navigation with a persistent tab bar (Voices → Presets → Script Reader → History) | Frontend | Med–High |
-| 5.2 | U1 | **Sidebar navigation** — Collapsible sidebar on desktop for quick section access; auto-collapse on smaller screens | Frontend | High |
-| 5.3 | U4 | **Floating mini-player** — Persistent bottom audio player with voice name, waveform, play/pause, and progress bar | Frontend | Med–High |
-| 5.4 | U3 | **Split-pane Script Reader** — Voice browser on the left, script editor on the right; resizable panes | Frontend | High |
-| 5.5 | U6 | **Command palette** — `Ctrl+K` palette for quick actions: switch voice, open settings, generate TTS, search presets | Frontend | Med |
-| 5.6 | U30 | **Onboarding tour** — First-time guided walkthrough highlighting key features with step-by-step tooltips | Frontend | Med |
+| # | Ref | Feature | Scope | Complexity | Status |
+|---|-----|---------|-------|------------|--------|
+| 5.1 | U2 | **Persistent tab bar** — Mobile bottom tabs (Voices → Presets → Script Reader → History) | Frontend | Med–High | ✅ Done |
+| 5.2 | U1 | **Sidebar navigation** — Collapsible sidebar on desktop; auto-collapse on mobile to bottom tabs | Frontend | High | ✅ Done |
+| 5.3 | U4 | **Floating mini-player** — Persistent bottom audio player with AudioProvider context, progress bar, source badges | Frontend | Med–High | ✅ Done |
+| 5.4 | U3 | **Split-pane Script Reader** — Resizable SplitPane: voice list on left, script editor on right (desktop); stacked on mobile | Frontend | High | ✅ Done |
+| 5.5 | U6 | **Command palette** — `Ctrl+K` palette for quick actions: navigate sections, search voices/presets, toggle theme/view, open settings | Frontend | Med | ✅ Done |
+| 5.6 | U30 | **Onboarding tour** — First-time guided walkthrough with step-by-step tooltips, localStorage-tracked completion | Frontend | Med | ✅ Done |
 
 **Implementation Notes:**
 - Items 5.1 and 5.2 are mutually exclusive layout strategies — choose one based on user feedback. A tab bar (5.1) is simpler and more mobile-friendly; a sidebar (5.2) is better for desktop power users. Could implement both with a responsive switch.
@@ -174,28 +174,28 @@ A phased plan for implementing the remaining improvements from [IMPROVEMENTS.md]
 
 ### Visual & Cards
 
-| # | Ref | Feature | Scope | Complexity |
-|---|-----|---------|-------|------------|
-| 6.8 | U7 | **Voice card hover preview** — Auto-play 2-second voice sample on hover (toggleable in Settings) | Frontend | Low–Med |
-| 6.9 | U8 | **Card detail expansion** — Inline expandable detail panel on voice cards with characteristics, sample player, quick TTS | Frontend | Med |
-| 6.10 | U9 | **Carousel pagination dots** — Position indicator dots below the 3D carousel | Frontend | Low |
-| 6.11 | U10 | **Grid density toggle** — Compact / comfortable / spacious grid density options | Frontend | Low |
-| 6.12 | U11 | **Voice card badges** — "New", "Popular", "AI Recommended", language flag badges on cards | Frontend | Low |
+| # | Ref | Feature | Scope | Complexity | Status |
+|---|-----|---------|-------|------------|--------|
+| 6.8 | U7 | **Voice card hover preview** — Auto-play 2-second voice sample on hover (toggleable in Settings) | Frontend | Low–Med | ✅ Done |
+| 6.9 | U8 | **Card detail expansion** — Inline expandable detail panel on voice cards with characteristics, sample player, quick TTS | Frontend | Med | ✅ Done |
+| 6.10 | U9 | **Carousel pagination dots** — Position indicator dots below the 3D carousel | Frontend | Low | ✅ Done |
+| 6.11 | U10 | **Grid density toggle** — Compact / comfortable / spacious grid density options | Frontend | Low | ✅ Done |
+| 6.12 | U11 | **Voice card badges** — "New", "Popular", "AI Recommended", language flag badges on cards | Frontend | Low | ✅ Done |
 
 ### Mobile & Accessibility
 
-| # | Ref | Feature | Scope | Complexity |
-|---|-----|---------|-------|------------|
-| 6.13 | U26 | **Micro-interactions** — Button ripples, card flip on save, subtle celebration animations | Frontend | Low–Med |
-| 6.14 | U27 | **Custom theme colors** — User-selectable accent color (blue, purple, green, rose, etc.) | Frontend | Low–Med |
-| 6.15 | U28 | **High-contrast mode** — Accessibility-focused theme with WCAG AAA contrast ratios | Frontend | Med |
-| 6.16 | U29 | **Glass morphism refinement** — Consistent blur values, better dark-mode contrast ratios | Frontend | Low |
-| 6.17 | U31 | **Bottom sheet modals on mobile** — Swipeable bottom sheets replacing standard modals on small screens | Frontend | Med |
-| 6.18 | U32 | **Touch gesture improvements** — Momentum swiping on carousel, pinch-to-zoom on waveforms | Frontend | Med |
-| 6.19 | U33 | **PWA support** — `manifest.json`, service worker, offline cached voices for installable PWA | Frontend + Backend | Med–High |
-| 6.20 | U34 | **Responsive filter drawer** — Slide-out filter drawer on mobile replacing multi-row filter bar | Frontend | Med |
-| 6.21 | U35 | **Landscape tablet layout** — Optimized two-column layout for tablet landscape orientation | Frontend | Low–Med |
-| 6.22 | U17 | **Split view: script + waveform** — Show waveform alongside script to visualize text-to-audio mapping | Frontend | High |
+| # | Ref | Feature | Scope | Complexity | Status |
+|---|-----|---------|-------|------------|--------|
+| 6.13 | U26 | **Micro-interactions** — Button ripples, card flip on save, subtle celebration animations | Frontend | Low–Med | ✅ Done |
+| 6.14 | U27 | **Custom theme colors** — User-selectable accent color (blue, purple, green, rose, etc.) | Frontend | Low–Med | ✅ Done |
+| 6.15 | U28 | **High-contrast mode** — Accessibility-focused theme with WCAG AAA contrast ratios | Frontend | Med | ✅ Done |
+| 6.16 | U29 | **Glass morphism refinement** — Consistent blur values, better dark-mode contrast ratios | Frontend | Low | ✅ Done |
+| 6.17 | U31 | **Bottom sheet modals on mobile** — Swipeable bottom sheets replacing standard modals on small screens | Frontend | Med | ✅ Done |
+| 6.18 | U32 | **Touch gesture improvements** — Momentum swiping on carousel, pinch-to-zoom on waveforms | Frontend | Med | 🔲 |
+| 6.19 | U33 | **PWA support** — `manifest.json`, service worker, offline cached voices for installable PWA | Frontend + Backend | Med–High | 🔲 |
+| 6.20 | U34 | **Responsive filter drawer** — Slide-out filter drawer on mobile replacing multi-row filter bar | Frontend | Med | ✅ Done |
+| 6.21 | U35 | **Landscape tablet layout** — Optimized two-column layout for tablet landscape orientation | Frontend | Low–Med | ✅ Done |
+| 6.22 | U17 | **Split view: script + waveform** — Show waveform alongside script to visualize text-to-audio mapping | Frontend | High | 🔲 |
 
 **Implementation Notes:**
 - Item 6.1 (audio formats) requires a Go-side audio encoder — use `lame` bindings for MP3 or encode client-side via Web Audio + `MediaRecorder`.

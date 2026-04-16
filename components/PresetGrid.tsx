@@ -13,7 +13,7 @@
 
 import React, { useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CustomPreset } from '../types';
+import { CustomPreset, GridDensity } from '../types';
 import { Sparkles, Download, Upload, GripVertical } from 'lucide-react';
 import PresetCard from './PresetCard';
 
@@ -29,9 +29,16 @@ interface PresetGridProps {
   onImport?: (file: File) => void;
   onInlineEdit?: (id: number, data: { name?: string; system_instruction?: string }) => Promise<void>;
   onReorder?: (orderedIds: number[]) => void;
+  gridDensity?: GridDensity;
 }
 
-const PresetGrid: React.FC<PresetGridProps> = ({ presets, playingPresetId, onPlayToggle, onEdit, onDelete, onDuplicate, onOpenAiCasting, onExport, onImport, onInlineEdit, onReorder }) => {
+const presetGridClasses: Record<GridDensity, string> = {
+  compact: 'grid-cols-2 sm:grid-cols-3 md:landscape:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-3',
+  comfortable: 'grid-cols-1 sm:grid-cols-2 md:landscape:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6',
+  spacious: 'grid-cols-1 sm:grid-cols-2 md:landscape:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-8',
+};
+
+const PresetGrid: React.FC<PresetGridProps> = ({ presets, playingPresetId, onPlayToggle, onEdit, onDelete, onDuplicate, onOpenAiCasting, onExport, onImport, onInlineEdit, onReorder, gridDensity = 'comfortable' }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
   const dragItemRef = useRef<number | null>(null);
@@ -134,7 +141,7 @@ const PresetGrid: React.FC<PresetGridProps> = ({ presets, playingPresetId, onPla
             )}
           </div>
         )}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+        <div className={`grid ${presetGridClasses[gridDensity]}`}>
           <AnimatePresence mode="popLayout">
             {presets.map(preset => (
               <motion.div

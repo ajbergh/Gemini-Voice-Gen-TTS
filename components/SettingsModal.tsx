@@ -16,6 +16,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Key, Eye, EyeOff, Check, AlertCircle, Loader2, Trash2, Shield, HardDrive, Download, Upload, Plus, RotateCcw } from 'lucide-react';
 import { listApiKeys, storeApiKey, deleteApiKey, testApiKey, APIKeyInfo, getCacheStats, clearCache, CacheStats, createBackup, restoreBackup, listKeyPool, addKeyToPool, deleteKeyFromPool, resetPoolKey, APIKeyPoolEntry } from '../api';
+import BottomSheet from './BottomSheet';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -231,17 +232,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="settings-title"
-    >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose}></div>
-
+    <BottomSheet onClose={onClose} ariaLabel="Settings">
       {/* Modal */}
-      <div ref={modalRef} className="relative w-full max-w-lg bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl overflow-hidden animate-slide-up ring-1 ring-zinc-900/5">
+      <div ref={modalRef} className="relative w-full max-w-lg mx-auto bg-white dark:bg-zinc-900 sm:rounded-3xl shadow-2xl overflow-hidden sm:animate-slide-up ring-1 ring-zinc-900/5">
         {/* Header */}
         <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-emerald-50/50 to-white/0 dark:from-emerald-900/20 dark:to-zinc-900/0 pointer-events-none"></div>
 
@@ -551,7 +544,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           </div>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   );
 };
 

@@ -71,9 +71,11 @@ interface ScriptReaderModalProps {
   customPresets?: CustomPreset[];
   initialVoiceName?: string;
   onClose: () => void;
+  /** When true, renders as inline section instead of modal overlay. */
+  inline?: boolean;
 }
 
-const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPresets = [], initialVoiceName, onClose }) => {
+const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPresets = [], initialVoiceName, onClose, inline = false }) => {
   const [script, setScript] = useState('Hello! I am ready to read your script. Type something here and click Listen.');
   const [showTemplates, setShowTemplates] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -285,39 +287,12 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
     return [baseVoice];
   }, [selectedPreset]);
 
-  return (
-    <div 
-      className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-fade-in"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="script-reader-title"
-    >
-      <div className="absolute inset-0" onClick={onClose}></div>
-      <div 
-        ref={modalRef}
-        tabIndex={-1}
-        className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden flex flex-col outline-none animate-slide-up"
-      >
-        <div className="flex items-center justify-between p-4 border-b border-zinc-100 dark:border-zinc-800">
-          <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
-            <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400">
-              <FileText size={18} />
-            </div>
-            <h2 id="script-reader-title" className="text-lg font-bold">Test Script</h2>
-          </div>
-          <button 
-            onClick={onClose}
-            className="p-2 text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-          {/* Mode Toggle */}
-          <div className="flex bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700 w-fit">
-            <button
-              onClick={() => setMode('single')}
+  const sharedContent = (
+    <>
+      {/* Mode Toggle */}
+      <div className="flex bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700 w-fit">
+        <button
+          onClick={() => setMode('single')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${mode === 'single' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'}`}
             >
               <Mic size={12} />
@@ -608,6 +583,58 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
               <VoiceCompare text={script} voices={sortedVoices} />
             )}
           </div>
+    </>
+  );
+
+  // Inline mode: render as a full-height section without modal overlay
+  if (inline) {
+    return (
+      <div ref={modalRef} tabIndex={-1} className="flex-1 flex flex-col bg-white dark:bg-zinc-900 overflow-hidden outline-none">
+        <div className="flex items-center justify-between p-4 border-b border-zinc-100 dark:border-zinc-800">
+          <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
+            <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400">
+              <FileText size={18} />
+            </div>
+            <h2 id="script-reader-title" className="text-lg font-bold">Script Reader</h2>
+          </div>
+        </div>
+        <div className="p-6 space-y-6 flex-1 overflow-y-auto">
+          {sharedContent}
+        </div>
+      </div>
+    );
+  }
+
+  // Modal mode: full-screen overlay
+  return (
+    <div 
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-fade-in"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="script-reader-title"
+    >
+      <div className="absolute inset-0" onClick={onClose}></div>
+      <div 
+        ref={modalRef}
+        tabIndex={-1}
+        className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden flex flex-col outline-none animate-slide-up"
+      >
+        <div className="flex items-center justify-between p-4 border-b border-zinc-100 dark:border-zinc-800">
+          <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
+            <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400">
+              <FileText size={18} />
+            </div>
+            <h2 id="script-reader-title" className="text-lg font-bold">Test Script</h2>
+          </div>
+          <button 
+            onClick={onClose}
+            className="p-2 text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+          {sharedContent}
         </div>
       </div>
     </div>

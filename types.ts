@@ -39,6 +39,9 @@ export interface FilterState {
   search: string;
 }
 
+/** Grid density controls column count and card size. */
+export type GridDensity = 'compact' | 'comfortable' | 'spacious';
+
 /** Structured AI recommendation returned by the Gemini voice casting endpoint. */
 export interface AiRecommendation {
   voiceNames: string[];

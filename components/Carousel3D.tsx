@@ -133,7 +133,7 @@ const Carousel3D: React.FC<Carousel3DProps> = ({
 
       <div 
         ref={containerRef} 
-        className="relative w-full h-[70vh] flex items-center justify-center"
+        className="relative w-full h-[70vh] md:landscape:h-[55vh] lg:landscape:h-[65vh] flex items-center justify-center"
         style={{ perspective: '1200px' }}
       >
         <div className="relative w-full h-full flex items-center justify-center transform-style-3d">
@@ -259,6 +259,60 @@ const Carousel3D: React.FC<Carousel3DProps> = ({
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Pagination dots */}
+      {voices.length > 1 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1 z-10">
+          {voices.length <= 15 ? (
+            voices.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => !disabled && onChange(idx)}
+                disabled={disabled}
+                className={`rounded-full transition-all duration-300 ${
+                  idx === activeIndex
+                    ? 'w-6 h-2 accent-bg'
+                    : 'w-2 h-2 bg-zinc-300 dark:bg-zinc-600 hover:bg-zinc-400 dark:hover:bg-zinc-500'
+                }`}
+                aria-label={`Go to voice ${idx + 1}`}
+                aria-current={idx === activeIndex ? 'true' : undefined}
+              />
+            ))
+          ) : (
+            /* For large sets, show a window of dots around the active index */
+            (() => {
+              const windowSize = 9;
+              const half = Math.floor(windowSize / 2);
+              let start = Math.max(0, activeIndex - half);
+              let end = Math.min(voices.length, start + windowSize);
+              if (end - start < windowSize) start = Math.max(0, end - windowSize);
+              const dots = [];
+              if (start > 0) dots.push(<span key="start-ellipsis" className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600" />);
+              for (let i = start; i < end; i++) {
+                const distance = Math.abs(i - activeIndex);
+                const scale = distance === 0 ? 1 : distance <= 1 ? 0.85 : 0.65;
+                dots.push(
+                  <button
+                    key={i}
+                    onClick={() => !disabled && onChange(i)}
+                    disabled={disabled}
+                    className={`rounded-full transition-all duration-300 ${
+                      i === activeIndex
+                        ? 'w-6 h-2 accent-bg'
+                        : 'w-2 h-2 bg-zinc-300 dark:bg-zinc-600 hover:bg-zinc-400 dark:hover:bg-zinc-500'
+                    }`}
+                    style={{ transform: `scale(${scale})` }}
+                    aria-label={`Go to voice ${i + 1}`}
+                    aria-current={i === activeIndex ? 'true' : undefined}
+                  />
+                );
+              }
+              if (end < voices.length) dots.push(<span key="end-ellipsis" className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600" />);
+              return dots;
+            })()
+          )}
+        </div>
+      )}
     </div>
   );
 };

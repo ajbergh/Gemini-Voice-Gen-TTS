@@ -17,6 +17,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, Loader2, X, ArrowRight, Wand2 } from 'lucide-react';
 import { Voice, AiRecommendation } from '../types';
 import { recommendVoices } from '../api';
+import BottomSheet from './BottomSheet';
 
 interface VoiceFinderProps {
   voices: Voice[];
@@ -108,20 +109,9 @@ const VoiceFinder: React.FC<VoiceFinderProps> = ({ voices, onRecommendation, onC
   };
 
   return (
-    <div 
-        className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="casting-title"
-    >
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm animate-fade-in"
-        onClick={onClose}
-      ></div>
-      
+    <BottomSheet onClose={onClose} ariaLabel="AI Casting Director">
       {/* Modal Content */}
-      <div ref={modalRef} className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl overflow-hidden animate-slide-up ring-1 ring-zinc-900/5">
+      <div ref={modalRef} className="relative w-full max-w-2xl mx-auto bg-white dark:bg-zinc-900 sm:rounded-3xl shadow-2xl overflow-hidden sm:animate-slide-up ring-1 ring-zinc-900/5">
         
         {/* Decorative Header Background */}
         <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-indigo-50/50 to-white/0 dark:from-indigo-900/30 dark:to-zinc-900/0 pointer-events-none"></div>
@@ -203,7 +193,7 @@ const VoiceFinder: React.FC<VoiceFinderProps> = ({ voices, onRecommendation, onC
         )}
 
       </div>
-    </div>
+    </BottomSheet>
   );
 };
 
