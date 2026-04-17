@@ -187,7 +187,9 @@ func (h *PresetsHandler) UpdatePreset(w http.ResponseWriter, r *http.Request) {
 			if writeErr := os.WriteFile(cachePath, audioBytes, 0o600); writeErr == nil {
 				// Remove old audio file if it exists
 				if existing.AudioPath != nil {
-					os.Remove(*existing.AudioPath)
+					if removeErr := removeCachedAudioFile(h.AudioCacheDir, *existing.AudioPath); removeErr != nil && !os.IsNotExist(removeErr) {
+						slog.Warn("failed to remove preset audio file", "path", *existing.AudioPath, "error", removeErr)
+					}
 				}
 				updated.AudioPath = &cachePath
 			}
@@ -223,7 +225,7 @@ func (h *PresetsHandler) DeletePreset(w http.ResponseWriter, r *http.Request) {
 
 	// Remove cached audio file
 	if preset.AudioPath != nil {
-		if removeErr := os.Remove(*preset.AudioPath); removeErr != nil && !os.IsNotExist(removeErr) {
+		if removeErr := removeCachedAudioFile(h.AudioCacheDir, *preset.AudioPath); removeErr != nil && !os.IsNotExist(removeErr) {
 			slog.Warn("failed to remove preset audio file", "path", *preset.AudioPath, "error", removeErr)
 		}
 	}
@@ -250,8 +252,9 @@ func (h *PresetsHandler) GetPresetAudio(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	audioBytes, err := os.ReadFile(*preset.AudioPath)
+	audioBytes, err := readCachedAudioFile(h.AudioCacheDir, *preset.AudioPath)
 	if err != nil {
+		slog.Warn("rejected preset audio path", "preset_id", id, "path", *preset.AudioPath, "error", err)
 		writeError(w, http.StatusNotFound, "audio file not found on disk")
 		return
 	}

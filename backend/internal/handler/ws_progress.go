@@ -40,7 +40,7 @@ func NewProgressHub() *ProgressHub {
 // HandleWS handles WebSocket upgrade and registration.
 func (h *ProgressHub) HandleWS(w http.ResponseWriter, r *http.Request) {
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		InsecureSkipVerify: true, // Allow connections from any origin (CORS handled by middleware)
+		OriginPatterns: []string{"localhost", "127.0.0.1", "::1", "[::1]"},
 	})
 	if err != nil {
 		slog.Warn("websocket accept failed", "error", err)

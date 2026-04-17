@@ -29,7 +29,7 @@ func New(addr string, st *store.Store, cryptoKey []byte, frontendFS fs.FS, audio
 	// Initialize handlers
 	configH := &handler.ConfigHandler{Store: st}
 	keysH := &handler.KeysHandler{Store: st, CryptoKey: cryptoKey}
-	historyH := &handler.HistoryHandler{Store: st}
+	historyH := &handler.HistoryHandler{Store: st, AudioCacheDir: audioCacheDir}
 	progressH := handler.NewProgressHub()
 	voicesH := &handler.VoicesHandler{Store: st, KeysHandler: keysH, AudioCacheDir: audioCacheDir, ProgressHub: progressH}
 	presetsH := &handler.PresetsHandler{Store: st, AudioCacheDir: audioCacheDir}
@@ -80,6 +80,7 @@ func (s *Server) Handler() http.Handler {
 	var h http.Handler = s.Mux
 	h = securityHeadersMiddleware(h)
 	h = corsMiddleware(h)
+	h = originProtectionMiddleware(h)
 	h = rateLimitMiddleware(DefaultRateLimiterConfig())(h)
 	h = loggingMiddleware(h)
 	h = recoveryMiddleware(h)

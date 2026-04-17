@@ -9,6 +9,7 @@ package server
 import (
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -46,10 +47,11 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 		// Only allow localhost origins to prevent cross-origin abuse
-		if origin == "" || isLocalhostOrigin(origin) {
+		if origin != "" && isLocalhostOrigin(origin) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Add("Vary", "Origin")
 		}
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if r.Method == http.MethodOptions {
@@ -61,13 +63,60 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// originProtectionMiddleware rejects unsafe browser requests from non-local origins.
+// This reduces cross-site request risks for a localhost-only application.
+func originProtectionMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !requiresTrustedOrigin(r.Method) || requestHasTrustedOrigin(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"error":"forbidden origin"}`))
+	})
+}
+
+func requiresTrustedOrigin(method string) bool {
+	switch method {
+	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+		return true
+	default:
+		return false
+	}
+}
+
+func requestHasTrustedOrigin(r *http.Request) bool {
+	if origin := r.Header.Get("Origin"); origin != "" {
+		return isLocalhostOrigin(origin)
+	}
+	if referer := r.Header.Get("Referer"); referer != "" {
+		return isLocalhostOrigin(referer)
+	}
+	return true
+}
+
 // isLocalhostOrigin checks if an origin is localhost or 127.0.0.1.
 func isLocalhostOrigin(origin string) bool {
-	// Match http://localhost:PORT or http://127.0.0.1:PORT
-	return strings.HasPrefix(origin, "http://localhost:") ||
-		strings.HasPrefix(origin, "http://127.0.0.1:") ||
-		origin == "http://localhost" ||
-		origin == "http://127.0.0.1"
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return false
+	}
+
+	switch host := parsed.Hostname(); {
+	case strings.EqualFold(host, "localhost"):
+		return true
+	case host == "127.0.0.1":
+		return true
+	case host == "::1":
+		return true
+	default:
+		return false
+	}
 }
 
 // securityHeadersMiddleware adds standard security response headers.
@@ -75,6 +124,7 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "no-referrer")
 		next.ServeHTTP(w, r)
 	})
 }

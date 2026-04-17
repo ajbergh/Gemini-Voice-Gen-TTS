@@ -10,8 +10,8 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/ajbergh/gemini-voice-gen-tts/backend/internal/store"
@@ -19,7 +19,8 @@ import (
 
 // HistoryHandler handles /api/history endpoints.
 type HistoryHandler struct {
-	Store *store.Store
+	Store         *store.Store
+	AudioCacheDir string
 }
 
 // ListHistory returns history entries with optional filters and pagination.
@@ -125,8 +126,9 @@ func (h *HistoryHandler) GetHistoryAudio(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	data, err := os.ReadFile(*entry.AudioPath)
+	data, err := readCachedAudioFile(h.AudioCacheDir, *entry.AudioPath)
 	if err != nil {
+		slog.Warn("rejected history audio path", "history_id", id, "path", *entry.AudioPath, "error", err)
 		writeError(w, http.StatusNotFound, "cached audio file not found")
 		return
 	}

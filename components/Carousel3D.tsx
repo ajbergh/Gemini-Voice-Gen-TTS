@@ -16,7 +16,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { Voice } from '../types';
-import { Play, Pause, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
 import AudioVisualizer from './AudioVisualizer';
 
 interface Carousel3DProps {
@@ -201,20 +201,26 @@ const Carousel3D: React.FC<Carousel3DProps> = ({
 
                   <div className="h-full flex flex-col relative">
                       <div className="flex-1 relative bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center overflow-hidden">
-                          <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.1]" style={{ backgroundImage: 'radial-gradient(currentColor 1px, transparent 1px)', backgroundSize: '12px 12px' }}></div>
-                          
+                          {/* Voice headshot image */}
+                          <img
+                            src={`/images/${voice.name}.png`}
+                            alt={voice.name}
+                            className="absolute inset-0 w-full h-full object-cover object-top"
+                            loading="lazy"
+                            draggable={false}
+                          />
+                          {/* Subtle gradient overlay for depth */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-white/40 via-transparent to-transparent dark:from-zinc-800/60 dark:via-transparent dark:to-transparent pointer-events-none" />
+
+                          {/* Audio visualizer overlay when playing */}
                           <div className={`absolute inset-0 z-10 transition-opacity duration-500 ${isPlaying ? 'opacity-100' : 'opacity-0'}`}>
-                              <AudioVisualizer isPlaying={isPlaying} color={document.documentElement.classList.contains('dark') ? '#a5b4fc' : '#18181b'} />
+                              <div className="absolute inset-0 bg-black/30 dark:bg-black/50" />
+                              <AudioVisualizer isPlaying={isPlaying} color={document.documentElement.classList.contains('dark') ? '#a5b4fc' : '#ffffff'} />
                           </div>
 
-                          <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-500 ${isPlaying ? 'opacity-0' : 'opacity-100'}`}>
-                              <div className="w-20 h-20 rounded-full bg-white dark:bg-zinc-800 shadow-sm border border-zinc-100 dark:border-zinc-700 flex items-center justify-center">
-                                  <Activity size={32} className="text-zinc-300 dark:text-zinc-600" />
-                              </div>
-                          </div>
-
+                          {/* Play/pause hover overlay */}
                           <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200">
-                               <div className="w-20 h-20 rounded-full bg-zinc-900/90 dark:bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-xl transform transition-transform active:scale-95">
+                               <div className="w-20 h-20 rounded-full bg-zinc-900/70 dark:bg-white/80 backdrop-blur-md flex items-center justify-center shadow-xl transform transition-transform active:scale-95">
                                   {isPlaying ? (
                                       <Pause size={32} className="text-white dark:text-zinc-900 fill-current" />
                                   ) : (
@@ -224,7 +230,7 @@ const Carousel3D: React.FC<Carousel3DProps> = ({
                           </div>
                           
                           {isPlaying && (
-                              <div className="absolute top-6 right-6 w-3 h-3 rounded-full animate-google-colors"></div>
+                              <div className="absolute top-6 right-6 w-3 h-3 rounded-full animate-google-colors z-20"></div>
                           )}
                       </div>
 

@@ -22,6 +22,7 @@ export default defineConfig({
         '/api': 'http://localhost:8080',
       },
     },
+    publicDir: 'assets',
     plugins: [react()],
     resolve: {
       alias: {
