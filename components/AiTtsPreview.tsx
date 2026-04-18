@@ -9,8 +9,10 @@
  * Generates speech from text using a selected Gemini TTS voice via the backend
  * proxy (/api/voices/tts). Audio is returned as base64-encoded raw PCM
  * (24kHz, 16-bit, mono), decoded with Web Audio API for playback, and can be
- * downloaded as a proper WAV file with RIFF headers. Includes an
- * AudioVisualizer canvas and a voice selector dropdown.
+ * downloaded as a proper WAV file with RIFF headers. Supports streaming TTS,
+ * model selection (3.1 Flash / 2.5 Flash), playback speed control, language
+ * auto-detection, undo/redo for settings, and an AudioVisualizer canvas.
+ * Includes voice selector dropdown with optional display name overrides.
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -75,6 +77,12 @@ interface AiTtsPreviewProps {
   sourceQuery?: string;
   hideVoiceSelector?: boolean;
   voiceDisplayNames?: Record<string, string>;
+  /** Optional accent dropdown options rendered next to the voice selector. */
+  accentOptions?: { id: string; label: string }[];
+  selectedAccentId?: string;
+  onAccentChange?: (id: string) => void;
+  /** When set, overrides the language selector (e.g. force en-US for accent mode). */
+  forceLanguageCode?: string;
   onVoiceChange?: (voiceName: string) => void;
   onSavePreset?: (data: { voiceName: string; text: string; systemInstruction: string; audioBase64: string | null; sourceQuery: string }) => void;
 }
@@ -203,7 +211,7 @@ function detectLanguageCode(input: string): string {
   return '';
 }
 
-const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruction, sourceQuery, hideVoiceSelector, voiceDisplayNames, onVoiceChange, onSavePreset }) => {
+const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruction, sourceQuery, hideVoiceSelector, voiceDisplayNames, accentOptions, selectedAccentId, onAccentChange, forceLanguageCode, onVoiceChange, onSavePreset }) => {
   const [selectedVoiceName, setSelectedVoiceName] = useState(voices[0]?.name || '');
   const [languageCode, setLanguageCode] = useState('');
   const [autoDetectedLang, setAutoDetectedLang] = useState('');
@@ -320,7 +328,10 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
   useEffect(() => {
     setAudioData(null);
     stopAudio();
-  }, [text, selectedVoiceName, languageCode]);
+  }, [text, selectedVoiceName, languageCode, systemInstruction]);
+
+  // When forceLanguageCode is set (e.g. accent mode forces en-US), use it; otherwise use user selection.
+  const effectiveLanguageCode = forceLanguageCode !== undefined ? forceLanguageCode : languageCode;
 
   /** Stop any currently playing audio source and reset playback state. */
   const stopAudio = () => {
@@ -337,7 +348,7 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
   const generateAudio = async (): Promise<string | null> => {
     setError(null);
     try {
-      const audioDataBase64 = await generateTts(text, selectedVoiceName, systemInstruction, languageCode || undefined, ttsModel);
+      const audioDataBase64 = await generateTts(text, selectedVoiceName, systemInstruction, effectiveLanguageCode || undefined, ttsModel);
       
       if (!isMountedRef.current) return null;
 
@@ -345,7 +356,14 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
       return audioDataBase64;
     } catch (err: any) {
       console.error("TTS Error:", err);
-      if (isMountedRef.current) setError("Failed to generate speech. Please try again.");
+      if (isMountedRef.current) {
+        const msg = err?.message || '';
+        if (msg.includes('503') || msg.includes('unavailable')) {
+          setError("Gemini TTS model is temporarily overloaded. Please try again in a few seconds.");
+        } else {
+          setError(msg || "Failed to generate speech. Please try again.");
+        }
+      }
       return null;
     }
   };
@@ -434,7 +452,7 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
 
       await streamTts(text, selectedVoiceName, {
         systemInstruction,
-        languageCode: languageCode || undefined,
+        languageCode: effectiveLanguageCode || undefined,
         model: ttsModel,
         signal: abortCtrl.signal,
         onChunk: (audioBase64, index) => {
@@ -542,15 +560,15 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
   return (
     <div className="w-full bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden">
         {/* Header / Controls */}
-        <div className="p-4 flex flex-col sm:flex-row gap-4 items-center justify-between bg-white dark:bg-zinc-800 border-b border-zinc-100 dark:border-zinc-700">
+        <div className="p-3 flex flex-wrap gap-2 items-center bg-white dark:bg-zinc-800 border-b border-zinc-100 dark:border-zinc-700">
             
             {/* Voice Selector */}
             {!hideVoiceSelector && (
-            <div className="relative group w-full sm:w-auto">
+            <div className="relative group">
                 <select
                     value={selectedVoiceName}
                     onChange={(e) => { pushUndo(getCurrentSnapshot()); setSelectedVoiceName(e.target.value); onVoiceChange?.(e.target.value); }}
-                    className="appearance-none w-full sm:w-48 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 py-2 pl-3 pr-10 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-600 cursor-pointer transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    className="appearance-none w-44 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 py-1.5 pl-3 pr-8 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-600 cursor-pointer transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800"
                     disabled={isLoading || isDownloading || isPlaying}
                 >
                     {voices.map(voice => (
@@ -565,10 +583,30 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
             </div>
             )}
 
+            {/* Accent Selector (optional, provided via props) */}
+            {accentOptions && accentOptions.length > 0 && onAccentChange && (
+            <div className="relative group">
+                <select
+                    value={selectedAccentId || ''}
+                    onChange={(e) => onAccentChange(e.target.value)}
+                    className="appearance-none w-40 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 py-1.5 pl-3 pr-8 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-600 cursor-pointer transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    disabled={isLoading || isDownloading || isPlaying}
+                    title="Voice accent"
+                >
+                    {accentOptions.map(accent => (
+                        <option key={accent.id} value={accent.id}>{accent.label}</option>
+                    ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-zinc-400">
+                    <ChevronDown size={14} />
+                </div>
+            </div>
+            )}
+
             {/* Language Selector */}
-            <div className="relative group w-full sm:w-auto">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-zinc-400 dark:text-zinc-500">
-                    <Globe size={14} />
+            <div className="relative group">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none text-zinc-400 dark:text-zinc-500">
+                    <Globe size={12} />
                 </div>
                 <select
                     value={languageCode}
@@ -579,7 +617,7 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
                       // Mark as user override unless they picked auto-detect
                       userOverrodeLangRef.current = val !== '';
                     }}
-                    className="appearance-none w-full sm:w-44 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 py-2 pl-8 pr-10 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-600 cursor-pointer transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    className="appearance-none w-40 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 py-1.5 pl-7 pr-8 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-600 cursor-pointer transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800"
                     disabled={isLoading || isDownloading || isPlaying}
                 >
                     {TTS_LANGUAGES.map(lang => (
@@ -596,11 +634,11 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
             </div>
 
             {/* Playback Speed */}
-            <div className="relative group w-full sm:w-auto">
+            <div className="relative group">
                 <select
                     value={playbackSpeed}
                     onChange={(e) => { pushUndo(getCurrentSnapshot()); setPlaybackSpeed(Number(e.target.value)); }}
-                    className="appearance-none w-full sm:w-20 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 py-2 pl-3 pr-7 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-600 cursor-pointer transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800 text-center"
+                    className="appearance-none w-16 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 py-1.5 pl-2 pr-6 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-600 cursor-pointer transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800 text-center"
                     disabled={isLoading || isDownloading}
                 >
                     <option value={0.5}>0.5×</option>
@@ -616,11 +654,11 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
             </div>
 
             {/* Model Selector */}
-            <div className="relative group w-full sm:w-auto">
+            <div className="relative group">
                 <select
                     value={ttsModel}
                     onChange={(e) => { pushUndo(getCurrentSnapshot()); setTtsModel(e.target.value); setAudioData(null); }}
-                    className="appearance-none w-full sm:w-40 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 py-2 pl-3 pr-8 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-600 cursor-pointer transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    className="appearance-none w-36 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 py-1.5 pl-2.5 pr-7 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-600 cursor-pointer transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800"
                     disabled={isLoading || isDownloading || isPlaying}
                     title="TTS model"
                 >
@@ -655,7 +693,7 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
             {/* Streaming Toggle */}
             <button
                 onClick={() => { pushUndo(getCurrentSnapshot()); setUseStreaming(!useStreaming); }}
-                className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium border transition-all ${
+                className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                   useStreaming
                     ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400'
                     : 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
@@ -668,7 +706,7 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
             </button>
 
             {/* Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 ml-auto">
                 {onSavePreset && (
                     <button
                         onClick={(e) => {
@@ -682,7 +720,7 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
                             });
                         }}
                         disabled={isLoading || isDownloading}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 rounded-full text-xs font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors border border-indigo-200 dark:border-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 rounded-full text-xs font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors border border-indigo-200 dark:border-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Save as Custom Preset"
                     >
                         <Save size={14} />
@@ -692,7 +730,7 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
                 <button
                     onClick={handleDownload}
                     disabled={isLoading || isDownloading || !text.trim()}
-                    className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${isDownloading ? 'bg-zinc-100 dark:bg-zinc-700 text-zinc-400 cursor-wait' : 'bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                    className={`flex items-center justify-center w-8 h-8 rounded-full transition-colors ${isDownloading ? 'bg-zinc-100 dark:bg-zinc-700 text-zinc-400 cursor-wait' : 'bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600'} disabled:opacity-50 disabled:cursor-not-allowed`}
                     title="Download Audio"
                 >
                     {isDownloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
@@ -701,7 +739,7 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
                 <button
                     onClick={handlePlay}
                     disabled={isLoading || isDownloading || !text.trim()}
-                    className={`flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 transform active:scale-95 ${
+                    className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-300 transform active:scale-95 ${
                         isPlaying 
                         ? 'bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-600 hover:bg-zinc-200 dark:hover:bg-zinc-600' 
                         : 'bg-zinc-900 dark:bg-indigo-600 text-white hover:bg-zinc-800 dark:hover:bg-indigo-500 shadow-md'

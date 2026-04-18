@@ -23,8 +23,9 @@ import (
 
 // maxTTSRetries is the number of attempts for TTS generation. The Gemini docs
 // note the model occasionally returns text tokens instead of audio, causing a
-// 500 error in a small percentage of requests.
-const maxTTSRetries = 3
+// 500 error in a small percentage of requests. The preview TTS model can also
+// return 503 (Service Unavailable) under load.
+const maxTTSRetries = 4
 
 const baseURL = "https://generativelanguage.googleapis.com/v1beta"
 
@@ -35,6 +36,81 @@ const defaultTTSModel = "gemini-3.1-flash-tts-preview"
 var allowedTTSModels = map[string]bool{
 	"gemini-3.1-flash-tts-preview": true,
 	"gemini-2.5-flash-preview-tts": true,
+}
+
+type ttsInlineData struct {
+	Data     string `json:"data"`
+	MimeType string `json:"mimeType"`
+}
+
+type ttsResponsePart struct {
+	Text       string         `json:"text"`
+	InlineData *ttsInlineData `json:"inlineData"`
+}
+
+type ttsResponseEnvelope struct {
+	Candidates []struct {
+		FinishReason string `json:"finishReason"`
+		Content      struct {
+			Parts []ttsResponsePart `json:"parts"`
+		} `json:"content"`
+	} `json:"candidates"`
+	PromptFeedback struct {
+		BlockReason        string `json:"blockReason"`
+		BlockReasonMessage string `json:"blockReasonMessage"`
+	} `json:"promptFeedback"`
+}
+
+func summarizeTTSResponseText(text string) string {
+	text = strings.Join(strings.Fields(text), " ")
+	if len(text) > 160 {
+		return text[:157] + "..."
+	}
+	return text
+}
+
+func parseTTSAudioResponse(body []byte) (string, string, error) {
+	var envelope ttsResponseEnvelope
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return "", "", err
+	}
+
+	var textSnippets []string
+	var finishReasons []string
+
+	for _, candidate := range envelope.Candidates {
+		if candidate.FinishReason != "" {
+			finishReasons = append(finishReasons, candidate.FinishReason)
+		}
+		for _, part := range candidate.Content.Parts {
+			if part.InlineData != nil && part.InlineData.Data != "" {
+				return part.InlineData.Data, "", nil
+			}
+			if text := strings.TrimSpace(part.Text); text != "" {
+				textSnippets = append(textSnippets, summarizeTTSResponseText(text))
+			}
+		}
+	}
+
+	diagnostics := make([]string, 0, 3)
+	if envelope.PromptFeedback.BlockReason != "" {
+		diagnostic := "prompt blocked: " + envelope.PromptFeedback.BlockReason
+		if envelope.PromptFeedback.BlockReasonMessage != "" {
+			diagnostic += " (" + envelope.PromptFeedback.BlockReasonMessage + ")"
+		}
+		diagnostics = append(diagnostics, diagnostic)
+	}
+	if len(finishReasons) > 0 {
+		diagnostics = append(diagnostics, "finish reasons: "+strings.Join(finishReasons, ", "))
+	}
+	if len(textSnippets) > 0 {
+		diagnostics = append(diagnostics, "text parts: "+strings.Join(textSnippets, " | "))
+	}
+	if len(diagnostics) == 0 {
+		diagnostics = append(diagnostics, "response contained no audio parts")
+	}
+
+	return "", strings.Join(diagnostics, "; "), nil
 }
 
 // resolveTTSModel returns a validated TTS model name or the default.
@@ -232,7 +308,7 @@ func (c *Client) GenerateTTS(text, voiceName, systemInstruction, languageCode, m
 	var lastErr error
 	for attempt := range maxTTSRetries {
 		if attempt > 0 {
-			time.Sleep(time.Duration(attempt) * 500 * time.Millisecond)
+			time.Sleep(time.Duration(attempt) * time.Second)
 			slog.Warn("retrying TTS request", "attempt", attempt+1, "lastError", lastErr)
 		}
 
@@ -249,9 +325,10 @@ func (c *Client) GenerateTTS(text, voiceName, systemInstruction, languageCode, m
 			continue
 		}
 
-		// Retry on 500 — the model occasionally returns text tokens instead of audio.
-		if resp.StatusCode == http.StatusInternalServerError && attempt < maxTTSRetries-1 {
-			lastErr = fmt.Errorf("gemini TTS API error (status 500): %s", string(body))
+		// Retry on 500/503 — the model occasionally returns text tokens instead of audio
+		// or is temporarily overloaded (503 Service Unavailable).
+		if (resp.StatusCode == http.StatusInternalServerError || resp.StatusCode == http.StatusServiceUnavailable) && attempt < maxTTSRetries-1 {
+			lastErr = fmt.Errorf("gemini TTS API error (status %d): %s", resp.StatusCode, string(body))
 			continue
 		}
 
@@ -259,32 +336,19 @@ func (c *Client) GenerateTTS(text, voiceName, systemInstruction, languageCode, m
 			return "", fmt.Errorf("gemini TTS API error (status %d): %s", resp.StatusCode, string(body))
 		}
 
-		var envelope struct {
-			Candidates []struct {
-				Content struct {
-					Parts []struct {
-						InlineData *struct {
-							Data     string `json:"data"`
-							MimeType string `json:"mimeType"`
-						} `json:"inlineData"`
-					} `json:"parts"`
-				} `json:"content"`
-			} `json:"candidates"`
-		}
-		if err := json.Unmarshal(body, &envelope); err != nil {
+		audioBase64, diagnostic, err := parseTTSAudioResponse(body)
+		if err != nil {
 			return "", fmt.Errorf("parse response: %w", err)
 		}
-
-		if len(envelope.Candidates) == 0 || len(envelope.Candidates[0].Content.Parts) == 0 {
-			return "", fmt.Errorf("empty TTS response from Gemini")
+		if audioBase64 == "" {
+			lastErr = fmt.Errorf("Gemini returned no audio data: %s", diagnostic)
+			if attempt < maxTTSRetries-1 {
+				continue
+			}
+			return "", lastErr
 		}
 
-		inlineData := envelope.Candidates[0].Content.Parts[0].InlineData
-		if inlineData == nil || inlineData.Data == "" {
-			return "", fmt.Errorf("no audio data in TTS response")
-		}
-
-		return inlineData.Data, nil
+		return audioBase64, nil
 	}
 	return "", fmt.Errorf("TTS failed after %d retries: %w", maxTTSRetries, lastErr)
 }
@@ -371,32 +435,16 @@ func (c *Client) GenerateTTSStream(text, voiceName, systemInstruction, languageC
 			continue
 		}
 
-		var chunk struct {
-			Candidates []struct {
-				Content struct {
-					Parts []struct {
-						InlineData *struct {
-							Data     string `json:"data"`
-							MimeType string `json:"mimeType"`
-						} `json:"inlineData"`
-					} `json:"parts"`
-				} `json:"content"`
-			} `json:"candidates"`
-		}
-		if err := json.Unmarshal([]byte(jsonData), &chunk); err != nil {
+		audioBase64, _, err := parseTTSAudioResponse([]byte(jsonData))
+		if err != nil {
 			slog.Warn("skip unparseable streaming chunk", "error", err)
 			continue
 		}
-
-		if len(chunk.Candidates) == 0 || len(chunk.Candidates[0].Content.Parts) == 0 {
-			continue
-		}
-		inlineData := chunk.Candidates[0].Content.Parts[0].InlineData
-		if inlineData == nil || inlineData.Data == "" {
+		if audioBase64 == "" {
 			continue
 		}
 
-		chunks <- StreamTTSChunk{AudioBase64: inlineData.Data, Index: idx, Done: false}
+		chunks <- StreamTTSChunk{AudioBase64: audioBase64, Index: idx, Done: false}
 		idx++
 	}
 
@@ -458,7 +506,7 @@ func (c *Client) GenerateMultiSpeakerTTS(text string, speakers []SpeakerConfig, 
 	for attempt := range maxTTSRetries {
 		if attempt > 0 {
 			slog.Warn("retrying multi-speaker TTS request", "attempt", attempt+1, "maxRetries", maxTTSRetries)
-			time.Sleep(time.Duration(attempt) * 500 * time.Millisecond)
+			time.Sleep(time.Duration(attempt) * time.Second)
 		}
 
 		resp, err := c.httpClient.Post(url, "application/json", bytes.NewReader(data))
@@ -474,40 +522,27 @@ func (c *Client) GenerateMultiSpeakerTTS(text string, speakers []SpeakerConfig, 
 			continue
 		}
 
-		if resp.StatusCode == http.StatusInternalServerError {
-			lastErr = fmt.Errorf("gemini TTS API error (status 500): %s", string(body))
+		if resp.StatusCode == http.StatusInternalServerError || resp.StatusCode == http.StatusServiceUnavailable {
+			lastErr = fmt.Errorf("gemini TTS API error (status %d): %s", resp.StatusCode, string(body))
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("gemini TTS API error (status %d): %s", resp.StatusCode, string(body))
 		}
 
-		var envelope struct {
-			Candidates []struct {
-				Content struct {
-					Parts []struct {
-						InlineData *struct {
-							Data     string `json:"data"`
-							MimeType string `json:"mimeType"`
-						} `json:"inlineData"`
-					} `json:"parts"`
-				} `json:"content"`
-			} `json:"candidates"`
-		}
-		if err := json.Unmarshal(body, &envelope); err != nil {
+		audioBase64, diagnostic, err := parseTTSAudioResponse(body)
+		if err != nil {
 			return "", fmt.Errorf("parse response: %w", err)
 		}
-
-		if len(envelope.Candidates) == 0 || len(envelope.Candidates[0].Content.Parts) == 0 {
-			return "", fmt.Errorf("empty TTS response from Gemini")
+		if audioBase64 == "" {
+			lastErr = fmt.Errorf("Gemini returned no audio data: %s", diagnostic)
+			if attempt < maxTTSRetries-1 {
+				continue
+			}
+			return "", lastErr
 		}
 
-		inlineData := envelope.Candidates[0].Content.Parts[0].InlineData
-		if inlineData == nil || inlineData.Data == "" {
-			return "", fmt.Errorf("no audio data in TTS response")
-		}
-
-		return inlineData.Data, nil
+		return audioBase64, nil
 	}
 	return "", fmt.Errorf("multi-speaker TTS failed after %d retries: %w", maxTTSRetries, lastErr)
 }

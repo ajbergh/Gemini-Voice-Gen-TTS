@@ -116,15 +116,15 @@ const VoiceFinder: React.FC<VoiceFinderProps> = ({ voices, onRecommendation, onC
         {/* Decorative Header Background */}
         <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-indigo-50/50 to-white/0 dark:from-indigo-900/30 dark:to-zinc-900/0 pointer-events-none"></div>
 
-        <div className="relative p-8 sm:p-10">
-          <div className="flex justify-between items-start mb-8">
-             <div className="space-y-3">
-                <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 mb-2">
-                    <Wand2 size={20} />
-                    <span className="text-sm font-bold tracking-wider uppercase">AI Casting Director</span>
+        <div className="relative p-6 sm:p-8">
+          <div className="flex justify-between items-start mb-6">
+             <div className="space-y-2">
+                <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 mb-1">
+                    <Wand2 size={18} />
+                    <span className="text-xs font-bold tracking-wider uppercase">AI Casting Director</span>
                 </div>
-                <h2 id="casting-title" className="text-4xl font-serif font-medium tracking-tight text-zinc-900 dark:text-white">Describe your character.</h2>
-                <p className="text-lg text-zinc-500 dark:text-zinc-400 font-light">Gemini will analyze the library and find the perfect match.</p>
+                <h2 id="casting-title" className="text-3xl font-serif font-medium tracking-tight text-zinc-900 dark:text-white">Describe your character.</h2>
+                <p className="text-base text-zinc-500 dark:text-zinc-400 font-light">Gemini will analyze the library and find the perfect match.</p>
              </div>
              <button 
                onClick={onClose}
@@ -141,7 +141,7 @@ const VoiceFinder: React.FC<VoiceFinderProps> = ({ voices, onRecommendation, onC
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="e.g. A friendly, energetic narrator for a children's book about space exploration..."
-              className="w-full h-32 bg-zinc-50 dark:bg-zinc-800 rounded-xl p-4 text-xl font-sans text-zinc-900 dark:text-white placeholder-zinc-300 dark:placeholder-zinc-600 border border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-300 dark:focus:border-indigo-600 focus:bg-white dark:focus:bg-zinc-900 resize-none transition-all leading-relaxed"
+              className="w-full h-28 bg-zinc-50 dark:bg-zinc-800 rounded-xl p-4 text-base font-sans text-zinc-900 dark:text-white placeholder-zinc-300 dark:placeholder-zinc-600 border border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-300 dark:focus:border-indigo-600 focus:bg-white dark:focus:bg-zinc-900 resize-none transition-all leading-relaxed"
               disabled={loading}
               autoFocus
             />
@@ -163,7 +163,7 @@ const VoiceFinder: React.FC<VoiceFinderProps> = ({ voices, onRecommendation, onC
                 ))}
             </div>
             
-            <div className="flex justify-between items-center mt-6">
+            <div className="flex justify-between items-center mt-4">
               <span className="text-zinc-400 dark:text-zinc-500 text-sm font-medium flex items-center gap-2">
                   {error ? (
                     <span className="text-red-500 dark:text-red-400 flex items-center gap-1"><X size={14}/> {error}</span>
@@ -175,7 +175,7 @@ const VoiceFinder: React.FC<VoiceFinderProps> = ({ voices, onRecommendation, onC
               <button
                 onClick={handleAnalyze}
                 disabled={loading || !query.trim()}
-                className="flex items-center gap-2 pl-6 pr-6 py-3 bg-zinc-900 dark:bg-indigo-600 hover:bg-indigo-600 dark:hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-full transition-all duration-300 transform active:scale-95 shadow-lg hover:shadow-indigo-500/25 dark:shadow-indigo-900/25"
+                className="flex items-center gap-2 pl-5 pr-5 py-2.5 bg-zinc-900 dark:bg-indigo-600 hover:bg-indigo-600 dark:hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-full transition-all duration-300 transform active:scale-95 shadow-lg hover:shadow-indigo-500/25 dark:shadow-indigo-900/25 text-sm"
               >
                 {loading ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
                 <span>Find Voices</span>

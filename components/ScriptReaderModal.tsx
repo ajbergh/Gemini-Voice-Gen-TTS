@@ -6,10 +6,13 @@
 /**
  * ScriptReaderModal.tsx — Custom Script Testing Modal
  *
- * Modal dialog for testing TTS with custom text. Users can type or paste a
- * script and preview it with any available voice using the embedded AiTtsPreview
- * component. Supports both stock voices and custom presets via a tab toggle.
- * Implements focus trap and Escape-to-close for accessibility.
+ * Modal or inline section for testing TTS with custom text. Users can type,
+ * paste, or drag-and-drop a script and preview it with any stock or custom
+ * voice using the embedded AiTtsPreview component. Supports a Stock / My Voices
+ * tab toggle, an accent selector (16 world accents via Director's Notes),
+ * multi-speaker dialogue mode, voice comparison, audio tag insertion with
+ * syntax highlighting via ScriptHighlighter, script templates, and AI-powered
+ * script formatting. Implements focus trap and Escape-to-close for accessibility.
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
@@ -21,6 +24,29 @@ import AiTtsPreview from './AiTtsPreview';
 import AudioTagsToolbar from './AudioTagsToolbar';
 import ScriptHighlighter from './ScriptHighlighter';
 import VoiceCompare from './VoiceCompare';
+
+/** Available TTS accents with Director's Notes prompts for Gemini 3.1. All accents produce English speech. */
+const ACCENT_TRANSCRIPT_GUARD = 'Keep the wording exactly as written. Do not translate or paraphrase.';
+
+const TTS_ACCENTS: { id: string; label: string; directorsNote: string; speechLanguageCode: string }[] = [
+  { id: '', label: 'No Accent', directorsNote: '', speechLanguageCode: '' },
+  { id: 'general-american', label: 'General American', directorsNote: `Read the transcript in English with a neutral General American accent. ${ACCENT_TRANSCRIPT_GUARD}`, speechLanguageCode: 'en-US' },
+  { id: 'british-rp', label: 'British (RP)', directorsNote: `Read the transcript in English with a formal British Received Pronunciation accent. ${ACCENT_TRANSCRIPT_GUARD}`, speechLanguageCode: 'en-GB' },
+  { id: 'london-brixton', label: 'London (Brixton)', directorsNote: `Read the transcript in English with a South London Brixton accent. ${ACCENT_TRANSCRIPT_GUARD}`, speechLanguageCode: 'en-GB' },
+  { id: 'australian', label: 'Australian', directorsNote: `Read the transcript in English with a General Australian accent. ${ACCENT_TRANSCRIPT_GUARD}`, speechLanguageCode: 'en-AU' },
+  { id: 'indian-english', label: 'Indian English', directorsNote: `Read the transcript in English with an Indian English accent. ${ACCENT_TRANSCRIPT_GUARD}`, speechLanguageCode: 'en-IN' },
+  { id: 'canadian', label: 'Canadian', directorsNote: `Read the transcript in English with a Canadian accent. ${ACCENT_TRANSCRIPT_GUARD}`, speechLanguageCode: 'en-CA' },
+  { id: 'irish', label: 'Irish', directorsNote: `Read the transcript in English with a Dublin Irish accent. ${ACCENT_TRANSCRIPT_GUARD}`, speechLanguageCode: 'en-IE' },
+  { id: 'scottish', label: 'Scottish', directorsNote: `Read the transcript in English with an Edinburgh Scottish accent. ${ACCENT_TRANSCRIPT_GUARD}`, speechLanguageCode: 'en-GB' },
+  { id: 'south-african', label: 'South African', directorsNote: `Read the transcript in English with a Cape Town South African accent. ${ACCENT_TRANSCRIPT_GUARD}`, speechLanguageCode: 'en-ZA' },
+  { id: 'castilian-spanish', label: 'Spanish (Castilian)', directorsNote: `Read the transcript in English with a Castilian Spanish accent. ${ACCENT_TRANSCRIPT_GUARD}`, speechLanguageCode: 'en' },
+  { id: 'mexican-spanish', label: 'Spanish (Mexican)', directorsNote: `Read the transcript in English with a Mexican Spanish accent. ${ACCENT_TRANSCRIPT_GUARD}`, speechLanguageCode: 'en' },
+  { id: 'parisian-french', label: 'French (Parisian)', directorsNote: `Read the transcript in English with a Parisian French accent. ${ACCENT_TRANSCRIPT_GUARD}`, speechLanguageCode: 'en' },
+  { id: 'quebecois-french', label: 'French (Québécois)', directorsNote: `Read the transcript in English with a Québécois French accent. ${ACCENT_TRANSCRIPT_GUARD}`, speechLanguageCode: 'en' },
+  { id: 'standard-german', label: 'German (Standard)', directorsNote: `Read the transcript in English with a standard German accent. ${ACCENT_TRANSCRIPT_GUARD}`, speechLanguageCode: 'en' },
+  { id: 'tokyo-japanese', label: 'Japanese (Tokyo)', directorsNote: `Read the transcript in English with a Tokyo Japanese accent. ${ACCENT_TRANSCRIPT_GUARD}`, speechLanguageCode: 'en' },
+  { id: 'mandarin', label: 'Mandarin Chinese', directorsNote: `Read the transcript in English with a Mandarin Chinese accent. ${ACCENT_TRANSCRIPT_GUARD}`, speechLanguageCode: 'en' },
+];
 
 /** Pre-loaded script templates for common use cases. */
 const SCRIPT_TEMPLATES: { label: string; category: string; content: string }[] = [
@@ -85,6 +111,7 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
   const [showRecents, setShowRecents] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
   const [voiceSource, setVoiceSource] = useState<'stock' | 'custom'>('stock');
+  const [selectedAccentId, setSelectedAccentId] = useState('');
   const [mode, setMode] = useState<'single' | 'dialogue' | 'compare'>('single');
   const [speaker1Name, setSpeaker1Name] = useState('Speaker1');
   const [speaker2Name, setSpeaker2Name] = useState('Speaker2');
@@ -316,6 +343,22 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
     [customPresets, selectedCustomVoiceName]
   );
 
+  // Derive accent system instruction for stock voices
+  const selectedAccent = useMemo(
+    () => TTS_ACCENTS.find(a => a.id === selectedAccentId) ?? TTS_ACCENTS[0],
+    [selectedAccentId]
+  );
+  const accentLanguageCode = selectedAccent.speechLanguageCode || undefined;
+  const accentSystemInstruction = selectedAccent.directorsNote
+    ? `## Director's Notes\n${selectedAccent.directorsNote}`
+    : undefined;
+
+  /** Accent options for the AiTtsPreview dropdown. */
+  const accentOptionsForTts = useMemo(
+    () => TTS_ACCENTS.map(a => ({ id: a.id, label: a.label })),
+    []
+  );
+
   const sharedContent = (
     <>
       {/* Mode Toggle */}
@@ -538,9 +581,19 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
             {/* Single speaker preview */}
             {mode === 'single' && (
               voiceSource === 'stock' ? (
-                <div className="bg-white dark:bg-zinc-800 p-1 rounded-2xl shadow-sm border border-zinc-100 dark:border-zinc-700">
-                  <AiTtsPreview text={script} voices={sortedVoices} />
-                </div>
+                <>
+                  <div className="bg-white dark:bg-zinc-800 p-1 rounded-2xl shadow-sm border border-zinc-100 dark:border-zinc-700">
+                    <AiTtsPreview
+                      text={script}
+                      voices={sortedVoices}
+                      systemInstruction={accentSystemInstruction}
+                      accentOptions={accentOptionsForTts}
+                      selectedAccentId={selectedAccentId}
+                      onAccentChange={setSelectedAccentId}
+                      forceLanguageCode={accentLanguageCode}
+                    />
+                  </div>
+                </>
               ) : presetVoicesForTts.length > 0 ? (
                 <div className="bg-white dark:bg-zinc-800 p-1 rounded-2xl shadow-sm border border-zinc-100 dark:border-zinc-700">
                   <AiTtsPreview

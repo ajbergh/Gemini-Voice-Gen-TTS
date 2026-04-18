@@ -9,7 +9,8 @@
  * Renders a transparent overlay that sits behind a textarea to color-code
  * TTS audio tags like [whispers], [excited], [pause: 2s], ## Section Headers,
  * and Speaker: prefixes. The textarea text remains invisible (transparent color)
- * while the overlay shows the styled version underneath.
+ * while the overlay shows the styled version underneath. Accepts a scrollTop
+ * prop to keep the highlighted text in sync with the textarea scroll position.
  */
 
 import React from 'react';
