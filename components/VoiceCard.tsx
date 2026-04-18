@@ -13,7 +13,7 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import { Play, Pause, Activity, Star, Sparkles, ChevronDown } from 'lucide-react';
+import { Play, Pause, Star, Sparkles, ChevronDown } from 'lucide-react';
 import { Voice } from '../types';
 import AudioVisualizer from './AudioVisualizer';
 
@@ -118,28 +118,30 @@ const VoiceCard: React.FC<VoiceCardProps> = ({ voice, isPlaying, onPlayToggle, i
       {/* Visualizer / Action Area - Left Side */}
       <div className="relative h-20 sm:h-full w-full sm:w-28 bg-zinc-50/50 dark:bg-zinc-900/50 shrink-0 border-b sm:border-b-0 sm:border-r border-zinc-100 dark:border-zinc-700 flex items-center justify-center overflow-hidden">
         
-        {/* Technical Grid Background */}
-        <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.1]" style={{ backgroundImage: 'radial-gradient(currentColor 1px, transparent 1px)', backgroundSize: '8px 8px' }}></div>
-
-        {/* Resting State Visual */}
-        <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${isPlaying ? 'opacity-0' : 'opacity-100'}`}>
-             <Activity size={20} className="text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} />
-        </div>
+        {/* Voice headshot image */}
+        <img
+          src={`/images/${voice.name}.png`}
+          alt={voice.name}
+          className="absolute inset-0 w-full h-full object-cover object-top"
+          loading="lazy"
+          draggable={false}
+        />
 
         {/* Active Visualizer */}
         <div className={`absolute inset-0 z-10 transition-opacity duration-200 ${isPlaying ? 'opacity-100' : 'opacity-0'}`}>
-             <AudioVisualizer isPlaying={isPlaying} color={document.documentElement.classList.contains('dark') ? '#a5b4fc' : '#18181b'} />
+             <div className="absolute inset-0 bg-black/30 dark:bg-black/50" />
+             <AudioVisualizer isPlaying={isPlaying} color={document.documentElement.classList.contains('dark') ? '#a5b4fc' : '#ffffff'} />
         </div>
 
         {/* Play Button Overlay - Tactile Feel */}
         <div className={`absolute inset-0 z-20 flex items-center justify-center transition-opacity duration-200 ${isPlaying ? 'opacity-0 hover:opacity-100 focus:opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus:opacity-100'}`}>
-            <div className="h-9 w-9 bg-zinc-900 dark:bg-zinc-100 rounded-full flex items-center justify-center shadow-lg transform transition-transform active:scale-95">
+            <div className="h-9 w-9 bg-zinc-900/70 dark:bg-white/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg transform transition-transform active:scale-95">
                 {isPlaying ? <Pause size={14} className="text-white dark:text-zinc-900" fill="currentColor" /> : <Play size={14} className="text-white dark:text-zinc-900 ml-0.5" fill="currentColor" />}
             </div>
         </div>
         
         {/* Status Indicator */}
-        <div className={`absolute top-2 left-2 w-1.5 h-1.5 rounded-full ${isPlaying ? 'animate-google-colors' : 'bg-zinc-200 dark:bg-zinc-600'}`}></div>
+        <div className={`absolute top-2 left-2 z-20 w-1.5 h-1.5 rounded-full ${isPlaying ? 'animate-google-colors' : 'bg-zinc-200/60 dark:bg-zinc-600/60'}`}></div>
       </div>
 
       {/* Content Area - Right Side */}

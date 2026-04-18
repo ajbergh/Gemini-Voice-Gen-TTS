@@ -16,6 +16,7 @@ import React from 'react';
 
 interface ScriptHighlighterProps {
   text: string;
+  scrollTop?: number;
 }
 
 /** Escape HTML entities for safe innerHTML rendering. */
@@ -49,13 +50,18 @@ function highlightScript(text: string): string {
     );
 }
 
-const ScriptHighlighter: React.FC<ScriptHighlighterProps> = ({ text }) => {
+const ScriptHighlighter: React.FC<ScriptHighlighterProps> = ({ text, scrollTop = 0 }) => {
   return (
     <div
-      className="absolute inset-0 p-3 text-sm leading-normal whitespace-pre-wrap break-words overflow-hidden pointer-events-none text-zinc-900 dark:text-white"
+      className="absolute inset-0 overflow-hidden pointer-events-none rounded-xl"
       aria-hidden="true"
-      dangerouslySetInnerHTML={{ __html: highlightScript(text) + '\n' }}
-    />
+    >
+      <div
+        className="p-3 text-sm leading-normal whitespace-pre-wrap break-words text-zinc-900 dark:text-white"
+        style={{ transform: `translateY(-${scrollTop}px)` }}
+        dangerouslySetInnerHTML={{ __html: highlightScript(text) + '\n' }}
+      />
+    </div>
   );
 };
 

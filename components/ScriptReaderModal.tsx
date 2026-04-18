@@ -85,7 +85,6 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
   const [showRecents, setShowRecents] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
   const [voiceSource, setVoiceSource] = useState<'stock' | 'custom'>('stock');
-  const [selectedPresetId, setSelectedPresetId] = useState<number | null>(customPresets[0]?.id ?? null);
   const [mode, setMode] = useState<'single' | 'dialogue' | 'compare'>('single');
   const [speaker1Name, setSpeaker1Name] = useState('Speaker1');
   const [speaker2Name, setSpeaker2Name] = useState('Speaker2');
@@ -100,6 +99,16 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
   const isMountedRef = useRef(true);
   const modalRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [highlighterScrollTop, setHighlighterScrollTop] = useState(0);
+
+  // Auto-resize textarea to fit content up to max-height
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 384)}px`;
+    setHighlighterScrollTop(textarea.scrollTop);
+  }, [script]);
 
   const handleInsertTag = (tag: string) => {
     const textarea = textareaRef.current;
@@ -278,14 +287,34 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
     return 0;
   }), [voices, initialVoiceName]);
 
-  // Find the selected preset and build a single-voice array for AiTtsPreview
-  const selectedPreset = useMemo(() => customPresets.find(p => p.id === selectedPresetId), [customPresets, selectedPresetId]);
-  const presetVoiceForTts: Voice[] = useMemo(() => {
-    if (!selectedPreset) return [];
-    const baseVoice = VOICE_DATA.find(v => v.name === selectedPreset.voice_name);
-    if (!baseVoice) return [];
-    return [baseVoice];
-  }, [selectedPreset]);
+  // Build voice list and display names for custom presets mode
+  const presetVoicesForTts: Voice[] = useMemo(() => {
+    const seen = new Set<string>();
+    const result: Voice[] = [];
+    for (const p of customPresets) {
+      if (seen.has(p.voice_name)) continue;
+      const v = VOICE_DATA.find(d => d.name === p.voice_name);
+      if (v) { seen.add(p.voice_name); result.push(v); }
+    }
+    return result;
+  }, [customPresets]);
+
+  // Display names for custom voice presets in the dropdown (preset name instead of voice name)
+  const presetDisplayNames: Record<string, string> = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const p of customPresets) {
+      // If multiple presets use the same voice, show the first preset's name
+      if (!map[p.voice_name]) map[p.voice_name] = p.name;
+    }
+    return map;
+  }, [customPresets]);
+
+  // Track which custom voice is currently selected to derive system instruction
+  const [selectedCustomVoiceName, setSelectedCustomVoiceName] = useState<string>(customPresets[0]?.voice_name ?? '');
+  const selectedCustomPreset = useMemo(
+    () => customPresets.find(p => p.voice_name === selectedCustomVoiceName) ?? customPresets[0],
+    [customPresets, selectedCustomVoiceName]
+  );
 
   const sharedContent = (
     <>
@@ -435,7 +464,7 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
             </div>
             <AudioTagsToolbar onInsertTag={handleInsertTag} />
             <div
-              className={`relative rounded-xl transition-colors bg-zinc-50 dark:bg-zinc-800/50 ${isDragOver ? 'ring-2 ring-indigo-400 dark:ring-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20' : ''}`}
+              className={`relative rounded-xl transition-colors border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 ${isDragOver ? 'ring-2 ring-indigo-400 dark:ring-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20' : ''}`}
               onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
               onDragLeave={() => setIsDragOver(false)}
               onDrop={(e) => {
@@ -457,13 +486,14 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
                   <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">Drop file to import</span>
                 </div>
               )}
-              <ScriptHighlighter text={script} />
+              <ScriptHighlighter text={script} scrollTop={highlighterScrollTop} />
               <textarea
                 id="script-input"
                 ref={textareaRef}
                 value={script}
                 onChange={(e) => setScript(e.target.value)}
-                className="relative w-full h-32 p-3 bg-transparent border border-zinc-200 dark:border-zinc-700 rounded-xl text-transparent caret-zinc-900 dark:caret-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none z-[1]"
+                onScroll={(e) => setHighlighterScrollTop(e.currentTarget.scrollTop)}
+                className="relative w-full min-h-[10rem] max-h-[24rem] p-3 bg-transparent border-0 rounded-xl text-sm leading-normal text-transparent caret-zinc-900 dark:caret-white placeholder-zinc-400 focus:outline-none focus:ring-0 resize-y z-[1] overflow-y-auto"
                 placeholder="Type the script you want the voice to read, or drop a .txt / .md file..."
               />
             </div>
@@ -503,25 +533,7 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
               )}
             </div>
 
-            {/* Custom preset selector — shown only when in custom mode (single speaker) */}
-            {mode === 'single' && voiceSource === 'custom' && customPresets.length > 0 && (
-              <div className="relative">
-                <select
-                  value={selectedPresetId ?? ''}
-                  onChange={(e) => setSelectedPresetId(Number(e.target.value))}
-                  className="appearance-none w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 py-2 pl-3 pr-10 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                >
-                  {customPresets.map(preset => (
-                    <option key={preset.id} value={preset.id}>
-                      {preset.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-zinc-400">
-                  <ChevronDown size={14} />
-                </div>
-              </div>
-            )}
+            {/* Custom preset selector — removed; presets now appear in the AiTtsPreview voice dropdown */}
             
             {/* Single speaker preview */}
             {mode === 'single' && (
@@ -529,9 +541,15 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
                 <div className="bg-white dark:bg-zinc-800 p-1 rounded-2xl shadow-sm border border-zinc-100 dark:border-zinc-700">
                   <AiTtsPreview text={script} voices={sortedVoices} />
                 </div>
-              ) : presetVoiceForTts.length > 0 ? (
+              ) : presetVoicesForTts.length > 0 ? (
                 <div className="bg-white dark:bg-zinc-800 p-1 rounded-2xl shadow-sm border border-zinc-100 dark:border-zinc-700">
-                  <AiTtsPreview key={selectedPresetId} text={script} voices={presetVoiceForTts} hideVoiceSelector systemInstruction={selectedPreset?.system_instruction || undefined} />
+                  <AiTtsPreview
+                    text={script}
+                    voices={presetVoicesForTts}
+                    voiceDisplayNames={presetDisplayNames}
+                    systemInstruction={selectedCustomPreset?.system_instruction || undefined}
+                    onVoiceChange={(name) => setSelectedCustomVoiceName(name)}
+                  />
                 </div>
               ) : (
                 <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200 dark:border-zinc-700 p-6 text-center">

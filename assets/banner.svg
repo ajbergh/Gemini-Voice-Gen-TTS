@@ -115,7 +115,7 @@
 
   <!-- Subtitle -->
   <text x="600" y="240" text-anchor="middle" font-family="'Segoe UI', system-ui, -apple-system, sans-serif" font-weight="400" font-size="18" fill="#94a3b8" letter-spacing="0.5">
-    Powered by Gemini 3.1 Flash TTS — 70+ Languages — Multi-Speaker Dialoguer Dialogue
+    Powered by Gemini 3.1 Flash TTS — 70+ Languages — Multi-Speaker Dialogue
   </text>
 
   <!-- Feature pills -->
@@ -153,14 +153,9 @@
     <!-- Single Binary -->
     <g transform="translate(350, 0)">
       <rect x="0" y="0" width="120" height="32" rx="16" fill="#EA4335" opacity="0.15" stroke="#EA4335" stroke-width="0.8" stroke-opacity="0.3"/>
-      <text x="60" y="21" text-anchor="middle" fill="#fca5a5">WAV Export</text>
-    </g>
-    <!-- Single Binary -->
-    <g transform="translate(350, 0)">
-      <rect x="0" y="0" width="120" height="32" rx="16" fill="#EA4335" opacity="0.15" stroke="#EA4335" stroke-width="0.8" stroke-opacity="0.3"/>
       <text x="60" y="21" text-anchor="middle" fill="#fca5a5">Single Binary</text>
     </g>
-  </g>GEMINI 3.1 FLASH TTS  ·  SQLITE  ·  VITE
+  </g>
 
   <!-- Tech badges row -->
   <g transform="translate(600, 340)" font-family="'Segoe UI', system-ui, -apple-system, sans-serif" font-size="11" font-weight="400" opacity="0.5">

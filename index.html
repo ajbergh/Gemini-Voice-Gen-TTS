@@ -250,6 +250,15 @@
       .high-contrast .opacity-60 {
         opacity: 1 !important;
       }
+      /* Fix selection highlight on transparent-text textareas (ScriptHighlighter overlay) */
+      #script-input::selection {
+        background: rgba(99, 102, 241, 0.3);
+        color: transparent;
+      }
+      #script-input::-moz-selection {
+        background: rgba(99, 102, 241, 0.3);
+        color: transparent;
+      }
     </style>
   <script type="importmap">
 {
@@ -263,7 +272,6 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
   <body>
     <div id="root"></div>

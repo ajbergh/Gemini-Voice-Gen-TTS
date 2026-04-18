@@ -32,7 +32,6 @@ import SettingsModal from './components/SettingsModal';
 import HistoryPanel from './components/HistoryPanel';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import MiniPlayer from './components/MiniPlayer';
-import SplitPane from './components/SplitPane';
 import CommandPalette from './components/CommandPalette';
 import OnboardingTour from './components/OnboardingTour';
 import { FilterState, AiRecommendation, CustomPreset } from './types';
@@ -639,57 +638,13 @@ const App: React.FC = () => {
         {activeSection === 'presets' && renderPresetsSection()}
         {activeSection === 'script' && (
           <div className="flex-1 overflow-hidden flex flex-col">
-            <div className="hidden lg:flex flex-1 overflow-hidden">
-              <SplitPane
-                defaultLeftPercent={30}
-                minLeft={220}
-                minRight={400}
-                left={
-                  <div className="h-full bg-zinc-50 dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
-                    <div className="p-3 border-b border-zinc-200 dark:border-zinc-800">
-                      <h3 className="text-xs font-bold tracking-wider uppercase text-zinc-400 dark:text-zinc-500">Voices</h3>
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                      {VOICE_DATA.map(v => (
-                        <button
-                          key={v.name}
-                          onClick={() => setScriptVoiceName(v.name)}
-                          aria-label={`Select voice ${v.name}`}
-                          aria-current={scriptVoiceName === v.name ? 'true' : undefined}
-                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm transition-colors ${
-                            scriptVoiceName === v.name
-                              ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 font-medium'
-                              : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                          }`}
-                        >
-                          <span className="truncate">{v.name}</span>
-                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500 flex-shrink-0">{v.analysis.gender}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                }
-                right={
-                  <ScriptReaderModal
-                    voices={VOICE_DATA}
-                    customPresets={customPresets}
-                    initialVoiceName={scriptVoiceName}
-                    onClose={() => setActiveSection('voices')}
-                    inline
-                  />
-                }
-              />
-            </div>
-            {/* Mobile: just the script reader without split pane */}
-            <div className="lg:hidden flex-1 overflow-hidden flex flex-col">
-              <ScriptReaderModal
-                voices={VOICE_DATA}
-                customPresets={customPresets}
-                initialVoiceName={scriptVoiceName}
-                onClose={() => setActiveSection('voices')}
-                inline
-              />
-            </div>
+            <ScriptReaderModal
+              voices={VOICE_DATA}
+              customPresets={customPresets}
+              initialVoiceName={scriptVoiceName}
+              onClose={() => setActiveSection('voices')}
+              inline
+            />
           </div>
         )}
         {activeSection === 'history' && (

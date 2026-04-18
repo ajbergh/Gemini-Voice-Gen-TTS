@@ -20,6 +20,15 @@ export default defineConfig({
       host: 'localhost',
       proxy: {
         '/api': 'http://localhost:8080',
+        '/ws': { target: 'ws://localhost:8080', ws: true },
+      },
+    },
+    preview: {
+      port: 4000,
+      host: 'localhost',
+      proxy: {
+        '/api': 'http://localhost:8080',
+        '/ws': { target: 'ws://localhost:8080', ws: true },
       },
     },
     publicDir: 'assets',

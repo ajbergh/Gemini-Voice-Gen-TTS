@@ -74,6 +74,8 @@ interface AiTtsPreviewProps {
   systemInstruction?: string;
   sourceQuery?: string;
   hideVoiceSelector?: boolean;
+  voiceDisplayNames?: Record<string, string>;
+  onVoiceChange?: (voiceName: string) => void;
   onSavePreset?: (data: { voiceName: string; text: string; systemInstruction: string; audioBase64: string | null; sourceQuery: string }) => void;
 }
 
@@ -201,7 +203,7 @@ function detectLanguageCode(input: string): string {
   return '';
 }
 
-const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruction, sourceQuery, hideVoiceSelector, onSavePreset }) => {
+const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruction, sourceQuery, hideVoiceSelector, voiceDisplayNames, onVoiceChange, onSavePreset }) => {
   const [selectedVoiceName, setSelectedVoiceName] = useState(voices[0]?.name || '');
   const [languageCode, setLanguageCode] = useState('');
   const [autoDetectedLang, setAutoDetectedLang] = useState('');
@@ -547,13 +549,13 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
             <div className="relative group w-full sm:w-auto">
                 <select
                     value={selectedVoiceName}
-                    onChange={(e) => { pushUndo(getCurrentSnapshot()); setSelectedVoiceName(e.target.value); }}
+                    onChange={(e) => { pushUndo(getCurrentSnapshot()); setSelectedVoiceName(e.target.value); onVoiceChange?.(e.target.value); }}
                     className="appearance-none w-full sm:w-48 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 py-2 pl-3 pr-10 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-600 cursor-pointer transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800"
                     disabled={isLoading || isDownloading || isPlaying}
                 >
                     {voices.map(voice => (
                         <option key={voice.name} value={voice.name}>
-                            {voice.name} ({voice.analysis.gender})
+                            {voiceDisplayNames?.[voice.name] || `${voice.name} (${voice.analysis.gender})`}
                         </option>
                     ))}
                 </select>
