@@ -18,7 +18,7 @@ import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { CustomPreset } from '../types';
 import { VOICE_DATA } from '../constants';
 import { getPresetAudio } from '../api';
-import { Play, Pause, Activity, ChevronLeft, ChevronRight, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { Play, Pause, Activity, ChevronLeft, ChevronRight, Loader2, Pencil, Trash2, Copy } from 'lucide-react';
 import AudioVisualizer from './AudioVisualizer';
 
 interface PresetCarousel3DProps {
@@ -29,6 +29,7 @@ interface PresetCarousel3DProps {
   onPlayToggle: (presetId: number) => void;
   onEdit: (preset: CustomPreset) => void;
   onDelete: (preset: CustomPreset) => void;
+  onDuplicate?: (preset: CustomPreset) => void;
   disabled?: boolean;
 }
 
@@ -50,6 +51,7 @@ const PresetCarousel3D: React.FC<PresetCarousel3DProps> = ({
   onPlayToggle,
   onEdit,
   onDelete,
+  onDuplicate,
   disabled = false
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -344,6 +346,15 @@ const PresetCarousel3D: React.FC<PresetCarousel3DProps> = ({
                         {/* Action Buttons */}
                         {isActive && (
                           <div className="flex gap-1.5 pt-1 relative z-50" onClick={(e) => e.stopPropagation()}>
+                            {onDuplicate && (
+                              <button
+                                onClick={() => onDuplicate(preset)}
+                                className="p-1.5 bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors border border-zinc-200 dark:border-zinc-600"
+                                title="Duplicate preset"
+                              >
+                                <Copy size={12} />
+                              </button>
+                            )}
                             <button
                               onClick={() => onEdit(preset)}
                               className="p-1.5 bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors border border-zinc-200 dark:border-zinc-600"

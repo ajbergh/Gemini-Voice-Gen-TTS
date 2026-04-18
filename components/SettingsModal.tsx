@@ -14,8 +14,9 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Key, Eye, EyeOff, Check, AlertCircle, Loader2, Trash2, Shield } from 'lucide-react';
-import { listApiKeys, storeApiKey, deleteApiKey, testApiKey, APIKeyInfo } from '../api';
+import { X, Key, Eye, EyeOff, Check, AlertCircle, Loader2, Trash2, Shield, HardDrive, Download, Upload, Plus, RotateCcw } from 'lucide-react';
+import { listApiKeys, storeApiKey, deleteApiKey, testApiKey, APIKeyInfo, getCacheStats, clearCache, CacheStats, createBackup, restoreBackup, listKeyPool, addKeyToPool, deleteKeyFromPool, resetPoolKey, APIKeyPoolEntry } from '../api';
+import BottomSheet from './BottomSheet';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -31,6 +32,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ valid: boolean; message: string } | null>(null);
+  const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
+  const [clearingCache, setClearingCache] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const restoreInputRef = useRef<HTMLInputElement>(null);
+  const [poolKeys, setPoolKeys] = useState<APIKeyPoolEntry[]>([]);
+  const [showPool, setShowPool] = useState(false);
+  const [newPoolKey, setNewPoolKey] = useState('');
+  const [newPoolLabel, setNewPoolLabel] = useState('');
+  const [addingPool, setAddingPool] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const isMountedRef = useRef(true);
@@ -38,6 +49,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   useEffect(() => {
     isMountedRef.current = true;
     loadKeys();
+    loadPool();
+    loadCacheStats();
     return () => { isMountedRef.current = false; };
   }, []);
 
@@ -76,6 +89,56 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
       if (isMountedRef.current) setKeys(data || []);
     } catch {
       if (isMountedRef.current) setError('Failed to load API keys.');
+    }
+  };
+
+  const loadPool = async () => {
+    try {
+      const data = await listKeyPool('gemini');
+      if (isMountedRef.current) setPoolKeys(data || []);
+    } catch { /* ignore — pool may not exist yet */ }
+  };
+
+  const handleAddPoolKey = async () => {
+    if (!newPoolKey.trim()) return;
+    setAddingPool(true);
+    setError(null);
+    try {
+      await addKeyToPool('gemini', newPoolKey.trim(), newPoolLabel.trim());
+      if (isMountedRef.current) {
+        setNewPoolKey('');
+        setNewPoolLabel('');
+        setSuccess('Key added to rotation pool.');
+        loadPool();
+      }
+    } catch {
+      if (isMountedRef.current) setError('Failed to add key to pool.');
+    } finally {
+      if (isMountedRef.current) setAddingPool(false);
+    }
+  };
+
+  const handleDeletePoolKey = async (id: number) => {
+    try {
+      await deleteKeyFromPool('gemini', id);
+      if (isMountedRef.current) {
+        setSuccess('Key removed from pool.');
+        loadPool();
+      }
+    } catch {
+      if (isMountedRef.current) setError('Failed to remove key from pool.');
+    }
+  };
+
+  const handleResetPoolKey = async (id: number) => {
+    try {
+      await resetPoolKey('gemini', id);
+      if (isMountedRef.current) {
+        setSuccess('Key errors reset.');
+        loadPool();
+      }
+    } catch {
+      if (isMountedRef.current) setError('Failed to reset key.');
     }
   };
 
@@ -136,18 +199,42 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     }
   };
 
-  return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="settings-title"
-    >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose}></div>
+  /** Load audio cache statistics from the backend. */
+  const loadCacheStats = async () => {
+    try {
+      const stats = await getCacheStats();
+      if (isMountedRef.current) setCacheStats(stats);
+    } catch {}
+  };
 
+  /** Clear all cached audio files. */
+  const handleClearCache = async () => {
+    setClearingCache(true);
+    try {
+      await clearCache();
+      if (isMountedRef.current) {
+        await loadCacheStats();
+        setSuccess('Audio cache cleared.');
+      }
+    } catch {
+      if (isMountedRef.current) setError('Failed to clear audio cache.');
+    } finally {
+      if (isMountedRef.current) setClearingCache(false);
+    }
+  };
+
+  /** Format bytes to a human-readable string. */
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${(bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
+  };
+
+  return (
+    <BottomSheet onClose={onClose} ariaLabel="Settings">
       {/* Modal */}
-      <div ref={modalRef} className="relative w-full max-w-lg bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl overflow-hidden animate-slide-up ring-1 ring-zinc-900/5">
+      <div ref={modalRef} className="relative w-full max-w-lg mx-auto bg-white dark:bg-zinc-900 sm:rounded-3xl shadow-2xl overflow-hidden sm:animate-slide-up ring-1 ring-zinc-900/5">
         {/* Header */}
         <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-emerald-50/50 to-white/0 dark:from-emerald-900/20 dark:to-zinc-900/0 pointer-events-none"></div>
 
@@ -269,9 +356,195 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             Get your API key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-emerald-600 dark:text-emerald-400 hover:underline">Google AI Studio</a>.
             Keys are encrypted with AES-256-GCM before storage.
           </p>
+
+          {/* API Key Rotation Pool */}
+          <div className="mt-6 pt-6 border-t border-zinc-200 dark:border-zinc-800">
+            <button
+              onClick={() => setShowPool(!showPool)}
+              className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 mb-3 w-full text-left"
+            >
+              <Key size={16} />
+              <span className="text-sm font-medium">Key Rotation Pool</span>
+              <span className="text-xs text-zinc-400 ml-auto">{poolKeys.length} key{poolKeys.length !== 1 ? 's' : ''}</span>
+            </button>
+
+            {showPool && (
+              <div className="space-y-3">
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                  Add multiple API keys for automatic round-robin rotation. Keys are used in order and auto-disabled after 5 consecutive errors.
+                </p>
+
+                {/* Pool key list */}
+                {poolKeys.length > 0 && (
+                  <div className="space-y-2">
+                    {poolKeys.map(pk => (
+                      <div key={pk.id} className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-block w-2 h-2 rounded-full ${pk.is_active ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                            <span className="text-sm font-medium text-zinc-900 dark:text-white truncate">
+                              {pk.label || `Key #${pk.id}`}
+                            </span>
+                          </div>
+                          {pk.error_count > 0 && (
+                            <p className="text-xs text-red-400 mt-0.5">{pk.error_count} error{pk.error_count !== 1 ? 's' : ''}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {!pk.is_active && (
+                            <button
+                              onClick={() => handleResetPoolKey(pk.id)}
+                              className="p-1.5 text-zinc-400 hover:text-emerald-500 transition-colors"
+                              title="Reset & reactivate"
+                            >
+                              <RotateCcw size={12} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeletePoolKey(pk.id)}
+                            className="p-1.5 text-zinc-400 hover:text-red-500 transition-colors"
+                            title="Remove key"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add new pool key */}
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={newPoolLabel}
+                    onChange={e => setNewPoolLabel(e.target.value)}
+                    placeholder="Label (optional, e.g. 'Key 2')"
+                    className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white placeholder:text-zinc-400"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={newPoolKey}
+                      onChange={e => setNewPoolKey(e.target.value)}
+                      placeholder="API key"
+                      className="flex-1 px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white placeholder:text-zinc-400"
+                    />
+                    <button
+                      onClick={handleAddPoolKey}
+                      disabled={addingPool || !newPoolKey.trim()}
+                      className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-300 dark:disabled:bg-zinc-700 text-white rounded-xl transition-colors"
+                    >
+                      {addingPool ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                      Add
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Audio Cache Management */}
+          <div className="mt-6 pt-6 border-t border-zinc-200 dark:border-zinc-800">
+            <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 mb-3">
+              <HardDrive size={16} />
+              <span className="text-sm font-medium">Audio Cache</span>
+            </div>
+
+            {cacheStats ? (
+              <div className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+                <div>
+                  <p className="text-sm font-medium text-zinc-900 dark:text-white">
+                    {formatBytes(cacheStats.total_size)}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    {cacheStats.file_count} cached {cacheStats.file_count === 1 ? 'file' : 'files'}
+                  </p>
+                </div>
+                {cacheStats.file_count > 0 && (
+                  <button
+                    onClick={handleClearCache}
+                    disabled={clearingCache}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  >
+                    {clearingCache ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                    Clear Cache
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center py-3">
+                <Loader2 size={14} className="animate-spin text-zinc-400" />
+              </div>
+            )}
+          </div>
+
+          {/* Backup & Restore */}
+          <div className="mt-6 pt-6 border-t border-zinc-200 dark:border-zinc-800">
+            <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 mb-3">
+              <Download size={16} />
+              <span className="text-sm font-medium">Backup & Restore</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={async () => {
+                  setBackingUp(true);
+                  setError(null);
+                  try {
+                    await createBackup();
+                    if (isMountedRef.current) setSuccess('Backup downloaded.');
+                  } catch {
+                    if (isMountedRef.current) setError('Failed to create backup.');
+                  } finally {
+                    if (isMountedRef.current) setBackingUp(false);
+                  }
+                }}
+                disabled={backingUp}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl transition-colors"
+              >
+                {backingUp ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                Download Backup
+              </button>
+              <button
+                onClick={() => restoreInputRef.current?.click()}
+                disabled={restoring}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl transition-colors"
+              >
+                {restoring ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                Restore Backup
+              </button>
+              <input
+                ref={restoreInputRef}
+                type="file"
+                accept=".db"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setRestoring(true);
+                  setError(null);
+                  try {
+                    await restoreBackup(file);
+                    if (isMountedRef.current) {
+                      setSuccess('Database restored. Reloading...');
+                      setTimeout(() => window.location.reload(), 1500);
+                    }
+                  } catch {
+                    if (isMountedRef.current) setError('Failed to restore backup.');
+                  } finally {
+                    if (isMountedRef.current) setRestoring(false);
+                    e.target.value = '';
+                  }
+                }}
+              />
+            </div>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">
+              Backup includes all settings, history, presets, and favorites.
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   );
 };
 

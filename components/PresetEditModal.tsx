@@ -12,20 +12,53 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
-import { CustomPreset } from '../types';
+import { X, Loader2, Plus, History, RotateCcw } from 'lucide-react';
+import { CustomPreset, PresetTag } from '../types';
+import { setPresetTags, listPresetVersions, revertPresetVersion, PresetVersion } from '../api';
 
 interface PresetEditModalProps {
   preset: CustomPreset;
-  onSave: (id: number, data: { name?: string; system_instruction?: string }) => Promise<void>;
+  onSave: (id: number, data: { name?: string; system_instruction?: string; color?: string }) => Promise<void>;
   onClose: () => void;
 }
+
+const TAG_COLORS = [
+  '#6366f1', // indigo
+  '#ec4899', // pink
+  '#f59e0b', // amber
+  '#10b981', // emerald
+  '#3b82f6', // blue
+  '#8b5cf6', // violet
+  '#ef4444', // red
+  '#14b8a6', // teal
+];
+
+const PRESET_COLORS = [
+  '#6366f1', // indigo
+  '#ec4899', // pink
+  '#f59e0b', // amber
+  '#10b981', // emerald
+  '#3b82f6', // blue
+  '#8b5cf6', // violet
+  '#ef4444', // red
+  '#14b8a6', // teal
+  '#f97316', // orange
+  '#06b6d4', // cyan
+];
 
 const PresetEditModal: React.FC<PresetEditModalProps> = ({ preset, onSave, onClose }) => {
   const [name, setName] = useState(preset.name);
   const [systemInstruction, setSystemInstruction] = useState(preset.system_instruction || '');
+  const [presetColor, setPresetColor] = useState(preset.color || '#6366f1');
+  const [tags, setTags] = useState<PresetTag[]>(preset.tags || []);
+  const [newTag, setNewTag] = useState('');
+  const [newTagColor, setNewTagColor] = useState(TAG_COLORS[0]);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showVersions, setShowVersions] = useState(false);
+  const [versions, setVersions] = useState<PresetVersion[]>([]);
+  const [loadingVersions, setLoadingVersions] = useState(false);
+  const [revertingId, setRevertingId] = useState<number | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -63,9 +96,12 @@ const PresetEditModal: React.FC<PresetEditModalProps> = ({ preset, onSave, onClo
     setIsSaving(true);
     setError(null);
     try {
+      // Save tags first so the refresh after onSave includes them
+      await setPresetTags(preset.id, tags.map(t => ({ tag: t.tag, color: t.color })));
       await onSave(preset.id, {
         name: trimmedName !== preset.name ? trimmedName : undefined,
         system_instruction: systemInstruction !== preset.system_instruction ? systemInstruction : undefined,
+        color: presetColor !== preset.color ? presetColor : undefined,
       });
       onClose();
     } catch (err: any) {
@@ -74,6 +110,61 @@ const PresetEditModal: React.FC<PresetEditModalProps> = ({ preset, onSave, onClo
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleAddTag = () => {
+    const trimmed = newTag.trim();
+    if (!trimmed) return;
+    if (tags.some(t => t.tag.toLowerCase() === trimmed.toLowerCase())) return;
+    setTags([...tags, { tag: trimmed, color: newTagColor }]);
+    setNewTag('');
+    // Cycle to next color
+    const idx = TAG_COLORS.indexOf(newTagColor);
+    setNewTagColor(TAG_COLORS[(idx + 1) % TAG_COLORS.length]);
+  };
+
+  const handleRemoveTag = (tagName: string) => {
+    setTags(tags.filter(t => t.tag !== tagName));
+  };
+
+  const handleToggleVersions = async () => {
+    if (showVersions) {
+      setShowVersions(false);
+      return;
+    }
+    setShowVersions(true);
+    setLoadingVersions(true);
+    try {
+      const data = await listPresetVersions(preset.id);
+      setVersions(data || []);
+    } catch {
+      setVersions([]);
+    } finally {
+      setLoadingVersions(false);
+    }
+  };
+
+  const handleRevert = async (versionId: number) => {
+    setRevertingId(versionId);
+    try {
+      const updated = await revertPresetVersion(preset.id, versionId);
+      // Update form fields with reverted values
+      setName(updated.name);
+      setSystemInstruction(updated.system_instruction || '');
+      setPresetColor(updated.color || '#6366f1');
+      // Refresh versions list
+      const data = await listPresetVersions(preset.id);
+      setVersions(data || []);
+    } catch {
+      setError('Failed to revert to this version.');
+    } finally {
+      setRevertingId(null);
+    }
+  };
+
+  const formatVersionDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
   return (
@@ -120,6 +211,132 @@ const PresetEditModal: React.FC<PresetEditModalProps> = ({ preset, onSave, onClo
               rows={6}
               className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 resize-none"
             />
+          </div>
+
+          {/* Tags */}
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Tags</label>
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {tags.map(t => (
+                  <span
+                    key={t.tag}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full text-white"
+                    style={{ backgroundColor: t.color }}
+                  >
+                    {t.tag}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTag(t.tag)}
+                      className="hover:opacity-70 transition-opacity"
+                      aria-label={`Remove tag ${t.tag}`}
+                    >
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                {TAG_COLORS.map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setNewTagColor(c)}
+                    className={`w-4 h-4 rounded-full transition-transform ${newTagColor === c ? 'ring-2 ring-offset-1 ring-zinc-400 dark:ring-zinc-500 scale-110' : 'hover:scale-110'}`}
+                    style={{ backgroundColor: c }}
+                    aria-label={`Select color ${c}`}
+                  />
+                ))}
+              </div>
+              <input
+                type="text"
+                value={newTag}
+                onChange={e => setNewTag(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
+                placeholder="Add tag..."
+                className="flex-1 px-2 py-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800"
+                maxLength={30}
+              />
+              <button
+                type="button"
+                onClick={handleAddTag}
+                disabled={!newTag.trim()}
+                className="p-1 text-zinc-500 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:opacity-30 transition-colors"
+                aria-label="Add tag"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Color Accent */}
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Color Accent</label>
+            <div className="flex items-center gap-1.5">
+              {PRESET_COLORS.map(c => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setPresetColor(c)}
+                  className={`w-6 h-6 rounded-full transition-transform ${presetColor === c ? 'ring-2 ring-offset-2 ring-zinc-400 dark:ring-zinc-500 dark:ring-offset-zinc-900 scale-110' : 'hover:scale-110'}`}
+                  style={{ backgroundColor: c }}
+                  aria-label={`Select preset color ${c}`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Version History */}
+          <div className="border-t border-zinc-200 dark:border-zinc-800 pt-3">
+            <button
+              type="button"
+              onClick={handleToggleVersions}
+              className="flex items-center gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
+            >
+              <History size={14} />
+              Version History
+              <span className="text-zinc-400 dark:text-zinc-500">{showVersions ? '▾' : '▸'}</span>
+            </button>
+
+            {showVersions && (
+              <div className="mt-2 max-h-40 overflow-y-auto space-y-1.5">
+                {loadingVersions ? (
+                  <div className="flex items-center justify-center py-3">
+                    <Loader2 size={14} className="animate-spin text-zinc-400" />
+                  </div>
+                ) : versions.length === 0 ? (
+                  <p className="text-xs text-zinc-400 dark:text-zinc-500 py-2">No previous versions.</p>
+                ) : (
+                  versions.map(v => (
+                    <div
+                      key={v.id}
+                      className="flex items-center justify-between p-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-100 dark:border-zinc-800"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">{v.name}</p>
+                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500">{formatVersionDate(v.created_at)}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRevert(v.id)}
+                        disabled={revertingId === v.id}
+                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded transition-colors"
+                        title="Revert to this version"
+                      >
+                        {revertingId === v.id ? (
+                          <Loader2 size={10} className="animate-spin" />
+                        ) : (
+                          <RotateCcw size={10} />
+                        )}
+                        Revert
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
 
           {error && (

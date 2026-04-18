@@ -115,47 +115,52 @@
 
   <!-- Subtitle -->
   <text x="600" y="240" text-anchor="middle" font-family="'Segoe UI', system-ui, -apple-system, sans-serif" font-weight="400" font-size="18" fill="#94a3b8" letter-spacing="0.5">
-    Discover, Cast &amp; Generate AI Voices with Google Gemini TTS
+    Powered by Gemini 3.1 Flash TTS — 70+ Languages — Multi-Speaker Dialogue
   </text>
 
   <!-- Feature pills -->
-  <g transform="translate(600, 280)" font-family="'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12.5" font-weight="500">
+  <g transform="translate(600, 280)" font-family="'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="500">
     <!-- 30 Voices -->
-    <g transform="translate(-420, 0)">
-      <rect x="0" y="0" width="120" height="32" rx="16" fill="#4285F4" opacity="0.15" stroke="#4285F4" stroke-width="0.8" stroke-opacity="0.3"/>
-      <text x="60" y="21" text-anchor="middle" fill="#93c5fd">30 AI Voices</text>
+    <g transform="translate(-460, 0)">
+      <rect x="0" y="0" width="110" height="32" rx="16" fill="#4285F4" opacity="0.15" stroke="#4285F4" stroke-width="0.8" stroke-opacity="0.3"/>
+      <text x="55" y="21" text-anchor="middle" fill="#93c5fd">30 AI Voices</text>
     </g>
     <!-- AI Casting -->
-    <g transform="translate(-275, 0)">
-      <rect x="0" y="0" width="126" height="32" rx="16" fill="#EA4335" opacity="0.15" stroke="#EA4335" stroke-width="0.8" stroke-opacity="0.3"/>
-      <text x="63" y="21" text-anchor="middle" fill="#fca5a5">AI Casting Director</text>
+    <g transform="translate(-330, 0)">
+      <rect x="0" y="0" width="120" height="32" rx="16" fill="#EA4335" opacity="0.15" stroke="#EA4335" stroke-width="0.8" stroke-opacity="0.3"/>
+      <text x="60" y="21" text-anchor="middle" fill="#fca5a5">AI Casting</text>
     </g>
-    <!-- Custom Presets -->
-    <g transform="translate(-124, 0)">
-      <rect x="0" y="0" width="130" height="32" rx="16" fill="#FBBC04" opacity="0.15" stroke="#FBBC04" stroke-width="0.8" stroke-opacity="0.3"/>
-      <text x="65" y="21" text-anchor="middle" fill="#fde68a">Custom Presets</text>
+    <!-- 70+ Languages -->
+    <g transform="translate(-190, 0)">
+      <rect x="0" y="0" width="120" height="32" rx="16" fill="#FBBC04" opacity="0.15" stroke="#FBBC04" stroke-width="0.8" stroke-opacity="0.3"/>
+      <text x="60" y="21" text-anchor="middle" fill="#fde68a">70+ Languages</text>
     </g>
-    <!-- Script Reader -->
-    <g transform="translate(31, 0)">
-      <rect x="0" y="0" width="120" height="32" rx="16" fill="#34A853" opacity="0.15" stroke="#34A853" stroke-width="0.8" stroke-opacity="0.3"/>
-      <text x="60" y="21" text-anchor="middle" fill="#86efac">Script Reader</text>
+    <!-- Audio Tags -->
+    <g transform="translate(-50, 0)">
+      <rect x="0" y="0" width="110" height="32" rx="16" fill="#34A853" opacity="0.15" stroke="#34A853" stroke-width="0.8" stroke-opacity="0.3"/>
+      <text x="55" y="21" text-anchor="middle" fill="#86efac">Audio Tags</text>
+    </g>
+    <!-- Dialogue -->
+    <g transform="translate(80, 0)">
+      <rect x="0" y="0" width="120" height="32" rx="16" fill="#a855f7" opacity="0.15" stroke="#a855f7" stroke-width="0.8" stroke-opacity="0.3"/>
+      <text x="60" y="21" text-anchor="middle" fill="#d8b4fe">Multi-Speaker</text>
     </g>
     <!-- WAV Export -->
-    <g transform="translate(176, 0)">
-      <rect x="0" y="0" width="115" height="32" rx="16" fill="#4285F4" opacity="0.15" stroke="#4285F4" stroke-width="0.8" stroke-opacity="0.3"/>
-      <text x="57.5" y="21" text-anchor="middle" fill="#93c5fd">WAV Export</text>
+    <g transform="translate(220, 0)">
+      <rect x="0" y="0" width="110" height="32" rx="16" fill="#4285F4" opacity="0.15" stroke="#4285F4" stroke-width="0.8" stroke-opacity="0.3"/>
+      <text x="55" y="21" text-anchor="middle" fill="#93c5fd">WAV Export</text>
     </g>
     <!-- Single Binary -->
-    <g transform="translate(316, 0)">
-      <rect x="0" y="0" width="120" height="32" rx="16" fill="#a855f7" opacity="0.15" stroke="#a855f7" stroke-width="0.8" stroke-opacity="0.3"/>
-      <text x="60" y="21" text-anchor="middle" fill="#d8b4fe">Single Binary</text>
+    <g transform="translate(350, 0)">
+      <rect x="0" y="0" width="120" height="32" rx="16" fill="#EA4335" opacity="0.15" stroke="#EA4335" stroke-width="0.8" stroke-opacity="0.3"/>
+      <text x="60" y="21" text-anchor="middle" fill="#fca5a5">Single Binary</text>
     </g>
   </g>
 
   <!-- Tech badges row -->
   <g transform="translate(600, 340)" font-family="'Segoe UI', system-ui, -apple-system, sans-serif" font-size="11" font-weight="400" opacity="0.5">
     <text x="0" y="14" text-anchor="middle" fill="#94a3b8" letter-spacing="3">
-      REACT 19  ·  GO  ·  SQLITE  ·  VITE  ·  FRAMER MOTION  ·  TAILWIND CSS
+      REACT 19  ·  GO  ·  GEMINI 3.1 FLASH TTS  ·  SQLITE  ·  VITE  ·  TAILWIND CSS
     </text>
   </g>
 

@@ -99,22 +99,22 @@ const AiResultCard: React.FC<AiResultCardProps> = ({ result, voices, onClose, on
         {/* Subtle Gradient Background */}
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-50/40 via-blue-50/40 to-white/0 dark:from-indigo-900/20 dark:via-blue-900/20 dark:to-transparent -z-10"></div>
         
-        <div className="p-6 md:p-8 flex flex-col md:flex-row gap-8 overflow-y-auto max-h-[85vh] md:max-h-[600px] md:h-auto">
+        <div className="p-5 sm:p-6 md:p-8 flex flex-col md:flex-row gap-5 md:gap-8 overflow-y-auto max-h-[85vh] md:max-h-[600px] md:h-auto">
             
             {/* Left: Persona Info */}
-            <div className="flex-1 space-y-4 min-w-0 flex flex-col">
-                <div className="flex items-center gap-2 mb-2 flex-shrink-0">
+            <div className="flex-1 space-y-3 min-w-0 flex flex-col">
+                <div className="flex items-center gap-2.5 mb-1 flex-shrink-0">
                     <div className="p-2 bg-gradient-to-br from-indigo-500 to-blue-500 rounded-lg text-white shadow-lg shadow-indigo-500/20">
                          <Sparkles size={18} />
                     </div>
                     <div>
-                        <h2 id="ai-result-title" className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight leading-tight">AI Suggested Persona</h2>
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Based on your description</p>
+                        <h2 id="ai-result-title" className="text-base font-bold text-zinc-900 dark:text-white tracking-tight leading-tight">AI Suggested Persona</h2>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">Based on your description</p>
                     </div>
                 </div>
 
-                <div className="bg-white/60 dark:bg-zinc-800/50 rounded-xl border border-zinc-200/50 dark:border-zinc-700/50 shadow-sm relative group/code flex-1 flex flex-col min-h-[300px] md:min-h-0 overflow-hidden">
-                    <div className="flex justify-between items-center p-4 pb-2 border-b border-zinc-100/50 dark:border-zinc-700/50 flex-shrink-0">
+                <div className="bg-white/60 dark:bg-zinc-800/50 rounded-xl border border-zinc-200/50 dark:border-zinc-700/50 shadow-sm relative group/code flex-1 flex flex-col min-h-[200px] md:min-h-0 overflow-hidden">
+                    <div className="flex justify-between items-center px-4 py-2.5 border-b border-zinc-100/50 dark:border-zinc-700/50 flex-shrink-0">
                         <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-1">
                             System Prompt
                         </span>
@@ -137,10 +137,10 @@ const AiResultCard: React.FC<AiResultCardProps> = ({ result, voices, onClose, on
             </div>
 
             {/* Right: Audio Preview */}
-            <div className="flex-1 flex flex-col justify-center space-y-5 pt-2">
-                 <div className="relative pl-8">
-                    <Quote size={24} className="absolute -top-1 left-0 text-indigo-200 dark:text-indigo-800" />
-                    <p className="text-lg text-zinc-700 dark:text-zinc-200 italic font-serif leading-relaxed">
+            <div className="flex-1 flex flex-col justify-center space-y-4">
+                 <div className="relative pl-7">
+                    <Quote size={20} className="absolute -top-0.5 left-0 text-indigo-200 dark:text-indigo-800" />
+                    <p className="text-base text-zinc-700 dark:text-zinc-200 italic font-serif leading-relaxed">
                         "{result.sampleText}"
                     </p>
                  </div>

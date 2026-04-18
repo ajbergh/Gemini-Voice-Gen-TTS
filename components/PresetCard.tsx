@@ -14,7 +14,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Activity, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { Play, Pause, Activity, Loader2, Pencil, Trash2, Copy, Check, X as XIcon } from 'lucide-react';
 import { CustomPreset } from '../types';
 import { VOICE_DATA } from '../constants';
 import { getPresetAudio } from '../api';
@@ -26,6 +26,8 @@ interface PresetCardProps {
   onPlayToggle: (presetId: number) => void;
   onEdit: (preset: CustomPreset) => void;
   onDelete: (preset: CustomPreset) => void;
+  onDuplicate?: (preset: CustomPreset) => void;
+  onInlineEdit?: (id: number, data: { name?: string; system_instruction?: string }) => Promise<void>;
 }
 
 function decodeBase64(base64: string): Uint8Array {
@@ -38,11 +40,17 @@ function decodeBase64(base64: string): Uint8Array {
   return bytes;
 }
 
-const PresetCard: React.FC<PresetCardProps> = ({ preset, isPlaying, onPlayToggle, onEdit, onDelete }) => {
+const PresetCard: React.FC<PresetCardProps> = ({ preset, isPlaying, onPlayToggle, onEdit, onDelete, onDuplicate, onInlineEdit }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [isInlineEditing, setIsInlineEditing] = useState(false);
+  const [editName, setEditName] = useState(preset.name);
+  const [editInstruction, setEditInstruction] = useState(preset.system_instruction || '');
+  const [isSavingInline, setIsSavingInline] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const isMountedRef = useRef(true);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const baseVoice = VOICE_DATA.find(v => v.name === preset.voice_name);
 
@@ -111,21 +119,60 @@ const PresetCard: React.FC<PresetCardProps> = ({ preset, isPlaying, onPlayToggle
   };
 
   const handleClick = () => {
+    if (isInlineEditing) return;
     if (preset.audio_path && !isLoading) {
       handlePlay();
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (isInlineEditing) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       handleClick();
     }
   };
 
+  const startInlineEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onInlineEdit) {
+      setEditName(preset.name);
+      setEditInstruction(preset.system_instruction || '');
+      setIsInlineEditing(true);
+      setTimeout(() => nameInputRef.current?.focus(), 50);
+    } else {
+      onEdit(preset);
+    }
+  };
+
+  const cancelInlineEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsInlineEditing(false);
+  };
+
+  const saveInlineEdit = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onInlineEdit) return;
+    const trimmed = editName.trim();
+    if (!trimmed) return;
+    setIsSavingInline(true);
+    try {
+      await onInlineEdit(preset.id, {
+        name: trimmed !== preset.name ? trimmed : undefined,
+        system_instruction: editInstruction !== (preset.system_instruction || '') ? editInstruction : undefined,
+      });
+      setIsInlineEditing(false);
+    } catch (err) {
+      console.error('Inline edit failed:', err);
+    } finally {
+      if (isMountedRef.current) setIsSavingInline(false);
+    }
+  };
+
   return (
     <div 
       className={`group relative bg-white dark:bg-zinc-800 border transition-all duration-200 flex flex-col sm:flex-row h-auto sm:h-28 cursor-pointer rounded-2xl overflow-hidden hover:border-zinc-300 dark:hover:border-zinc-600 ${isPlaying ? 'border-blue-200 dark:border-blue-800 ring-2 ring-blue-100 dark:ring-blue-900/30 shadow-md' : 'border-zinc-200 dark:border-zinc-700 shadow-sm hover:shadow-md'}`}
+      style={{ borderLeftWidth: '4px', borderLeftColor: preset.color || '#6366f1' }}
       onClick={handleClick}
       role="button"
       tabIndex={0}
@@ -143,6 +190,22 @@ const PresetCard: React.FC<PresetCardProps> = ({ preset, isPlaying, onPlayToggle
         <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${isPlaying ? 'opacity-0' : 'opacity-100'}`}>
           {isLoading ? (
             <Loader2 size={20} className="text-zinc-300 dark:text-zinc-600 animate-spin" />
+          ) : preset.audio_path ? (
+            /* Mini static waveform when audio is cached */
+            <div className="flex items-center gap-[2px] h-8">
+              {Array.from({ length: 12 }, (_, i) => {
+                // Deterministic heights from preset ID
+                const seed = ((preset.id * 7 + i * 13 + 37) % 100) / 100;
+                const h = 20 + seed * 80; // 20-100% height
+                return (
+                  <div
+                    key={i}
+                    className="w-[2px] rounded-full bg-zinc-300 dark:bg-zinc-600"
+                    style={{ height: `${h}%` }}
+                  />
+                );
+              })}
+            </div>
           ) : (
             <Activity size={20} className="text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} />
           )}
@@ -170,37 +233,119 @@ const PresetCard: React.FC<PresetCardProps> = ({ preset, isPlaying, onPlayToggle
       </div>
 
       {/* Content Area - Right Side */}
-      <div className="flex-1 p-4 flex flex-col justify-center min-w-0 bg-white dark:bg-zinc-800">
+      <div
+        className="flex-1 p-4 flex flex-col justify-center min-w-0 bg-white dark:bg-zinc-800 relative"
+        onMouseEnter={() => !isInlineEditing && preset.system_instruction && setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+      >
         
-        {/* Header */}
-        <div className="flex items-center justify-between mb-1">
-          <h3 className="text-lg font-medium text-zinc-900 dark:text-white tracking-tight truncate">{preset.name}</h3>
-          <div className="flex gap-1 shrink-0 ml-2">
-            <span className="inline-flex items-center px-2 py-0.5 border border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 text-[10px] font-medium text-zinc-500 dark:text-zinc-400 rounded-full">
-              {preset.voice_name}
-            </span>
-            {baseVoice && (
-              <span className="inline-flex items-center px-2 py-0.5 border border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 text-[10px] font-medium text-zinc-500 dark:text-zinc-400 rounded-full">
-                {baseVoice.analysis.pitch}
-              </span>
-            )}
+        {/* System Instruction Tooltip */}
+        {showTooltip && !isInlineEditing && preset.system_instruction && (
+          <div className="absolute bottom-full left-4 right-4 mb-2 z-50 pointer-events-none animate-fade-in">
+            <div className="bg-zinc-900 dark:bg-zinc-700 text-white text-xs rounded-xl p-3 shadow-lg max-h-32 overflow-y-auto">
+              <p className="font-medium text-zinc-300 dark:text-zinc-400 mb-1 text-[10px] uppercase tracking-wider">System Instruction</p>
+              <p className="leading-relaxed whitespace-pre-wrap">{preset.system_instruction}</p>
+            </div>
           </div>
-        </div>
-        
-        {/* Description / Source Query */}
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed line-clamp-1 font-light">
-          {preset.source_query ? `"${preset.source_query}"` : baseVoice ? baseVoice.analysis.characteristics.join(', ') : preset.voice_name}
-        </p>
+        )}
 
-        {!preset.audio_path && (
-          <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 font-medium">No cached audio</p>
+        {isInlineEditing ? (
+          /* Inline Edit Mode */
+          <div className="space-y-2" onClick={e => e.stopPropagation()}>
+            <input
+              ref={nameInputRef}
+              type="text"
+              value={editName}
+              onChange={e => setEditName(e.target.value)}
+              className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800"
+              maxLength={100}
+              placeholder="Preset name"
+              onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); setIsInlineEditing(false); } }}
+            />
+            <textarea
+              value={editInstruction}
+              onChange={e => setEditInstruction(e.target.value)}
+              rows={2}
+              className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 resize-none"
+              placeholder="System instruction (optional)"
+              onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); setIsInlineEditing(false); } }}
+            />
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={saveInlineEdit}
+                disabled={isSavingInline || !editName.trim()}
+                className="flex items-center gap-1 px-2.5 py-1 bg-zinc-900 dark:bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-zinc-800 dark:hover:bg-indigo-500 transition-colors disabled:opacity-50"
+              >
+                {isSavingInline ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                Save
+              </button>
+              <button
+                onClick={cancelInlineEdit}
+                className="px-2.5 py-1 text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Display Mode */
+          <>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-lg font-medium text-zinc-900 dark:text-white tracking-tight truncate">{preset.name}</h3>
+              <div className="flex gap-1 shrink-0 ml-2">
+                <span className="inline-flex items-center px-2 py-0.5 border border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 text-[10px] font-medium text-zinc-500 dark:text-zinc-400 rounded-full">
+                  {preset.voice_name}
+                </span>
+                {baseVoice && (
+                  <span className="inline-flex items-center px-2 py-0.5 border border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 text-[10px] font-medium text-zinc-500 dark:text-zinc-400 rounded-full">
+                    {baseVoice.analysis.pitch}
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            {/* Description / Source Query */}
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed line-clamp-1 font-light">
+              {preset.source_query ? `"${preset.source_query}"` : baseVoice ? baseVoice.analysis.characteristics.join(', ') : preset.voice_name}
+            </p>
+
+            {/* Tags */}
+            {preset.tags && preset.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {preset.tags.map(t => (
+                  <span
+                    key={t.tag}
+                    className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-semibold rounded-full text-white"
+                    style={{ backgroundColor: t.color }}
+                  >
+                    {t.tag}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {!preset.audio_path && (
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 font-medium">No cached audio</p>
+            )}
+          </>
         )}
       </div>
 
       {/* Action Buttons - Right Edge (visible on hover) */}
+      {!isInlineEditing && (
       <div className="hidden sm:flex items-center gap-1 pr-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0" onClick={(e) => e.stopPropagation()}>
+        {onDuplicate && (
+          <button
+            onClick={() => onDuplicate(preset)}
+            className="p-1.5 bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors border border-zinc-200 dark:border-zinc-600"
+            title="Duplicate preset"
+          >
+            <Copy size={12} />
+          </button>
+        )}
         <button
-          onClick={() => onEdit(preset)}
+          onClick={startInlineEdit}
           className="p-1.5 bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors border border-zinc-200 dark:border-zinc-600"
           title="Edit preset"
         >
@@ -214,11 +359,22 @@ const PresetCard: React.FC<PresetCardProps> = ({ preset, isPlaying, onPlayToggle
           <Trash2 size={12} />
         </button>
       </div>
+      )}
 
       {/* Mobile Action Buttons */}
+      {!isInlineEditing && (
       <div className="flex sm:hidden items-center gap-1.5 px-4 pb-3" onClick={(e) => e.stopPropagation()}>
+        {onDuplicate && (
+          <button
+            onClick={() => onDuplicate(preset)}
+            className="p-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border border-zinc-200 dark:border-zinc-700"
+            title="Duplicate preset"
+          >
+            <Copy size={12} />
+          </button>
+        )}
         <button
-          onClick={() => onEdit(preset)}
+          onClick={startInlineEdit}
           className="p-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border border-zinc-200 dark:border-zinc-700"
           title="Edit preset"
         >
@@ -232,6 +388,7 @@ const PresetCard: React.FC<PresetCardProps> = ({ preset, isPlaying, onPlayToggle
           <Trash2 size={12} />
         </button>
       </div>
+      )}
     </div>
   );
 };

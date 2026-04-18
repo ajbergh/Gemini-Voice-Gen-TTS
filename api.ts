@@ -20,7 +20,7 @@
  * the Go binary serves both the SPA and API on the same port.
  */
 
-import { AiRecommendation, Voice, CustomPreset } from './types';
+import { AiRecommendation, Voice, CustomPreset, PresetTag } from './types';
 
 /** Base path for all API requests; proxied to Go backend in dev. */
 const API_BASE = '/api';
@@ -63,11 +63,35 @@ export async function recommendVoices(query: string, voices: { name: string; gen
  * Generate TTS audio via the Gemini backend proxy.
  * Returns base64-encoded raw PCM audio (24kHz, 16-bit, mono).
  * An optional systemInstruction shapes the voice's delivery style.
+ * An optional languageCode (e.g. "en", "es") overrides automatic language detection.
  */
-export async function generateTts(text: string, voiceName: string, systemInstruction?: string): Promise<string> {
+export async function generateTts(text: string, voiceName: string, systemInstruction?: string, languageCode?: string, model?: string, provider?: string): Promise<string> {
   const body: Record<string, string> = { text, voiceName };
   if (systemInstruction) body.systemInstruction = systemInstruction;
+  if (languageCode) body.languageCode = languageCode;
+  if (model) body.model = model;
+  if (provider) body.provider = provider;
   const data = await request<{ audioBase64: string }>('/voices/tts', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  return data.audioBase64;
+}
+
+/**
+ * Generate multi-speaker dialogue TTS audio via the Gemini backend proxy.
+ * Returns base64-encoded raw PCM audio (24kHz, 16-bit, mono).
+ */
+export async function generateMultiSpeakerTts(
+  text: string,
+  speakers: { speaker: string; voiceName: string }[],
+  languageCode?: string,
+  model?: string
+): Promise<string> {
+  const body: Record<string, any> = { text, speakers };
+  if (languageCode) body.languageCode = languageCode;
+  if (model) body.model = model;
+  const data = await request<{ audioBase64: string }>('/voices/tts/multi', {
     method: 'POST',
     body: JSON.stringify(body),
   });
@@ -109,6 +133,49 @@ export async function testApiKey(provider: string): Promise<{ valid: boolean; me
   return request<{ valid: boolean; message: string }>(`/keys/${encodeURIComponent(provider)}/test`);
 }
 
+// --- API Key Pool (rotation) ---
+
+/** Metadata for a key in the rotation pool. */
+export interface APIKeyPoolEntry {
+  id: number;
+  provider: string;
+  label: string;
+  is_active: boolean;
+  error_count: number;
+  last_used_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** List all keys in the rotation pool for a provider. */
+export async function listKeyPool(provider: string): Promise<APIKeyPoolEntry[]> {
+  return request<APIKeyPoolEntry[]>(`/keys/${encodeURIComponent(provider)}/pool`);
+}
+
+/** Add a new key to the rotation pool. */
+export async function addKeyToPool(provider: string, key: string, label?: string): Promise<{ id: number; status: string }> {
+  return request<{ id: number; status: string }>(`/keys/${encodeURIComponent(provider)}/pool`, {
+    method: 'POST',
+    body: JSON.stringify({ key, label: label || '' }),
+  });
+}
+
+/** Remove a key from the rotation pool. */
+export async function deleteKeyFromPool(provider: string, id: number): Promise<void> {
+  await request<void>(`/keys/${encodeURIComponent(provider)}/pool`, {
+    method: 'DELETE',
+    body: JSON.stringify({ id }),
+  });
+}
+
+/** Reset error count and reactivate a pool key. */
+export async function resetPoolKey(provider: string, id: number): Promise<void> {
+  await request<void>(`/keys/${encodeURIComponent(provider)}/pool/reset`, {
+    method: 'POST',
+    body: JSON.stringify({ id }),
+  });
+}
+
 // --- Config ---
 
 /** Retrieve all key-value config pairs from the backend. */
@@ -137,12 +204,27 @@ export interface HistoryEntry {
   created_at: string;
 }
 
-/** Fetch paginated history entries, optionally filtered by type ('tts' | 'recommendation'). */
-export async function getHistory(type?: string, limit = 50, offset = 0): Promise<HistoryEntry[]> {
+/** Optional filters for fetching history entries. */
+export interface HistoryFilters {
+  type?: string;
+  q?: string;
+  voice?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/** Fetch paginated history entries with optional filters. */
+export async function getHistory(filters: HistoryFilters = {}): Promise<HistoryEntry[]> {
   const params = new URLSearchParams();
-  if (type) params.set('type', type);
-  params.set('limit', String(limit));
-  params.set('offset', String(offset));
+  if (filters.type) params.set('type', filters.type);
+  if (filters.q) params.set('q', filters.q);
+  if (filters.voice) params.set('voice', filters.voice);
+  if (filters.from) params.set('from', filters.from);
+  if (filters.to) params.set('to', filters.to);
+  params.set('limit', String(filters.limit ?? 50));
+  params.set('offset', String(filters.offset ?? 0));
   return request<HistoryEntry[]>(`/history?${params.toString()}`);
 }
 
@@ -167,11 +249,123 @@ export async function clearHistory(): Promise<void> {
   await request<void>('/history', { method: 'DELETE' });
 }
 
+/** Get the export URL for history (opens direct download). */
+export function getHistoryExportUrl(format: 'csv' | 'json' = 'json'): string {
+  return `${API_BASE}/history/export?format=${format}`;
+}
+
 // --- Health ---
 
 /** Check if the backend is running and healthy. */
 export async function getHealth(): Promise<{ status: string }> {
   return request<{ status: string }>('/health');
+}
+
+// --- Audio Cache ---
+
+/** Cache stats response. */
+export interface CacheStats {
+  total_size: number;
+  file_count: number;
+  cache_dir: string;
+}
+
+/** Get audio cache statistics. */
+export async function getCacheStats(): Promise<CacheStats> {
+  return request<CacheStats>('/cache/stats');
+}
+
+/** Clear the audio cache. */
+export async function clearCache(): Promise<{ status: string; removed: number }> {
+  return request<{ status: string; removed: number }>('/cache', { method: 'DELETE' });
+}
+
+// --- Backup & Restore ---
+
+/** Create a database backup and download it. */
+export async function createBackup(): Promise<void> {
+  const response = await fetch(`${API_BASE}/backup`, { method: 'POST' });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'Backup failed');
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const match = disposition.match(/filename="(.+)"/);
+  const filename = match ? match[1] : 'gemini-voice-backup.db';
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Restore the database from an uploaded backup file. */
+export async function restoreBackup(file: File): Promise<{ status: string }> {
+  const form = new FormData();
+  form.append('backup', file);
+  const response = await fetch(`${API_BASE}/restore`, {
+    method: 'POST',
+    body: form,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'Restore failed');
+  }
+  return response.json();
+}
+
+// --- WebSocket Progress ---
+
+/** Progress event received from the WebSocket. */
+export interface ProgressEvent {
+  job_id: string;
+  type: string;
+  status: string;
+  message?: string;
+  percent: number;
+}
+
+/** Connect to the WebSocket progress endpoint. Returns a cleanup function. */
+export function connectProgress(onEvent: (event: ProgressEvent) => void): () => void {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const url = `${protocol}//${window.location.host}/api/ws/progress`;
+  let ws: WebSocket | null = new WebSocket(url);
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const connect = () => {
+    ws = new WebSocket(url);
+    ws.onmessage = (e) => {
+      try {
+        const event = JSON.parse(e.data) as ProgressEvent;
+        onEvent(event);
+      } catch { /* ignore malformed */ }
+    };
+    ws.onclose = () => {
+      // Auto-reconnect after 3s
+      reconnectTimer = setTimeout(connect, 3000);
+    };
+  };
+
+  ws.onmessage = (e) => {
+    try {
+      const event = JSON.parse(e.data) as ProgressEvent;
+      onEvent(event);
+    } catch { /* ignore */ }
+  };
+  ws.onclose = () => {
+    reconnectTimer = setTimeout(connect, 3000);
+  };
+
+  return () => {
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (ws) {
+      ws.onclose = null;
+      ws.close();
+      ws = null;
+    }
+  };
 }
 
 // --- Custom Presets ---
@@ -208,6 +402,7 @@ export async function updatePreset(id: number, data: {
   sample_text?: string;
   audio_base64?: string;
   metadata_json?: string;
+  color?: string;
 }): Promise<void> {
   await request<void>(`/presets/${id}`, {
     method: 'PUT',
@@ -224,4 +419,153 @@ export async function deletePreset(id: number): Promise<void> {
 export async function getPresetAudio(id: number): Promise<string> {
   const data = await request<{ audioBase64: string }>(`/presets/${id}/audio`);
   return data.audioBase64;
+}
+
+/** List all distinct tags across all presets. */
+export async function listAllTags(): Promise<PresetTag[]> {
+  return request<PresetTag[]>('/presets/tags');
+}
+
+/** Replace all tags for a given preset. */
+export async function setPresetTags(presetId: number, tags: { tag: string; color: string }[]): Promise<void> {
+  await request<void>(`/presets/${presetId}/tags`, {
+    method: 'PUT',
+    body: JSON.stringify({ tags }),
+  });
+}
+
+/** Export all presets as JSON (triggers download). */
+export async function exportPresets(): Promise<void> {
+  const res = await fetch(`${API_BASE}/presets/export`);
+  if (!res.ok) throw new Error('Export failed');
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'voice-presets.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Import presets from a JSON array. Returns count of imported and skipped. */
+export async function importPresets(data: unknown[]): Promise<{ imported: number; skipped: number }> {
+  return request<{ imported: number; skipped: number }>('/presets/import', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/** Reorder presets by providing an ordered array of preset IDs. */
+export async function reorderPresets(orderedIds: number[]): Promise<void> {
+  await request<void>('/presets/reorder', {
+    method: 'PATCH',
+    body: JSON.stringify({ ordered_ids: orderedIds }),
+  });
+}
+
+/** A preset version snapshot. */
+export interface PresetVersion {
+  id: number;
+  preset_id: number;
+  name: string;
+  voice_name: string;
+  system_instruction: string;
+  sample_text: string;
+  color: string;
+  metadata_json?: string;
+  created_at: string;
+}
+
+/** List version history for a preset. */
+export async function listPresetVersions(presetId: number): Promise<PresetVersion[]> {
+  return request<PresetVersion[]>(`/presets/${presetId}/versions`);
+}
+
+/** Revert a preset to a specific version. Returns the updated preset. */
+export async function revertPresetVersion(presetId: number, versionId: number): Promise<CustomPreset> {
+  return request<CustomPreset>(`/presets/${presetId}/versions/${versionId}/revert`, { method: 'POST' });
+}
+
+// --- Favorites ---
+
+/** List all favorited voice names. */
+export async function listFavorites(): Promise<string[]> {
+  return request<string[]>('/favorites');
+}
+
+/** Add or remove a voice from favorites. */
+export async function toggleFavorite(voiceName: string, favorite: boolean): Promise<void> {
+  await request<{ ok: boolean }>('/favorites', {
+    method: 'POST',
+    body: JSON.stringify({ voice_name: voiceName, favorite }),
+  });
+}
+
+/** Use Gemini to reformat raw script text into optimised TTS prompt structure. */
+export async function formatScript(script: string): Promise<string> {
+  const data = await request<{ formatted: string }>('/voices/format-script', {
+    method: 'POST',
+    body: JSON.stringify({ script }),
+  });
+  return data.formatted;
+}
+
+/** Stream TTS audio chunks via SSE. Calls onChunk with each base64 audio fragment. */
+export async function streamTts(
+  text: string,
+  voiceName: string,
+  opts: {
+    systemInstruction?: string;
+    languageCode?: string;
+    model?: string;
+    onChunk: (audioBase64: string, index: number) => void;
+    onDone: () => void;
+    onError: (error: string) => void;
+    signal?: AbortSignal;
+  }
+): Promise<void> {
+  const body: Record<string, string> = { text, voiceName };
+  if (opts.systemInstruction) body.systemInstruction = opts.systemInstruction;
+  if (opts.languageCode) body.languageCode = opts.languageCode;
+  if (opts.model) body.model = opts.model;
+
+  const resp = await fetch(`${API_BASE}/voices/tts/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: opts.signal,
+  });
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(err || `HTTP ${resp.status}`);
+  }
+
+  const reader = resp.body?.getReader();
+  if (!reader) throw new Error('ReadableStream not supported');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const json = line.slice(6).trim();
+      if (!json) continue;
+      try {
+        const parsed = JSON.parse(json);
+        if (parsed.error) { opts.onError(parsed.error); return; }
+        if (parsed.done) { opts.onDone(); return; }
+        if (parsed.audioBase64) { opts.onChunk(parsed.audioBase64, parsed.index); }
+      } catch {}
+    }
+  }
+  opts.onDone();
 }

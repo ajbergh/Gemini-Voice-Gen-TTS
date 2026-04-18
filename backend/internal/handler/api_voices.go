@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ajbergh/gemini-voice-gen-tts/backend/internal/gemini"
+	"github.com/ajbergh/gemini-voice-gen-tts/backend/internal/openai"
 	"github.com/ajbergh/gemini-voice-gen-tts/backend/internal/store"
 )
 
@@ -23,6 +24,7 @@ type VoicesHandler struct {
 	Store         *store.Store
 	KeysHandler   *KeysHandler
 	AudioCacheDir string // directory for cached TTS audio files
+	ProgressHub   *ProgressHub
 }
 
 // Recommend proxies AI casting requests to Gemini.
@@ -78,14 +80,8 @@ func (h *VoicesHandler) Recommend(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GenerateTTS proxies TTS requests to Gemini.
+// GenerateTTS proxies TTS requests to Gemini or OpenAI.
 func (h *VoicesHandler) GenerateTTS(w http.ResponseWriter, r *http.Request) {
-	apiKey, err := h.KeysHandler.GetDecryptedKey("gemini")
-	if err != nil {
-		writeError(w, http.StatusPreconditionFailed, "no Gemini API key configured — add one via Settings")
-		return
-	}
-
 	var req gemini.TTSRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
@@ -97,12 +93,48 @@ func (h *VoicesHandler) GenerateTTS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := gemini.NewClient(apiKey)
-	audioBase64, err := client.GenerateTTS(req.Text, req.VoiceName, req.SystemInstruction)
-	if err != nil {
-		slog.Error("gemini TTS failed", "error", err, "voice", req.VoiceName, "hasSystemInstruction", req.SystemInstruction != "")
-		writeError(w, http.StatusBadGateway, "TTS generation failed: "+err.Error())
+	jobID := fmt.Sprintf("tts_%d", time.Now().UnixMilli())
+
+	var audioBase64 string
+	var genErr error
+
+	if req.Provider == "openai" {
+		// Use OpenAI TTS
+		apiKey, err := h.KeysHandler.GetDecryptedKey("openai")
+		if err != nil {
+			writeError(w, http.StatusPreconditionFailed, "no OpenAI API key configured — add one via Settings")
+			return
+		}
+		if h.ProgressHub != nil {
+			h.ProgressHub.EmitProgress(jobID, "tts", "processing", "Generating speech via OpenAI...", 10)
+		}
+		client := openai.NewClient(apiKey)
+		audioBase64, genErr = client.GenerateTTS(req.Text, req.VoiceName, req.Model)
+	} else {
+		// Use Gemini TTS (default)
+		apiKey, err := h.KeysHandler.GetDecryptedKey("gemini")
+		if err != nil {
+			writeError(w, http.StatusPreconditionFailed, "no Gemini API key configured — add one via Settings")
+			return
+		}
+		if h.ProgressHub != nil {
+			h.ProgressHub.EmitProgress(jobID, "tts", "processing", "Generating speech for "+req.VoiceName+"...", 10)
+		}
+		client := gemini.NewClient(apiKey)
+		audioBase64, genErr = client.GenerateTTS(req.Text, req.VoiceName, req.SystemInstruction, req.LanguageCode, req.Model)
+	}
+
+	if genErr != nil {
+		if h.ProgressHub != nil {
+			h.ProgressHub.EmitProgress(jobID, "tts", "error", "TTS generation failed", 0)
+		}
+		slog.Error("TTS failed", "error", genErr, "provider", req.Provider, "voice", req.VoiceName)
+		writeError(w, http.StatusBadGateway, "TTS generation failed: "+genErr.Error())
 		return
+	}
+
+	if h.ProgressHub != nil {
+		h.ProgressHub.EmitProgress(jobID, "tts", "complete", "Audio ready", 100)
 	}
 
 	// Save audio to cache and history
@@ -129,6 +161,71 @@ func (h *VoicesHandler) GenerateTTS(w http.ResponseWriter, r *http.Request) {
 	h.Store.InsertHistory(store.HistoryEntry{
 		Type:      "tts",
 		VoiceName: &voiceName,
+		InputText: req.Text,
+		AudioPath: audioPath,
+	})
+
+	writeJSON(w, http.StatusOK, gemini.TTSResponse{AudioBase64: audioBase64})
+}
+
+// GenerateMultiSpeakerTTS proxies multi-speaker dialogue TTS requests to Gemini.
+func (h *VoicesHandler) GenerateMultiSpeakerTTS(w http.ResponseWriter, r *http.Request) {
+	apiKey, err := h.KeysHandler.GetDecryptedKey("gemini")
+	if err != nil {
+		writeError(w, http.StatusPreconditionFailed, "no Gemini API key configured — add one via Settings")
+		return
+	}
+
+	var req gemini.MultiSpeakerTTSRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	if req.Text == "" {
+		writeError(w, http.StatusBadRequest, "text is required")
+		return
+	}
+	if len(req.Speakers) < 1 || len(req.Speakers) > 2 {
+		writeError(w, http.StatusBadRequest, "1 or 2 speakers are required")
+		return
+	}
+	for _, s := range req.Speakers {
+		if s.Speaker == "" || s.VoiceName == "" {
+			writeError(w, http.StatusBadRequest, "each speaker must have a speaker name and voiceName")
+			return
+		}
+	}
+
+	client := gemini.NewClient(apiKey)
+	audioBase64, err := client.GenerateMultiSpeakerTTS(req.Text, req.Speakers, req.LanguageCode, req.Model)
+	if err != nil {
+		slog.Error("gemini multi-speaker TTS failed", "error", err, "speakerCount", len(req.Speakers))
+		writeError(w, http.StatusBadGateway, "Multi-speaker TTS generation failed: "+err.Error())
+		return
+	}
+
+	// Save audio to cache and history
+	var audioPath *string
+	if h.AudioCacheDir != "" {
+		filename := fmt.Sprintf("tts_multi_%d.raw", time.Now().UnixMilli())
+		cachePath, ok := safeCachePath(h.AudioCacheDir, filename)
+		if !ok {
+			slog.Warn("invalid cache path computed for multi-speaker")
+		} else {
+			audioBytes, decErr := base64.StdEncoding.DecodeString(audioBase64)
+			if decErr == nil {
+				if writeErr := os.WriteFile(cachePath, audioBytes, 0o600); writeErr == nil {
+					audioPath = &cachePath
+				} else {
+					slog.Warn("failed to cache multi-speaker audio", "error", writeErr)
+				}
+			}
+		}
+	}
+
+	h.Store.InsertHistory(store.HistoryEntry{
+		Type:      "tts_multi",
 		InputText: req.Text,
 		AudioPath: audioPath,
 	})
@@ -201,4 +298,86 @@ func (h *VoicesHandler) getVoiceData() ([]gemini.VoiceData, error) {
 
 func strPtr(s string) *string {
 	return &s
+}
+
+// FormatScript sends script text to Gemini for TTS-optimised reformatting.
+func (h *VoicesHandler) FormatScript(w http.ResponseWriter, r *http.Request) {
+	apiKey, err := h.KeysHandler.GetDecryptedKey("gemini")
+	if err != nil {
+		writeError(w, http.StatusPreconditionFailed, "no Gemini API key configured — add one via Settings")
+		return
+	}
+
+	var req struct {
+		Script string `json:"script"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if req.Script == "" {
+		writeError(w, http.StatusBadRequest, "script is required")
+		return
+	}
+
+	client := gemini.NewClient(apiKey)
+	formatted, err := client.FormatScript(req.Script)
+	if err != nil {
+		slog.Error("FormatScript failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to format script")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"formatted": formatted})
+}
+
+// GenerateTTSStream uses Server-Sent Events to stream TTS audio chunks.
+func (h *VoicesHandler) GenerateTTSStream(w http.ResponseWriter, r *http.Request) {
+	apiKey, err := h.KeysHandler.GetDecryptedKey("gemini")
+	if err != nil {
+		writeError(w, http.StatusPreconditionFailed, "no Gemini API key configured")
+		return
+	}
+
+	var req gemini.TTSRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if req.Text == "" || req.VoiceName == "" {
+		writeError(w, http.StatusBadRequest, "text and voiceName are required")
+		return
+	}
+
+	// Set SSE headers
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "streaming not supported")
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	client := gemini.NewClient(apiKey)
+	chunks := make(chan gemini.StreamTTSChunk, 16)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- client.GenerateTTSStream(req.Text, req.VoiceName, req.SystemInstruction, req.LanguageCode, req.Model, chunks)
+	}()
+
+	for chunk := range chunks {
+		data, _ := json.Marshal(chunk)
+		fmt.Fprintf(w, "data: %s\n\n", data)
+		flusher.Flush()
+	}
+
+	if err := <-errCh; err != nil {
+		slog.Error("streaming TTS failed", "error", err)
+		errData, _ := json.Marshal(map[string]string{"error": err.Error()})
+		fmt.Fprintf(w, "data: %s\n\n", errData)
+		flusher.Flush()
+	}
 }

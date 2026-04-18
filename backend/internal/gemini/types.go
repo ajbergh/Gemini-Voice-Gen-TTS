@@ -22,6 +22,9 @@ type TTSRequest struct {
 	Text              string `json:"text"`
 	VoiceName         string `json:"voiceName"`
 	SystemInstruction string `json:"systemInstruction,omitempty"`
+	LanguageCode      string `json:"languageCode,omitempty"`
+	Model             string `json:"model,omitempty"`
+	Provider          string `json:"provider,omitempty"` // "gemini" (default) or "openai"
 }
 
 // TTSResponse is the response back to the frontend.
@@ -35,4 +38,18 @@ type VoiceData struct {
 	Gender          string   `json:"gender"`
 	Pitch           string   `json:"pitch"`
 	Characteristics []string `json:"characteristics"`
+}
+
+// MultiSpeakerTTSRequest is the payload for multi-speaker dialogue.
+type MultiSpeakerTTSRequest struct {
+	Text         string          `json:"text"`
+	Speakers     []SpeakerConfig `json:"speakers"`
+	LanguageCode string          `json:"languageCode,omitempty"`
+	Model        string          `json:"model,omitempty"`
+}
+
+// SpeakerConfig maps a speaker label to a voice name.
+type SpeakerConfig struct {
+	Speaker   string `json:"speaker"`
+	VoiceName string `json:"voiceName"`
 }

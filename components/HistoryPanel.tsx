@@ -14,18 +14,26 @@
  * detail views. Implements focus trap and Escape-to-close.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Clock, Sparkles, Volume2, Trash2, Loader2, ChevronDown, Play, Square } from 'lucide-react';
-import { getHistory, deleteHistoryEntry, clearHistory, getHistoryAudio, HistoryEntry } from '../api';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { X, Clock, Sparkles, Volume2, Trash2, Loader2, ChevronDown, Play, Square, Search, Calendar, Download } from 'lucide-react';
+import { getHistory, deleteHistoryEntry, clearHistory, getHistoryAudio, getHistoryExportUrl, HistoryEntry } from '../api';
+import BottomSheet from './BottomSheet';
 
 interface HistoryPanelProps {
   onClose: () => void;
+  /** When true, renders as inline section instead of slide-in panel. */
+  inline?: boolean;
 }
 
-const HistoryPanel: React.FC<HistoryPanelProps> = ({ onClose }) => {
+const HistoryPanel: React.FC<HistoryPanelProps> = ({ onClose, inline = false }) => {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'tts' | 'recommendation'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [voiceFilter, setVoiceFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [showDateFilters, setShowDateFilters] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +44,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ onClose }) => {
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const isMountedRef = useRef(true);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -43,8 +52,9 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ onClose }) => {
     return () => {
       isMountedRef.current = false;
       stopAudio();
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
-  }, [filter]);
+  }, [filter, voiceFilter, dateFrom, dateTo]);
 
   // Focus trap
   useEffect(() => {
@@ -72,19 +82,35 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ onClose }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  /** Fetch history entries from the backend, filtered by current type selection. */
-  const loadHistory = async () => {
+  /** Fetch history entries from the backend with current filters. */
+  const loadHistory = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const type = filter === 'all' ? undefined : filter;
-      const data = await getHistory(type, 100, 0);
+      const data = await getHistory({
+        type: filter === 'all' ? undefined : filter,
+        q: searchQuery || undefined,
+        voice: voiceFilter || undefined,
+        from: dateFrom || undefined,
+        to: dateTo || undefined,
+        limit: 100,
+        offset: 0,
+      });
       if (isMountedRef.current) setEntries(data || []);
     } catch {
       if (isMountedRef.current) setError('Failed to load history.');
     } finally {
       if (isMountedRef.current) setLoading(false);
     }
+  }, [filter, searchQuery, voiceFilter, dateFrom, dateTo]);
+
+  /** Debounced search handler. */
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      loadHistory();
+    }, 300);
   };
 
   /** Delete a single history entry and remove it from local state. */
@@ -189,41 +215,43 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ onClose }) => {
     return d.toLocaleDateString();
   };
 
-  return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="history-title"
-    >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose}></div>
+  const headerContent = (
+    <div className={inline ? 'relative p-6 pb-4 flex-shrink-0' : 'relative p-8 pb-4 flex-shrink-0'}>
+      <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-violet-50/50 to-white/0 dark:from-violet-900/20 dark:to-zinc-900/0 pointer-events-none"></div>
 
-      {/* Modal */}
-      <div ref={modalRef} className="relative w-full max-w-2xl max-h-[85vh] bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl overflow-hidden animate-slide-up ring-1 ring-zinc-900/5 flex flex-col">
-        {/* Header */}
-        <div className="relative p-8 pb-4 flex-shrink-0">
-          <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-violet-50/50 to-white/0 dark:from-violet-900/20 dark:to-zinc-900/0 pointer-events-none"></div>
-
-          <div className="relative flex justify-between items-start mb-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-violet-600 dark:text-violet-400 mb-1">
-                <Clock size={18} />
-                <span className="text-sm font-bold tracking-wider uppercase">History</span>
-              </div>
-              <h2 id="history-title" className="text-2xl font-serif font-medium tracking-tight text-zinc-900 dark:text-white">Generation History</h2>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-              aria-label="Close"
-            >
-              <X size={20} />
-            </button>
+      <div className="relative flex justify-between items-start mb-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-violet-600 dark:text-violet-400 mb-1">
+            <Clock size={18} />
+            <span className="text-sm font-bold tracking-wider uppercase">History</span>
+          </div>
+          <h2 id="history-title" className="text-2xl font-serif font-medium tracking-tight text-zinc-900 dark:text-white">Generation History</h2>
+        </div>
+        {!inline && (
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+            aria-label="Close"
+          >
+            <X size={20} />
+          </button>
+        )}
           </div>
 
-          {/* Filter tabs + Clear */}
-          <div className="flex items-center justify-between">
+          {/* Search bar */}
+          <div className="relative mb-3">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => handleSearchChange(e.target.value)}
+              placeholder="Search history..."
+              className="w-full pl-9 pr-3 py-2 text-sm bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-colors"
+            />
+          </div>
+
+          {/* Filter tabs + Date toggle + Clear */}
+          <div className="flex items-center justify-between gap-2">
             <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1">
               {(['all', 'recommendation', 'tts'] as const).map(t => (
                 <button
@@ -235,21 +263,101 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ onClose }) => {
                 </button>
               ))}
             </div>
-            {entries.length > 0 && (
+            <div className="flex items-center gap-1">
               <button
-                onClick={handleClear}
-                disabled={clearing}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                onClick={() => setShowDateFilters(prev => !prev)}
+                className={`p-1.5 rounded-lg text-xs transition-colors ${showDateFilters ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                aria-label="Toggle date filters"
+                title="Date filters"
               >
-                {clearing ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                Clear All
+                <Calendar size={14} />
               </button>
-            )}
+              {entries.length > 0 && (
+                <>
+                  <div className="relative group">
+                    <button
+                      className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                      aria-label="Export history"
+                      title="Export history"
+                    >
+                      <Download size={14} />
+                    </button>
+                    <div className="hidden group-hover:flex absolute right-0 top-full mt-1 z-50 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg overflow-hidden">
+                      <a
+                        href={getHistoryExportUrl('json')}
+                        download="history.json"
+                        className="px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 whitespace-nowrap"
+                      >
+                        JSON
+                      </a>
+                      <a
+                        href={getHistoryExportUrl('csv')}
+                        download="history.csv"
+                        className="px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 whitespace-nowrap"
+                      >
+                        CSV
+                      </a>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleClear}
+                    disabled={clearing}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  >
+                    {clearing ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                    Clear All
+                  </button>
+                </>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto px-8 pb-8">
+          {/* Date range & voice filter (collapsible) */}
+          {showDateFilters && (
+            <div className="flex flex-wrap items-center gap-2 mt-3 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800">
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap">From</label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={e => setDateFrom(e.target.value)}
+                  className="px-2 py-1 text-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500/30"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap">To</label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={e => setDateTo(e.target.value)}
+                  className="px-2 py-1 text-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500/30"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap">Voice</label>
+                <input
+                  type="text"
+                  value={voiceFilter}
+                  onChange={e => setVoiceFilter(e.target.value)}
+                  placeholder="e.g. Zephyr"
+                  className="w-24 px-2 py-1 text-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-violet-500/30"
+                />
+              </div>
+              {(dateFrom || dateTo || voiceFilter) && (
+                <button
+                  onClick={() => { setDateFrom(''); setDateTo(''); setVoiceFilter(''); }}
+                  className="text-xs text-violet-600 dark:text-violet-400 hover:underline ml-auto"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          )}
+    </div>
+  );
+
+  const scrollContent = (
+    <>
           {error && (
             <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm mb-4">
               {error}
@@ -351,9 +459,31 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ onClose }) => {
               })}
             </div>
           )}
+    </>
+  );
+
+  // Inline mode: full-height section without modal overlay
+  if (inline) {
+    return (
+      <div ref={modalRef} className="flex-1 bg-white dark:bg-zinc-900 overflow-hidden flex flex-col">
+        {headerContent}
+        <div className="flex-1 overflow-y-auto px-6 pb-6">
+          {scrollContent}
         </div>
       </div>
-    </div>
+    );
+  }
+
+  // Modal mode: full-screen overlay
+  return (
+    <BottomSheet onClose={onClose} ariaLabel="History">
+      <div ref={modalRef} className="relative w-full max-w-2xl mx-auto max-h-[85vh] bg-white dark:bg-zinc-900 sm:rounded-3xl shadow-2xl overflow-hidden sm:animate-slide-up ring-1 ring-zinc-900/5 flex flex-col">
+        {headerContent}
+        <div className="flex-1 overflow-y-auto px-8 pb-8">
+          {scrollContent}
+        </div>
+      </div>
+    </BottomSheet>
   );
 };
 

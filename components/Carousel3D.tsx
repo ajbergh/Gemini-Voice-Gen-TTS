@@ -16,7 +16,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { Voice } from '../types';
-import { Play, Pause, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
 import AudioVisualizer from './AudioVisualizer';
 
 interface Carousel3DProps {
@@ -133,7 +133,7 @@ const Carousel3D: React.FC<Carousel3DProps> = ({
 
       <div 
         ref={containerRef} 
-        className="relative w-full h-[70vh] flex items-center justify-center"
+        className="relative w-full h-[70vh] md:landscape:h-[55vh] lg:landscape:h-[65vh] flex items-center justify-center"
         style={{ perspective: '1200px' }}
       >
         <div className="relative w-full h-full flex items-center justify-center transform-style-3d">
@@ -201,20 +201,26 @@ const Carousel3D: React.FC<Carousel3DProps> = ({
 
                   <div className="h-full flex flex-col relative">
                       <div className="flex-1 relative bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center overflow-hidden">
-                          <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.1]" style={{ backgroundImage: 'radial-gradient(currentColor 1px, transparent 1px)', backgroundSize: '12px 12px' }}></div>
-                          
+                          {/* Voice headshot image */}
+                          <img
+                            src={`/images/${voice.name}.png`}
+                            alt={voice.name}
+                            className="absolute inset-0 w-full h-full object-cover object-top"
+                            loading="lazy"
+                            draggable={false}
+                          />
+                          {/* Subtle gradient overlay for depth */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-white/40 via-transparent to-transparent dark:from-zinc-800/60 dark:via-transparent dark:to-transparent pointer-events-none" />
+
+                          {/* Audio visualizer overlay when playing */}
                           <div className={`absolute inset-0 z-10 transition-opacity duration-500 ${isPlaying ? 'opacity-100' : 'opacity-0'}`}>
-                              <AudioVisualizer isPlaying={isPlaying} color={document.documentElement.classList.contains('dark') ? '#a5b4fc' : '#18181b'} />
+                              <div className="absolute inset-0 bg-black/30 dark:bg-black/50" />
+                              <AudioVisualizer isPlaying={isPlaying} color={document.documentElement.classList.contains('dark') ? '#a5b4fc' : '#ffffff'} />
                           </div>
 
-                          <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-500 ${isPlaying ? 'opacity-0' : 'opacity-100'}`}>
-                              <div className="w-20 h-20 rounded-full bg-white dark:bg-zinc-800 shadow-sm border border-zinc-100 dark:border-zinc-700 flex items-center justify-center">
-                                  <Activity size={32} className="text-zinc-300 dark:text-zinc-600" />
-                              </div>
-                          </div>
-
+                          {/* Play/pause hover overlay */}
                           <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200">
-                               <div className="w-20 h-20 rounded-full bg-zinc-900/90 dark:bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-xl transform transition-transform active:scale-95">
+                               <div className="w-20 h-20 rounded-full bg-zinc-900/70 dark:bg-white/80 backdrop-blur-md flex items-center justify-center shadow-xl transform transition-transform active:scale-95">
                                   {isPlaying ? (
                                       <Pause size={32} className="text-white dark:text-zinc-900 fill-current" />
                                   ) : (
@@ -224,7 +230,7 @@ const Carousel3D: React.FC<Carousel3DProps> = ({
                           </div>
                           
                           {isPlaying && (
-                              <div className="absolute top-6 right-6 w-3 h-3 rounded-full animate-google-colors"></div>
+                              <div className="absolute top-6 right-6 w-3 h-3 rounded-full animate-google-colors z-20"></div>
                           )}
                       </div>
 
@@ -259,6 +265,60 @@ const Carousel3D: React.FC<Carousel3DProps> = ({
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Pagination dots */}
+      {voices.length > 1 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1 z-10">
+          {voices.length <= 15 ? (
+            voices.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => !disabled && onChange(idx)}
+                disabled={disabled}
+                className={`rounded-full transition-all duration-300 ${
+                  idx === activeIndex
+                    ? 'w-6 h-2 accent-bg'
+                    : 'w-2 h-2 bg-zinc-300 dark:bg-zinc-600 hover:bg-zinc-400 dark:hover:bg-zinc-500'
+                }`}
+                aria-label={`Go to voice ${idx + 1}`}
+                aria-current={idx === activeIndex ? 'true' : undefined}
+              />
+            ))
+          ) : (
+            /* For large sets, show a window of dots around the active index */
+            (() => {
+              const windowSize = 9;
+              const half = Math.floor(windowSize / 2);
+              let start = Math.max(0, activeIndex - half);
+              let end = Math.min(voices.length, start + windowSize);
+              if (end - start < windowSize) start = Math.max(0, end - windowSize);
+              const dots = [];
+              if (start > 0) dots.push(<span key="start-ellipsis" className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600" />);
+              for (let i = start; i < end; i++) {
+                const distance = Math.abs(i - activeIndex);
+                const scale = distance === 0 ? 1 : distance <= 1 ? 0.85 : 0.65;
+                dots.push(
+                  <button
+                    key={i}
+                    onClick={() => !disabled && onChange(i)}
+                    disabled={disabled}
+                    className={`rounded-full transition-all duration-300 ${
+                      i === activeIndex
+                        ? 'w-6 h-2 accent-bg'
+                        : 'w-2 h-2 bg-zinc-300 dark:bg-zinc-600 hover:bg-zinc-400 dark:hover:bg-zinc-500'
+                    }`}
+                    style={{ transform: `scale(${scale})` }}
+                    aria-label={`Go to voice ${i + 1}`}
+                    aria-current={i === activeIndex ? 'true' : undefined}
+                  />
+                );
+              }
+              if (end < voices.length) dots.push(<span key="end-ellipsis" className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600" />);
+              return dots;
+            })()
+          )}
+        </div>
+      )}
     </div>
   );
 };

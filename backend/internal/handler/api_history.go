@@ -7,8 +7,11 @@ package handler
 
 import (
 	"encoding/base64"
+	"encoding/csv"
+	"encoding/json"
+	"fmt"
+	"log/slog"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/ajbergh/gemini-voice-gen-tts/backend/internal/store"
@@ -16,28 +19,39 @@ import (
 
 // HistoryHandler handles /api/history endpoints.
 type HistoryHandler struct {
-	Store *store.Store
+	Store         *store.Store
+	AudioCacheDir string
 }
 
-// ListHistory returns history entries with optional type filter and pagination.
+// ListHistory returns history entries with optional filters and pagination.
 func (h *HistoryHandler) ListHistory(w http.ResponseWriter, r *http.Request) {
-	historyType := r.URL.Query().Get("type")
+	q := r.URL.Query()
 
 	limit := 50
-	if l := r.URL.Query().Get("limit"); l != "" {
+	if l := q.Get("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 200 {
 			limit = parsed
 		}
 	}
 
 	offset := 0
-	if o := r.URL.Query().Get("offset"); o != "" {
+	if o := q.Get("offset"); o != "" {
 		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
 			offset = parsed
 		}
 	}
 
-	entries, err := h.Store.ListHistory(historyType, limit, offset)
+	filter := store.HistoryFilter{
+		Type:     q.Get("type"),
+		Query:    q.Get("q"),
+		Voice:    q.Get("voice"),
+		DateFrom: q.Get("from"),
+		DateTo:   q.Get("to"),
+		Limit:    limit,
+		Offset:   offset,
+	}
+
+	entries, err := h.Store.ListHistory(filter)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list history")
 		return
@@ -112,8 +126,9 @@ func (h *HistoryHandler) GetHistoryAudio(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	data, err := os.ReadFile(*entry.AudioPath)
+	data, err := readCachedAudioFile(h.AudioCacheDir, *entry.AudioPath)
 	if err != nil {
+		slog.Warn("rejected history audio path", "history_id", id, "path", *entry.AudioPath, "error", err)
 		writeError(w, http.StatusNotFound, "cached audio file not found")
 		return
 	}
@@ -121,4 +136,49 @@ func (h *HistoryHandler) GetHistoryAudio(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, map[string]string{
 		"audioBase64": base64.StdEncoding.EncodeToString(data),
 	})
+}
+
+// ExportHistory exports all history entries as CSV or JSON.
+func (h *HistoryHandler) ExportHistory(w http.ResponseWriter, r *http.Request) {
+	format := r.URL.Query().Get("format")
+	if format != "csv" && format != "json" {
+		format = "json"
+	}
+
+	entries, err := h.Store.ListHistory(store.HistoryFilter{Limit: 10000, Offset: 0})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to export history")
+		return
+	}
+	if entries == nil {
+		entries = []store.HistoryEntry{}
+	}
+
+	if format == "csv" {
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Content-Disposition", "attachment; filename=history.csv")
+
+		writer := csv.NewWriter(w)
+		_ = writer.Write([]string{"id", "type", "voice_name", "input_text", "created_at"})
+		for _, e := range entries {
+			voice := ""
+			if e.VoiceName != nil {
+				voice = *e.VoiceName
+			}
+			_ = writer.Write([]string{
+				fmt.Sprintf("%d", e.ID),
+				e.Type,
+				voice,
+				e.InputText,
+				e.CreatedAt,
+			})
+		}
+		writer.Flush()
+		return
+	}
+
+	// JSON export
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=history.json")
+	_ = json.NewEncoder(w).Encode(entries)
 }

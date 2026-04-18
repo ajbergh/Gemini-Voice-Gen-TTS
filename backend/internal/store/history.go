@@ -6,7 +6,6 @@
 package store
 
 import (
-	"database/sql"
 	"fmt"
 )
 
@@ -21,22 +20,48 @@ type HistoryEntry struct {
 	CreatedAt  string  `json:"created_at"`
 }
 
-// ListHistory returns history entries with optional type filter and pagination.
-func (s *Store) ListHistory(historyType string, limit, offset int) ([]HistoryEntry, error) {
-	var rows *sql.Rows
-	var err error
+// HistoryFilter holds optional filters for listing history entries.
+type HistoryFilter struct {
+	Type     string // "tts" or "recommendation" or "" for all
+	Query    string // Full-text search in input_text and voice_name
+	Voice    string // Filter by voice_name
+	DateFrom string // ISO date string (>=)
+	DateTo   string // ISO date string (<=)
+	Limit    int
+	Offset   int
+}
 
-	if historyType != "" {
-		rows, err = s.db.Query(
-			"SELECT id, type, voice_name, input_text, result_json, audio_path, created_at FROM history WHERE type = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
-			historyType, limit, offset,
-		)
-	} else {
-		rows, err = s.db.Query(
-			"SELECT id, type, voice_name, input_text, result_json, audio_path, created_at FROM history ORDER BY created_at DESC LIMIT ? OFFSET ?",
-			limit, offset,
-		)
+// ListHistory returns history entries with optional filters and pagination.
+func (s *Store) ListHistory(f HistoryFilter) ([]HistoryEntry, error) {
+	query := "SELECT id, type, voice_name, input_text, result_json, audio_path, created_at FROM history WHERE 1=1"
+	args := []interface{}{}
+
+	if f.Type != "" {
+		query += " AND type = ?"
+		args = append(args, f.Type)
 	}
+	if f.Query != "" {
+		query += " AND (input_text LIKE ? OR voice_name LIKE ?)"
+		like := "%" + f.Query + "%"
+		args = append(args, like, like)
+	}
+	if f.Voice != "" {
+		query += " AND voice_name = ?"
+		args = append(args, f.Voice)
+	}
+	if f.DateFrom != "" {
+		query += " AND created_at >= ?"
+		args = append(args, f.DateFrom)
+	}
+	if f.DateTo != "" {
+		query += " AND created_at <= ?"
+		args = append(args, f.DateTo)
+	}
+
+	query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+	args = append(args, f.Limit, f.Offset)
+
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query history: %w", err)
 	}

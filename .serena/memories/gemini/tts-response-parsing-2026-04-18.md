@@ -1,0 +1,3 @@
+- Gemini preview TTS can return HTTP 200 without audio in the first part, or text-only parts before audio.
+- backend/internal/gemini/client.go now scans all candidates/parts for inlineData and retries non-audio 200 responses up to 4 attempts.
+- Accent mode in ScriptReaderModal should use concise 'Read the transcript in English with ... accent' notes plus accent-specific English locale hints instead of forcing every accent to en-US.
