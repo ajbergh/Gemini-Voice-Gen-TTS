@@ -14,7 +14,7 @@ Allow users to **save AI-recommended voices as custom presets** with cached samp
 | Phase 2: Backend API endpoints | **Complete** | `handler/api_presets.go`, routes + server wiring |
 | Phase 3: Frontend API client | **Complete** | `types.ts` + `api.ts` updated with 6 preset functions |
 | Phase 4: Tab UI + PresetGrid/Card | **Complete** | `PresetGrid.tsx`, `PresetCard.tsx`, FilterBar tab switcher, App.tsx state |
-| Phase 5: Save as Preset flow | **Complete** | "Save Preset" button in AiTtsPreview, sourceQuery threaded from VoiceFinder |
+| Phase 5: Save as Preset flow | **Complete** | "Save Preset" button in AiTtsPreview, App-owned save dialog with suggested naming, sourceQuery/personDescription threaded from VoiceFinder |
 | Phase 6: Playback, edit, delete | **Complete** | PresetCard playback, PresetEditModal, delete with confirmation |
 | Phase 7: My Voices UI rework | **Complete** | PresetCard horizontal layout matching VoiceCard, PresetCarousel3D mirroring Carousel3D, carousel/grid toggle for My Voices tab |
 | Phase 8: ScriptReader stock/custom toggle | **Complete** | Stock/My Voices toggle in ScriptReaderModal, custom preset selector dropdown, AiTtsPreview receives selected preset's base voice |
@@ -270,16 +270,19 @@ After the AI Casting Director returns results and the user previews TTS audio, a
 
 **Flow:**
 1. User clicks "Save as Preset" on a recommended voice.
-2. A small inline form or popover appears asking for a **preset name** (defaulting to something like "Irish Storyteller — Kore").
-3. On confirm, the frontend calls `createPreset()` with:
+2. An App-owned save dialog opens with a recommended **preset name** pre-populated from the casting query/persona.
+3. The dialog shows that Gemini artwork will be generated from the saved persona description when available.
+4. On confirm, the frontend calls `createPreset()` with:
    - `name`: user-entered name
    - `voice_name`: the Gemini voice name
    - `system_instruction`: from `aiResult.systemInstruction`
    - `sample_text`: from `aiResult.sampleText`
    - `audio_base64`: the already-generated TTS audio (if available from the preview)
    - `source_query`: the original user query
-4. On success, the `customPresets` state in App.tsx is refreshed.
-5. Show a success toast/notification.
+  - `person_description`: the AI casting persona description for Gemini portrait generation
+5. While the request is in flight, the dialog shows a save/progress state indicating Gemini portrait generation.
+6. On success, the `customPresets` state in App.tsx is refreshed, the AI result UI closes, and the app returns to the custom presets view.
+7. Show a success toast/notification.
 
 ### 5b. Re-generate Audio on Save (if not previewed)
 
@@ -291,6 +294,8 @@ If the user saves without having previewed the voice's TTS:
 ### Files Changed (Phase 5)
 - `components/AiResultCard.tsx` — add "Save as Preset" button per voice
 - `components/AiTtsPreview.tsx` — expose generated audio data upward (callback or ref) so AiResultCard can pass it to the save flow
+- `components/SavePresetDialog.tsx` — save confirmation dialog with suggested naming and Gemini artwork progress UI
+- `App.tsx` — own the save dialog state, suggested naming, and return-to-presets success flow
 
 ---
 

@@ -13,8 +13,8 @@ Ships as a **single cross-platform binary** (Windows, macOS, Linux) with a pure 
 ## Features
 
 - **Voice Browsing** — Explore 30 pre-loaded voices with detailed metadata (gender, pitch, characteristics) in a 3D carousel or responsive grid view with face images
-- **Custom Voice Presets ("My Voices")** — Save AI-recommended voices as custom presets with cached sample audio, tags, color labels, and version history; switch between Stock and My Voices tabs to browse them in the same carousel / grid UI
-- **AI Casting Director** — Describe your ideal voice in natural language and let Gemini analyze the library to recommend the top 3 matches, complete with a structured system prompt (Audio Profile, Scene, Director's Notes, Sample Context, Transcript)
+- **Custom Voice Presets ("My Voices")** — Save AI-recommended voices as custom presets through a dedicated save dialog with suggested naming, cached sample audio, Gemini-generated portrait artwork, tags, color labels, and version history; switch between Stock and My Voices tabs to browse them in the same carousel / grid UI
+- **AI Casting Director** — Describe your ideal voice in natural language and let Gemini analyze the library to recommend the top 3 matches, complete with a structured system prompt (Audio Profile, Scene, Director's Notes, Sample Context, Transcript) and persona metadata used for custom preset artwork generation
 - **Script Reader** — Enter custom text and preview it with any stock or custom voice using real-time TTS generation, with accent selection (16 world accents), audio tag insertion with syntax highlighting, script templates, drag-and-drop file import, and AI-powered script formatting
 - **Accent Selector** — Choose from 16 world accents (General American, British RP, Australian, Irish, Scottish, Indian English, and more) that inject Director's Notes into the TTS system instruction for authentic regional speech
 - **Voice Compare** — Side-by-side comparison of two voices reading the same text

@@ -1,3 +1,12 @@
+/**
+ * SavePresetDialog.tsx — Custom Preset Save Confirmation
+ *
+ * Collects or confirms the preset name before saving an AI casting result as a
+ * custom voice preset. Shows the base voice, the casting/persona context, and a
+ * client-side progress indicator while the backend saves the preset and, when
+ * available, generates the Gemini portrait.
+ */
+
 import React from 'react';
 import { Loader2, Save, Sparkles, X } from 'lucide-react';
 

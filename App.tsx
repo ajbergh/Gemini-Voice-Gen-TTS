@@ -9,7 +9,8 @@
  * Owns all top-level state: active voice, AI results, filter criteria, view mode,
  * theme (dark/light), carousel index, and modal visibility flags. Delegates
  * rendering to Carousel3D or GridView based on viewMode, and conditionally
- * renders modals (VoiceFinder, ScriptReader, Settings, History, AiResultCard).
+ * renders modals (VoiceFinder, ScriptReader, Settings, History, AiResultCard,
+ * preset edit, and the custom preset save dialog).
  *
  * Theme preference is persisted to the Go backend via /api/config so it survives
  * across sessions. Filtering logic is memoized with useMemo; when an AI result
@@ -328,7 +329,7 @@ const App: React.FC = () => {
     setActiveIndex(0);
   }, []);
 
-  /** Dismiss the AI result card and reset filters. */
+  /** Dismiss the AI result card and return the voice search state to neutral. */
   const clearAiResult = () => {
     setAiResult(null);
     setIsAiCardVisible(false);
@@ -428,7 +429,7 @@ const App: React.FC = () => {
     showToast('Preset updated', 'success');
   };
 
-  /** Save a new custom voice preset from the AI result TTS preview. */
+  /** Open the save dialog for a new custom voice preset from the AI result preview. */
   const handleSavePreset = (data: PendingPresetSave) => {
     setPendingPresetSave(data);
     setPendingPresetName(buildSuggestedPresetName(data));
@@ -450,6 +451,7 @@ const App: React.FC = () => {
     resetSavePresetDialog();
   };
 
+  /** Persist the pending preset and return the user to the custom presets view. */
   const handleConfirmSavePreset = async () => {
     if (!pendingPresetSave) return;
 
