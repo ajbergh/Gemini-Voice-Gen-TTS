@@ -15,6 +15,7 @@ type RecommendResponse struct {
 	RecommendedVoices []string `json:"recommendedVoices"`
 	SystemInstruction string   `json:"systemInstruction"`
 	SampleText        string   `json:"sampleText"`
+	PersonDescription string   `json:"personDescription"`
 }
 
 // TTSRequest is the payload from the frontend for TTS generation.

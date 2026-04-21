@@ -57,6 +57,8 @@ func RegisterRoutes(mux *http.ServeMux, configH *handler.ConfigHandler, keysH *h
 	mux.HandleFunc("PUT /api/presets/{id}", presetsH.UpdatePreset)
 	mux.HandleFunc("DELETE /api/presets/{id}", presetsH.DeletePreset)
 	mux.HandleFunc("GET /api/presets/{id}/audio", presetsH.GetPresetAudio)
+	mux.HandleFunc("GET /api/presets/{id}/image", presetsH.GetPresetImage)
+	mux.HandleFunc("POST /api/presets/{id}/image/regenerate", presetsH.RegeneratePresetImage)
 	mux.HandleFunc("PUT /api/presets/{id}/tags", presetsH.SetPresetTags)
 	mux.HandleFunc("GET /api/presets/{id}/versions", presetsH.ListPresetVersions)
 	mux.HandleFunc("POST /api/presets/{id}/versions/{versionId}/revert", presetsH.RevertPresetVersion)

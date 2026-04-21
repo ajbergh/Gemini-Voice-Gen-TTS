@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ajbergh/gemini-voice-gen-tts/backend/internal/store"
@@ -21,6 +22,7 @@ import (
 type PresetsHandler struct {
 	Store         *store.Store
 	AudioCacheDir string
+	KeysHandler   *KeysHandler
 }
 
 // presetWithTags wraps a preset with its tags for JSON responses.
@@ -83,6 +85,8 @@ func (h *PresetsHandler) CreatePreset(w http.ResponseWriter, r *http.Request) {
 		AudioBase64       *string `json:"audio_base64"`
 		SourceQuery       *string `json:"source_query"`
 		MetadataJSON      *string `json:"metadata_json"`
+		GenerateHeadshot  bool    `json:"generate_headshot"`
+		PersonDescription *string `json:"person_description"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
@@ -94,13 +98,28 @@ func (h *PresetsHandler) CreatePreset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sourceQuery := ""
+	if req.SourceQuery != nil {
+		sourceQuery = *req.SourceQuery
+	}
+	personDescription := ""
+	if req.PersonDescription != nil {
+		personDescription = *req.PersonDescription
+	}
+
+	metadataJSON, cachedHeadshotPath, err := h.buildPresetMetadata(req.MetadataJSON, sourceQuery, personDescription, req.GenerateHeadshot, req.Name, req.VoiceName)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	preset := store.CustomPreset{
 		Name:              req.Name,
 		VoiceName:         req.VoiceName,
 		SystemInstruction: req.SystemInstruction,
 		SampleText:        req.SampleText,
 		SourceQuery:       req.SourceQuery,
-		MetadataJSON:      req.MetadataJSON,
+		MetadataJSON:      metadataJSON,
 	}
 
 	// Cache audio to disk if provided
@@ -126,6 +145,16 @@ func (h *PresetsHandler) CreatePreset(w http.ResponseWriter, r *http.Request) {
 
 	id, err := h.Store.InsertCustomPreset(preset)
 	if err != nil {
+		if preset.AudioPath != nil {
+			if removeErr := removeCachedAudioFile(h.AudioCacheDir, *preset.AudioPath); removeErr != nil && !os.IsNotExist(removeErr) {
+				slog.Warn("failed to remove orphaned preset audio", "path", *preset.AudioPath, "error", removeErr)
+			}
+		}
+		if cachedHeadshotPath != "" {
+			if removeErr := removeCachedImageFile(h.AudioCacheDir, cachedHeadshotPath); removeErr != nil && !os.IsNotExist(removeErr) {
+				slog.Warn("failed to remove orphaned preset image", "path", cachedHeadshotPath, "error", removeErr)
+			}
+		}
 		writeError(w, http.StatusConflict, "failed to create preset: "+err.Error())
 		return
 	}
@@ -142,11 +171,12 @@ func (h *PresetsHandler) UpdatePreset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Name         *string `json:"name"`
-		SampleText   *string `json:"sample_text"`
-		AudioBase64  *string `json:"audio_base64"`
-		MetadataJSON *string `json:"metadata_json"`
-		Color        *string `json:"color"`
+		Name              *string `json:"name"`
+		SystemInstruction *string `json:"system_instruction"`
+		SampleText        *string `json:"sample_text"`
+		AudioBase64       *string `json:"audio_base64"`
+		MetadataJSON      *string `json:"metadata_json"`
+		Color             *string `json:"color"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
@@ -162,6 +192,9 @@ func (h *PresetsHandler) UpdatePreset(w http.ResponseWriter, r *http.Request) {
 	updated := *existing
 	if req.Name != nil {
 		updated.Name = *req.Name
+	}
+	if req.SystemInstruction != nil {
+		updated.SystemInstruction = req.SystemInstruction
 	}
 	if req.SampleText != nil {
 		updated.SampleText = req.SampleText
@@ -229,6 +262,9 @@ func (h *PresetsHandler) DeletePreset(w http.ResponseWriter, r *http.Request) {
 			slog.Warn("failed to remove preset audio file", "path", *preset.AudioPath, "error", removeErr)
 		}
 	}
+	if removeErr := removePresetHeadshot(h.AudioCacheDir, preset.MetadataJSON); removeErr != nil && !os.IsNotExist(removeErr) {
+		slog.Warn("failed to remove preset headshot file", "preset_id", id, "error", removeErr)
+	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
@@ -261,6 +297,111 @@ func (h *PresetsHandler) GetPresetAudio(w http.ResponseWriter, r *http.Request) 
 
 	audioBase64 := base64.StdEncoding.EncodeToString(audioBytes)
 	writeJSON(w, http.StatusOK, map[string]string{"audioBase64": audioBase64})
+}
+
+// GetPresetImage returns a cached headshot image for a preset.
+func (h *PresetsHandler) GetPresetImage(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid preset ID")
+		return
+	}
+
+	preset, err := h.Store.GetCustomPreset(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "preset not found")
+		return
+	}
+
+	headshot, err := headshotMetadataFromRaw(preset.MetadataJSON)
+	if err != nil || headshot == nil {
+		writeError(w, http.StatusNotFound, "no image cached for this preset")
+		return
+	}
+
+	imageBytes, err := readCachedImageFile(h.AudioCacheDir, headshot.Path)
+	if err != nil {
+		slog.Warn("rejected preset image path", "preset_id", id, "path", headshot.Path, "error", err)
+		writeError(w, http.StatusNotFound, "image file not found on disk")
+		return
+	}
+
+	mimeType := headshot.MimeType
+	if mimeType == "" {
+		mimeType = http.DetectContentType(imageBytes)
+	}
+	w.Header().Set("Content-Type", mimeType)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(imageBytes)
+}
+
+// ListAllTags returns all distinct tags across all presets.
+
+// RegeneratePresetImage regenerates and caches a headshot for an existing preset using
+// its stored personDescription from the castingDirector metadata. Returns 422 if no
+// personDescription is available.
+func (h *PresetsHandler) RegeneratePresetImage(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid preset ID")
+		return
+	}
+
+	preset, err := h.Store.GetCustomPreset(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "preset not found")
+		return
+	}
+
+	// Extract personDescription from existing castingDirector metadata.
+	existingMeta, err := parsePresetMetadata(preset.MetadataJSON)
+	if err != nil || existingMeta.CastingDirector == nil || strings.TrimSpace(existingMeta.CastingDirector.PersonDescription) == "" {
+		writeError(w, http.StatusUnprocessableEntity, "no personDescription available to regenerate headshot; save from AI Casting Director first")
+		return
+	}
+	personDescription := existingMeta.CastingDirector.PersonDescription
+
+	// Remove old cached image file before generating a new one.
+	if removeErr := removePresetHeadshot(h.AudioCacheDir, preset.MetadataJSON); removeErr != nil {
+		slog.Warn("failed to remove old preset headshot", "preset_id", id, "error", removeErr)
+	}
+
+	// Clear old headshot from metadata so buildPresetMetadata starts fresh.
+	existingMeta.Headshot = nil
+	cleanedMeta, marshalErr := marshalPresetMetadata(existingMeta)
+	if marshalErr != nil {
+		writeError(w, http.StatusInternalServerError, "failed to prepare metadata")
+		return
+	}
+
+	newMetadataJSON, _, err := h.buildPresetMetadata(
+		cleanedMeta,
+		existingMeta.CastingDirector.SourceQuery,
+		personDescription,
+		true,
+		preset.Name,
+		preset.VoiceName,
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to generate headshot")
+		return
+	}
+
+	updated := *preset
+	updated.MetadataJSON = newMetadataJSON
+	if err := h.Store.UpdateCustomPreset(id, updated); err != nil {
+		// Orphan cleanup: remove newly generated image if DB update fails.
+		_ = removePresetHeadshot(h.AudioCacheDir, newMetadataJSON)
+		writeError(w, http.StatusInternalServerError, "failed to save regenerated headshot")
+		return
+	}
+
+	refreshed, err := h.Store.GetCustomPreset(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch updated preset")
+		return
+	}
+	writeJSON(w, http.StatusOK, refreshed)
 }
 
 // ListAllTags returns all distinct tags across all presets.
@@ -340,7 +481,7 @@ func (h *PresetsHandler) ExportPresets(w http.ResponseWriter, r *http.Request) {
 			SystemInstruction: p.SystemInstruction,
 			SampleText:        p.SampleText,
 			SourceQuery:       p.SourceQuery,
-			MetadataJSON:      p.MetadataJSON,
+			MetadataJSON:      portablePresetMetadata(p.MetadataJSON),
 		}
 		for _, t := range tags {
 			ep.Tags = append(ep.Tags, exportTag{Tag: t.Tag, Color: t.Color})
@@ -390,7 +531,7 @@ func (h *PresetsHandler) ImportPresets(w http.ResponseWriter, r *http.Request) {
 			SystemInstruction: ep.SystemInstruction,
 			SampleText:        ep.SampleText,
 			SourceQuery:       ep.SourceQuery,
-			MetadataJSON:      ep.MetadataJSON,
+			MetadataJSON:      portablePresetMetadata(ep.MetadataJSON),
 		}
 
 		id, err := h.Store.InsertCustomPreset(preset)

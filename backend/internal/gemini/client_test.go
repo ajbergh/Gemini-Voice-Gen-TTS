@@ -4,6 +4,8 @@
 package gemini
 
 import (
+	"bytes"
+	"encoding/base64"
 	"strings"
 	"testing"
 )
@@ -60,5 +62,71 @@ func TestParseTTSAudioResponseReportsTextOnlyResponse(t *testing.T) {
 	}
 	if !strings.Contains(diagnostic, "text parts: I could not generate audio for that request.") {
 		t.Fatalf("expected text response in diagnostic, got %q", diagnostic)
+	}
+}
+
+func TestParseImageResponsePrefersFinalNonThoughtImage(t *testing.T) {
+	thoughtImage := base64.StdEncoding.EncodeToString([]byte("thought-image"))
+	finalImage := base64.StdEncoding.EncodeToString([]byte("final-image"))
+	body := []byte(`{
+		"candidates": [
+			{
+				"content": {
+					"parts": [
+						{"inlineData": {"mimeType": "image/png", "data": "` + thoughtImage + `"}, "thought": true},
+						{"inlineData": {"mimeType": "image/png", "data": "` + finalImage + `"}}
+					]
+				}
+			}
+		]
+	}`)
+
+	imageBytes, mimeType, diagnostic, err := parseImageResponse(body)
+	if err != nil {
+		t.Fatalf("parseImageResponse returned error: %v", err)
+	}
+	if mimeType != "image/png" {
+		t.Fatalf("expected image/png mime type, got %q", mimeType)
+	}
+	if !bytes.Equal(imageBytes, []byte("final-image")) {
+		t.Fatalf("expected final image bytes, got %q", string(imageBytes))
+	}
+	if diagnostic != "" {
+		t.Fatalf("expected empty diagnostic for image response, got %q", diagnostic)
+	}
+}
+
+func TestParseImageResponseReportsMissingImage(t *testing.T) {
+	body := []byte(`{
+		"candidates": [
+			{
+				"finishReason": "NO_IMAGE",
+				"content": {
+					"parts": [
+						{"text": "I could not create an image for that request."}
+					]
+				}
+			}
+		],
+		"promptFeedback": {
+			"blockReason": "IMAGE_SAFETY"
+		}
+	}`)
+
+	imageBytes, mimeType, diagnostic, err := parseImageResponse(body)
+	if err != nil {
+		t.Fatalf("parseImageResponse returned error: %v", err)
+	}
+	if len(imageBytes) != 0 {
+		t.Fatalf("expected no image bytes, got %q", string(imageBytes))
+	}
+	if mimeType != "" {
+		t.Fatalf("expected empty mime type, got %q", mimeType)
+	}
+	if !strings.Contains(diagnostic, "prompt blocked: IMAGE_SAFETY") {
+		t.Fatalf("expected prompt block in diagnostic, got %q", diagnostic)
+	}
+	if !strings.Contains(diagnostic, "finish reasons: NO_IMAGE") {
+		t.Fatalf("expected finish reason in diagnostic, got %q", diagnostic)
 	}
 }

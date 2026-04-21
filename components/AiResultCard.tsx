@@ -22,7 +22,7 @@ interface AiResultCardProps {
   result: AiRecommendation;
   voices: Voice[];
   onClose: () => void;
-  onSavePreset?: (data: { voiceName: string; text: string; systemInstruction: string; audioBase64: string | null; sourceQuery: string }) => void;
+  onSavePreset?: (data: { voiceName: string; text: string; systemInstruction: string; audioBase64: string | null; sourceQuery: string; personDescription?: string }) => void;
 }
 
 const AiResultCard: React.FC<AiResultCardProps> = ({ result, voices, onClose, onSavePreset }) => {
@@ -151,6 +151,7 @@ const AiResultCard: React.FC<AiResultCardProps> = ({ result, voices, onClose, on
                       voices={voices}
                       systemInstruction={result.systemInstruction}
                       sourceQuery={result.sourceQuery}
+                      personDescription={result.personDescription}
                       onSavePreset={onSavePreset}
                     />
                  </div>

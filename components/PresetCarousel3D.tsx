@@ -20,6 +20,8 @@ import { VOICE_DATA } from '../constants';
 import { getPresetAudio } from '../api';
 import { Play, Pause, Activity, ChevronLeft, ChevronRight, Loader2, Pencil, Trash2, Copy } from 'lucide-react';
 import AudioVisualizer from './AudioVisualizer';
+import PresetArtwork from './PresetArtwork';
+import { getPresetHeadshotMetadata } from '../presetMetadata';
 
 interface PresetCarousel3DProps {
   presets: CustomPreset[];
@@ -212,6 +214,7 @@ const PresetCarousel3D: React.FC<PresetCarousel3DProps> = ({
               const offset = index - activeIndex;
               const isPlaying = playingPresetId === preset.id;
               const baseVoice = VOICE_DATA.find(v => v.name === preset.voice_name);
+              const hasHeadshot = !!getPresetHeadshotMetadata(preset);
               
               const zIndex = 100 - Math.abs(offset);
               const isMobile = windowWidth < 640;
@@ -270,6 +273,14 @@ const PresetCarousel3D: React.FC<PresetCarousel3DProps> = ({
                   <div className="h-full flex flex-col relative">
                     {/* Visualizer Area - Top */}
                     <div className="flex-1 relative bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center overflow-hidden">
+                      <PresetArtwork
+                        presetId={preset.id}
+                        hasHeadshot={hasHeadshot}
+                        fallbackImageUrl={baseVoice?.imageUrl}
+                        alt={preset.name}
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/60 via-zinc-950/15 to-white/10 dark:from-zinc-950/70 dark:via-zinc-950/25 dark:to-zinc-950/5"></div>
                       <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.1]" style={{ backgroundImage: 'radial-gradient(currentColor 1px, transparent 1px)', backgroundSize: '12px 12px' }}></div>
                       
                       <div className={`absolute inset-0 z-10 transition-opacity duration-500 ${isPlaying ? 'opacity-100' : 'opacity-0'}`}>
@@ -277,7 +288,7 @@ const PresetCarousel3D: React.FC<PresetCarousel3DProps> = ({
                       </div>
 
                       <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-500 ${isPlaying ? 'opacity-0' : 'opacity-100'}`}>
-                        <div className="w-20 h-20 rounded-full bg-white dark:bg-zinc-800 shadow-sm border border-zinc-100 dark:border-zinc-700 flex items-center justify-center">
+                        <div className={`w-20 h-20 rounded-full shadow-sm border flex items-center justify-center ${hasHeadshot || baseVoice?.imageUrl ? 'bg-white/85 dark:bg-zinc-800/85 backdrop-blur-sm border-white/50 dark:border-zinc-700/80' : 'bg-white dark:bg-zinc-800 border-zinc-100 dark:border-zinc-700'}`}>
                           {isLoading && isActive ? (
                             <Loader2 size={32} className="text-zinc-300 dark:text-zinc-600 animate-spin" />
                           ) : (

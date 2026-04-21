@@ -23,6 +23,7 @@ import GridView from './components/GridView';
 import PresetCarousel3D from './components/PresetCarousel3D';
 import PresetGrid from './components/PresetGrid';
 import PresetEditModal from './components/PresetEditModal';
+import SavePresetDialog from './components/SavePresetDialog';
 import FilterBar from './components/FilterBar';
 import NavigationSidebar, { AppSection } from './components/NavigationSidebar';
 import VoiceFinder from './components/VoiceFinder';
@@ -36,8 +37,49 @@ import CommandPalette from './components/CommandPalette';
 import OnboardingTour from './components/OnboardingTour';
 import { FilterState, AiRecommendation, CustomPreset } from './types';
 import { Info, Sparkles, X } from 'lucide-react';
-import { getConfig, updateConfig, listPresets, deletePreset as apiDeletePreset, createPreset as apiCreatePreset, updatePreset as apiUpdatePreset, listFavorites, toggleFavorite as apiToggleFavorite, exportPresets as apiExportPresets, importPresets as apiImportPresets, reorderPresets as apiReorderPresets } from './api';
+import { getConfig, updateConfig, listPresets, deletePreset as apiDeletePreset, createPreset as apiCreatePreset, updatePreset as apiUpdatePreset, listFavorites, toggleFavorite as apiToggleFavorite, exportPresets as apiExportPresets, importPresets as apiImportPresets, reorderPresets as apiReorderPresets, regeneratePresetImage as apiRegeneratePresetImage } from './api';
 import { useToast } from './components/ToastProvider';
+
+interface PendingPresetSave {
+  voiceName: string;
+  text: string;
+  systemInstruction: string;
+  audioBase64: string | null;
+  sourceQuery: string;
+  personDescription?: string;
+}
+
+const PRESET_NAME_STOPWORDS = new Set([
+  'a', 'an', 'and', 'as', 'at', 'for', 'from', 'in', 'into', 'of', 'on', 'or', 'the', 'to', 'with',
+  'voice', 'voices', 'sound', 'sounding', 'style', 'persona', 'persona', 'person', 'character',
+  'male', 'female', 'man', 'woman', 'guy', 'girl', 'someone', 'someone', 'that', 'this', 'who',
+  'warm', 'cool', 'very', 'really', 'need', 'want', 'looking', 'like'
+]);
+
+const PRESET_NAME_ROLE_WORDS = new Set([
+  'narrator', 'host', 'guide', 'announcer', 'presenter', 'speaker', 'coach', 'assistant', 'mentor',
+  'commentator', 'storyteller', 'companion', 'caster', 'director', 'reader', 'performer'
+]);
+
+function toTitleCase(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
+
+function buildSuggestedPresetName(data: PendingPresetSave): string {
+  const tokenSource = `${data.sourceQuery || ''} ${data.personDescription || ''}`.toLowerCase();
+  const tokens = tokenSource.match(/[a-z0-9]+/g) ?? [];
+  const meaningful = tokens.filter(token => token.length > 2 && !PRESET_NAME_STOPWORDS.has(token));
+  const role = meaningful.find(token => PRESET_NAME_ROLE_WORDS.has(token));
+  const descriptors = meaningful
+    .filter(token => token !== role)
+    .slice(0, role ? 2 : 3)
+    .map(toTitleCase);
+
+  const parts = role ? [...descriptors, toTitleCase(role)] : descriptors;
+  if (parts.length > 0) return parts.join(' ');
+
+  return `${data.voiceName} Signature`;
+}
 
 const App: React.FC = () => {
   const { showToast } = useToast();
@@ -76,6 +118,12 @@ const App: React.FC = () => {
   const [similarTo, setSimilarTo] = useState<string | null>(null);
   const [presetTagFilter, setPresetTagFilter] = useState<string | null>(null);
   const [scriptVoiceName, setScriptVoiceName] = useState<string>(VOICE_DATA[0]?.name ?? '');
+  const [pendingPresetSave, setPendingPresetSave] = useState<PendingPresetSave | null>(null);
+  const [pendingPresetName, setPendingPresetName] = useState('');
+  const [pendingPresetError, setPendingPresetError] = useState<string | null>(null);
+  const [isSavingPreset, setIsSavingPreset] = useState(false);
+  const [savePresetProgress, setSavePresetProgress] = useState(0);
+  const [savePresetProgressLabel, setSavePresetProgressLabel] = useState('Ready to save preset');
 
   const [filters, setFilters] = useState<FilterState>({
     gender: 'All',
@@ -287,6 +335,39 @@ const App: React.FC = () => {
     setFilters({ ...filters, search: '' });
   };
 
+  useEffect(() => {
+    if (!isSavingPreset) {
+      setSavePresetProgress(0);
+      setSavePresetProgressLabel('Ready to save preset');
+      return;
+    }
+
+    setSavePresetProgress(12);
+    setSavePresetProgressLabel('Saving your custom voice preset...');
+
+    const intervalId = window.setInterval(() => {
+      setSavePresetProgress(current => {
+        if (current >= 90) return current;
+        if (current < 42) return current + 10;
+        if (current < 72) return current + 5;
+        return current + 2;
+      });
+    }, 260);
+
+    const labelTimeoutId = window.setTimeout(() => {
+      setSavePresetProgressLabel(
+        pendingPresetSave?.personDescription?.trim()
+          ? 'Generating Gemini portrait from the persona description...'
+          : 'Finalizing custom preset...'
+      );
+    }, 700);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.clearTimeout(labelTimeoutId);
+    };
+  }, [isSavingPreset, pendingPresetSave]);
+
   /** Toggle preset audio playback. */
   const handlePresetPlayToggle = (presetId: number) => {
     setPlayingPresetId(current => current === presetId ? null : presetId);
@@ -335,6 +416,12 @@ const App: React.FC = () => {
     showToast('Preset updated', 'success');
   };
 
+    const handleRegenerateHeadshot = async (id: number) => {
+      await apiRegeneratePresetImage(id);
+      refreshPresets();
+      showToast('Headshot regenerated', 'success');
+    };
+
   const handlePresetInlineEdit = async (id: number, data: { name?: string; system_instruction?: string }) => {
     await apiUpdatePreset(id, data);
     refreshPresets();
@@ -342,28 +429,68 @@ const App: React.FC = () => {
   };
 
   /** Save a new custom voice preset from the AI result TTS preview. */
-  const handleSavePreset = async (data: { voiceName: string; text: string; systemInstruction: string; audioBase64: string | null; sourceQuery: string }) => {
-    const name = prompt(`Name this voice preset (e.g., "Friendly Narrator"):`)?.trim();
-    if (!name) return;
+  const handleSavePreset = (data: PendingPresetSave) => {
+    setPendingPresetSave(data);
+    setPendingPresetName(buildSuggestedPresetName(data));
+    setPendingPresetError(null);
+    setSavePresetProgress(0);
+    setSavePresetProgressLabel('Ready to save preset');
+  };
+
+  const resetSavePresetDialog = () => {
+    setPendingPresetSave(null);
+    setPendingPresetName('');
+    setPendingPresetError(null);
+    setSavePresetProgress(0);
+    setSavePresetProgressLabel('Ready to save preset');
+  };
+
+  const handleCloseSavePresetDialog = () => {
+    if (isSavingPreset) return;
+    resetSavePresetDialog();
+  };
+
+  const handleConfirmSavePreset = async () => {
+    if (!pendingPresetSave) return;
+
+    const name = pendingPresetName.trim();
+    if (!name) {
+      setPendingPresetError('Preset name is required.');
+      return;
+    }
+
+    setIsSavingPreset(true);
+    setPendingPresetError(null);
     try {
+      const personDescription = pendingPresetSave.personDescription?.trim();
       await apiCreatePreset({
         name,
-        voice_name: data.voiceName,
-        system_instruction: data.systemInstruction,
-        sample_text: data.text,
-        audio_base64: data.audioBase64 || undefined,
-        source_query: data.sourceQuery,
+        voice_name: pendingPresetSave.voiceName,
+        system_instruction: pendingPresetSave.systemInstruction,
+        sample_text: pendingPresetSave.text,
+        audio_base64: pendingPresetSave.audioBase64 || undefined,
+        source_query: pendingPresetSave.sourceQuery,
+        generate_headshot: !!personDescription,
+        person_description: personDescription || undefined,
       });
+      setSavePresetProgress(100);
+      setSavePresetProgressLabel(personDescription ? 'Gemini portrait generated. Returning to presets...' : 'Preset saved. Returning to presets...');
       refreshPresets();
       setVoiceTab('custom');
+      setActiveSection('presets');
+      resetSavePresetDialog();
+      clearAiResult();
       showToast(`Preset "${name}" saved`, 'success');
     } catch (err: any) {
       const msg = err?.message || 'Failed to save preset.';
       if (msg.includes('UNIQUE')) {
-        showToast(`A preset named "${name}" already exists`, 'warning');
+        setPendingPresetError(`A preset named "${name}" already exists.`);
       } else {
-        showToast(msg, 'error');
+        setPendingPresetError(msg);
       }
+      showToast(msg.includes('UNIQUE') ? `A preset named "${name}" already exists` : msg, msg.includes('UNIQUE') ? 'warning' : 'error');
+    } finally {
+      setIsSavingPreset(false);
     }
   };
 
@@ -402,7 +529,7 @@ const App: React.FC = () => {
     }
   };
 
-  const isModalOpen = showVoiceFinder || showSettings || showShortcuts || showCommandPalette || (aiResult && isAiCardVisible) || !!editingPreset;
+  const isModalOpen = showVoiceFinder || showSettings || showShortcuts || showCommandPalette || (aiResult && isAiCardVisible) || !!editingPreset || !!pendingPresetSave;
 
   /** Handle section change from sidebar. Map presets section to voiceTab='custom'. */
   const handleSectionChange = useCallback((section: AppSection) => {
@@ -703,6 +830,24 @@ const App: React.FC = () => {
           preset={editingPreset}
           onSave={handlePresetEditSave}
           onClose={() => setEditingPreset(null)}
+          onRegenerateHeadshot={handleRegenerateHeadshot}
+        />
+      )}
+
+      {pendingPresetSave && (
+        <SavePresetDialog
+          voiceName={pendingPresetSave.voiceName}
+          presetName={pendingPresetName}
+          suggestedName={buildSuggestedPresetName(pendingPresetSave)}
+          sourceQuery={pendingPresetSave.sourceQuery}
+          personDescription={pendingPresetSave.personDescription}
+          isSaving={isSavingPreset}
+          progress={savePresetProgress}
+          progressLabel={savePresetProgressLabel}
+          error={pendingPresetError}
+          onNameChange={setPendingPresetName}
+          onClose={handleCloseSavePresetDialog}
+          onSave={handleConfirmSavePreset}
         />
       )}
 

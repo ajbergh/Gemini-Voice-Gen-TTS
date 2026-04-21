@@ -389,6 +389,8 @@ export async function createPreset(data: {
   audio_base64?: string;
   source_query?: string;
   metadata_json?: string;
+  generate_headshot?: boolean;
+  person_description?: string;
 }): Promise<{ id: number }> {
   return request<{ id: number }>('/presets', {
     method: 'POST',
@@ -399,6 +401,7 @@ export async function createPreset(data: {
 /** Update a custom preset's mutable fields. */
 export async function updatePreset(id: number, data: {
   name?: string;
+  system_instruction?: string;
   sample_text?: string;
   audio_base64?: string;
   metadata_json?: string;
@@ -419,6 +422,16 @@ export async function deletePreset(id: number): Promise<void> {
 export async function getPresetAudio(id: number): Promise<string> {
   const data = await request<{ audioBase64: string }>(`/presets/${id}/audio`);
   return data.audioBase64;
+}
+
+/** Retrieve a generated preset headshot image URL for direct img src usage. */
+export function getPresetImageUrl(id: number): string {
+  return `${API_BASE}/presets/${id}/image`;
+}
+
+/** Regenerate the headshot for a preset using its stored personDescription. */
+export async function regeneratePresetImage(id: number): Promise<CustomPreset> {
+  return request<CustomPreset>(`/presets/${id}/image/regenerate`, { method: 'POST' });
 }
 
 /** List all distinct tags across all presets. */

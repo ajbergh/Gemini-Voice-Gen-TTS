@@ -19,6 +19,8 @@ import { CustomPreset } from '../types';
 import { VOICE_DATA } from '../constants';
 import { getPresetAudio } from '../api';
 import AudioVisualizer from './AudioVisualizer';
+import PresetArtwork from './PresetArtwork';
+import { getPresetHeadshotMetadata } from '../presetMetadata';
 
 interface PresetCardProps {
   preset: CustomPreset;
@@ -53,6 +55,7 @@ const PresetCard: React.FC<PresetCardProps> = ({ preset, isPlaying, onPlayToggle
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const baseVoice = VOICE_DATA.find(v => v.name === preset.voice_name);
+  const hasHeadshot = !!getPresetHeadshotMetadata(preset);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -182,6 +185,14 @@ const PresetCard: React.FC<PresetCardProps> = ({ preset, isPlaying, onPlayToggle
       
       {/* Visualizer / Action Area - Left Side */}
       <div className="relative h-20 sm:h-full w-full sm:w-28 bg-zinc-50/50 dark:bg-zinc-900/50 shrink-0 border-b sm:border-b-0 sm:border-r border-zinc-100 dark:border-zinc-700 flex items-center justify-center overflow-hidden">
+        <PresetArtwork
+          presetId={preset.id}
+          hasHeadshot={hasHeadshot}
+          fallbackImageUrl={baseVoice?.imageUrl}
+          alt={preset.name}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/45 via-zinc-950/10 to-white/10 dark:from-zinc-950/60 dark:via-zinc-950/20 dark:to-zinc-950/5"></div>
         
         {/* Technical Grid Background */}
         <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.1]" style={{ backgroundImage: 'radial-gradient(currentColor 1px, transparent 1px)', backgroundSize: '8px 8px' }}></div>
@@ -190,7 +201,7 @@ const PresetCard: React.FC<PresetCardProps> = ({ preset, isPlaying, onPlayToggle
         <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${isPlaying ? 'opacity-0' : 'opacity-100'}`}>
           {isLoading ? (
             <Loader2 size={20} className="text-zinc-300 dark:text-zinc-600 animate-spin" />
-          ) : preset.audio_path ? (
+          ) : hasHeadshot || baseVoice?.imageUrl ? null : preset.audio_path ? (
             /* Mini static waveform when audio is cached */
             <div className="flex items-center gap-[2px] h-8">
               {Array.from({ length: 12 }, (_, i) => {

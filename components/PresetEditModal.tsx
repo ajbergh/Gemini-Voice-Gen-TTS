@@ -12,14 +12,18 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Loader2, Plus, History, RotateCcw } from 'lucide-react';
+import { X, Loader2, Plus, History, RotateCcw, RefreshCw } from 'lucide-react';
 import { CustomPreset, PresetTag } from '../types';
 import { setPresetTags, listPresetVersions, revertPresetVersion, PresetVersion } from '../api';
+import { VOICE_DATA } from '../constants';
+import PresetArtwork from './PresetArtwork';
+import { getPresetHeadshotMetadata } from '../presetMetadata';
 
 interface PresetEditModalProps {
   preset: CustomPreset;
   onSave: (id: number, data: { name?: string; system_instruction?: string; color?: string }) => Promise<void>;
   onClose: () => void;
+  onRegenerateHeadshot?: (id: number) => Promise<void>;
 }
 
 const TAG_COLORS = [
@@ -46,7 +50,7 @@ const PRESET_COLORS = [
   '#06b6d4', // cyan
 ];
 
-const PresetEditModal: React.FC<PresetEditModalProps> = ({ preset, onSave, onClose }) => {
+const PresetEditModal: React.FC<PresetEditModalProps> = ({ preset, onSave, onClose, onRegenerateHeadshot }) => {
   const [name, setName] = useState(preset.name);
   const [systemInstruction, setSystemInstruction] = useState(preset.system_instruction || '');
   const [presetColor, setPresetColor] = useState(preset.color || '#6366f1');
@@ -59,7 +63,12 @@ const PresetEditModal: React.FC<PresetEditModalProps> = ({ preset, onSave, onClo
   const [versions, setVersions] = useState<PresetVersion[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [revertingId, setRevertingId] = useState<number | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [regenerateError, setRegenerateError] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const baseVoice = VOICE_DATA.find(v => v.name === preset.voice_name);
+  const hasHeadshot = !!getPresetHeadshotMetadata(preset);
+  const hasCastingDirector = !!preset.metadata_json && preset.metadata_json.includes('"castingDirector"');
 
   useEffect(() => {
     modalRef.current?.focus();
@@ -96,7 +105,6 @@ const PresetEditModal: React.FC<PresetEditModalProps> = ({ preset, onSave, onClo
     setIsSaving(true);
     setError(null);
     try {
-      // Save tags first so the refresh after onSave includes them
       await setPresetTags(preset.id, tags.map(t => ({ tag: t.tag, color: t.color })));
       await onSave(preset.id, {
         name: trimmedName !== preset.name ? trimmedName : undefined,
@@ -118,7 +126,6 @@ const PresetEditModal: React.FC<PresetEditModalProps> = ({ preset, onSave, onClo
     if (tags.some(t => t.tag.toLowerCase() === trimmed.toLowerCase())) return;
     setTags([...tags, { tag: trimmed, color: newTagColor }]);
     setNewTag('');
-    // Cycle to next color
     const idx = TAG_COLORS.indexOf(newTagColor);
     setNewTagColor(TAG_COLORS[(idx + 1) % TAG_COLORS.length]);
   };
@@ -128,10 +135,7 @@ const PresetEditModal: React.FC<PresetEditModalProps> = ({ preset, onSave, onClo
   };
 
   const handleToggleVersions = async () => {
-    if (showVersions) {
-      setShowVersions(false);
-      return;
-    }
+    if (showVersions) { setShowVersions(false); return; }
     setShowVersions(true);
     setLoadingVersions(true);
     try {
@@ -148,11 +152,9 @@ const PresetEditModal: React.FC<PresetEditModalProps> = ({ preset, onSave, onClo
     setRevertingId(versionId);
     try {
       const updated = await revertPresetVersion(preset.id, versionId);
-      // Update form fields with reverted values
       setName(updated.name);
       setSystemInstruction(updated.system_instruction || '');
       setPresetColor(updated.color || '#6366f1');
-      // Refresh versions list
       const data = await listPresetVersions(preset.id);
       setVersions(data || []);
     } catch {
@@ -191,6 +193,56 @@ const PresetEditModal: React.FC<PresetEditModalProps> = ({ preset, onSave, onClo
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <h2 id="preset-edit-title" className="text-lg font-bold text-zinc-900 dark:text-white">Edit Preset</h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">Voice: {preset.voice_name}</p>
+
+          <div className="flex items-center gap-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-800/40 p-3">
+            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
+              <PresetArtwork
+                presetId={preset.id}
+                hasHeadshot={hasHeadshot}
+                fallbackImageUrl={baseVoice?.imageUrl}
+                alt={preset.name}
+                className="h-full w-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/40 via-transparent to-white/10 dark:from-zinc-950/55 dark:to-zinc-950/5"></div>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                {hasHeadshot ? 'Generated Headshot' : baseVoice?.imageUrl ? 'Voice Artwork' : 'Artwork Status'}
+              </p>
+              <p className="text-sm text-zinc-700 dark:text-zinc-200 leading-relaxed">
+                {hasHeadshot
+                  ? 'This preset is using its Gemini-generated portrait.'
+                  : baseVoice?.imageUrl
+                    ? `No preset headshot cached. Using ${baseVoice.name} fallback artwork.`
+                    : 'No artwork is currently available for this preset.'}
+              </p>
+              {hasCastingDirector && onRegenerateHeadshot && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsRegenerating(true);
+                    setRegenerateError(null);
+                    try {
+                      await onRegenerateHeadshot(preset.id);
+                    } catch (err: any) {
+                      setRegenerateError(err?.message || 'Failed to regenerate headshot.');
+                    } finally {
+                      setIsRegenerating(false);
+                    }
+                  }}
+                  disabled={isRegenerating || isSaving}
+                  className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] font-medium text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 disabled:opacity-40 transition-colors"
+                >
+                  {isRegenerating
+                    ? <><Loader2 size={12} className="animate-spin" />&nbsp;Generating...</>
+                    : <><RefreshCw size={12} />&nbsp;Regenerate headshot</>}
+                </button>
+              )}
+              {regenerateError && (
+                <p className="mt-1 text-[10px] text-red-500 dark:text-red-400 leading-snug">{regenerateError}</p>
+              )}
+            </div>
+          </div>
 
           <div>
             <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Preset Name</label>
@@ -297,7 +349,7 @@ const PresetEditModal: React.FC<PresetEditModalProps> = ({ preset, onSave, onClo
             >
               <History size={14} />
               Version History
-              <span className="text-zinc-400 dark:text-zinc-500">{showVersions ? '▾' : '▸'}</span>
+              <span className="text-zinc-400 dark:text-zinc-500">{showVersions ? 'v' : '>'}</span>
             </button>
 
             {showVersions && (

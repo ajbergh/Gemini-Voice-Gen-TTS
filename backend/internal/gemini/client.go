@@ -12,6 +12,7 @@ package gemini
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -32,10 +33,20 @@ const baseURL = "https://generativelanguage.googleapis.com/v1beta"
 // defaultTTSModel is the default model for TTS generation.
 const defaultTTSModel = "gemini-3.1-flash-tts-preview"
 
+// defaultImageModel is the default model for headshot image generation.
+const defaultImageModel = "gemini-3.1-flash-image-preview"
+
 // allowedTTSModels is the set of models the frontend is permitted to request.
 var allowedTTSModels = map[string]bool{
 	"gemini-3.1-flash-tts-preview": true,
 	"gemini-2.5-flash-preview-tts": true,
+}
+
+// allowedImageModels is the set of image generation models the backend may use.
+var allowedImageModels = map[string]bool{
+	"gemini-3.1-flash-image-preview": true,
+	"gemini-3-pro-image-preview":     true,
+	"gemini-2.5-flash-image":         true,
 }
 
 type ttsInlineData struct {
@@ -46,6 +57,7 @@ type ttsInlineData struct {
 type ttsResponsePart struct {
 	Text       string         `json:"text"`
 	InlineData *ttsInlineData `json:"inlineData"`
+	Thought    bool           `json:"thought,omitempty"`
 }
 
 type ttsResponseEnvelope struct {
@@ -113,12 +125,82 @@ func parseTTSAudioResponse(body []byte) (string, string, error) {
 	return "", strings.Join(diagnostics, "; "), nil
 }
 
+func parseImageResponse(body []byte) ([]byte, string, string, error) {
+	var envelope ttsResponseEnvelope
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, "", "", err
+	}
+
+	var textSnippets []string
+	var finishReasons []string
+	var fallbackImageData string
+	var fallbackMimeType string
+
+	for _, candidate := range envelope.Candidates {
+		if candidate.FinishReason != "" {
+			finishReasons = append(finishReasons, candidate.FinishReason)
+		}
+		for _, part := range candidate.Content.Parts {
+			if part.InlineData != nil && part.InlineData.Data != "" && strings.HasPrefix(strings.ToLower(part.InlineData.MimeType), "image/") {
+				if !part.Thought {
+					imageBytes, err := base64.StdEncoding.DecodeString(part.InlineData.Data)
+					if err != nil {
+						return nil, "", "", fmt.Errorf("decode image inline data: %w", err)
+					}
+					return imageBytes, part.InlineData.MimeType, "", nil
+				}
+				fallbackImageData = part.InlineData.Data
+				fallbackMimeType = part.InlineData.MimeType
+			}
+			if text := strings.TrimSpace(part.Text); text != "" {
+				textSnippets = append(textSnippets, summarizeTTSResponseText(text))
+			}
+		}
+	}
+
+	if fallbackImageData != "" {
+		imageBytes, err := base64.StdEncoding.DecodeString(fallbackImageData)
+		if err != nil {
+			return nil, "", "", fmt.Errorf("decode fallback image inline data: %w", err)
+		}
+		return imageBytes, fallbackMimeType, "", nil
+	}
+
+	diagnostics := make([]string, 0, 3)
+	if envelope.PromptFeedback.BlockReason != "" {
+		diagnostic := "prompt blocked: " + envelope.PromptFeedback.BlockReason
+		if envelope.PromptFeedback.BlockReasonMessage != "" {
+			diagnostic += " (" + envelope.PromptFeedback.BlockReasonMessage + ")"
+		}
+		diagnostics = append(diagnostics, diagnostic)
+	}
+	if len(finishReasons) > 0 {
+		diagnostics = append(diagnostics, "finish reasons: "+strings.Join(finishReasons, ", "))
+	}
+	if len(textSnippets) > 0 {
+		diagnostics = append(diagnostics, "text parts: "+strings.Join(textSnippets, " | "))
+	}
+	if len(diagnostics) == 0 {
+		diagnostics = append(diagnostics, "response contained no image parts")
+	}
+
+	return nil, "", strings.Join(diagnostics, "; "), nil
+}
+
 // resolveTTSModel returns a validated TTS model name or the default.
 func resolveTTSModel(model string) string {
 	if model != "" && allowedTTSModels[model] {
 		return model
 	}
 	return defaultTTSModel
+}
+
+// resolveImageModel returns a validated image model name or the default.
+func resolveImageModel(model string) string {
+	if model != "" && allowedImageModels[model] {
+		return model
+	}
+	return defaultImageModel
 }
 
 // Client interacts with the Gemini API.
@@ -155,6 +237,7 @@ Task:
 1. Select the top 3 voices from the available list that best match the user's request.
 2. Create a detailed System Instruction that defines the persona/character.
 3. Write a brief sample text paragraph (2-3 sentences).
+4. Create a concise visual person description for a professional portrait headshot image prompt. Focus on the person only. Do not include camera, lens, lighting, or background instructions.
 
 PROMPT STRUCTURE (Markdown):
 Ensure you use double newlines between sections so it renders correctly as markdown headers.
@@ -199,6 +282,10 @@ The text that the model will speak out.`, string(voicesJSON), query)
 					"sampleText": map[string]any{
 						"type":        "STRING",
 						"description": "Sample text",
+					},
+					"personDescription": map[string]any{
+						"type":        "STRING",
+						"description": "Concise visual description of the person or character suitable for a professional portrait headshot prompt",
 					},
 				},
 			},
@@ -250,6 +337,61 @@ The text that the model will speak out.`, string(voicesJSON), query)
 	}
 
 	return &result, nil
+}
+
+// GenerateHeadshot calls Gemini image generation to create a square portrait.
+func (c *Client) GenerateHeadshot(prompt, model string) ([]byte, string, error) {
+	reqBody := map[string]any{
+		"contents": []map[string]any{
+			{
+				"parts": []map[string]any{
+					{"text": prompt},
+				},
+			},
+		},
+		"generationConfig": map[string]any{
+			"responseModalities": []string{"IMAGE"},
+			"imageConfig": map[string]any{
+				"aspectRatio": "1:1",
+				"imageSize":   "1K",
+			},
+		},
+	}
+
+	data, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, "", fmt.Errorf("marshal request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", baseURL, resolveImageModel(model), c.apiKey)
+	resp, err := c.httpClient.Post(url, "application/json", bytes.NewReader(data))
+	if err != nil {
+		return nil, "", fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", fmt.Errorf("gemini image API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	imageBytes, mimeType, diagnostic, err := parseImageResponse(body)
+	if err != nil {
+		return nil, "", fmt.Errorf("parse response: %w", err)
+	}
+	if len(imageBytes) == 0 {
+		return nil, "", fmt.Errorf("Gemini returned no image data: %s", diagnostic)
+	}
+
+	if mimeType == "" {
+		mimeType = http.DetectContentType(imageBytes)
+	}
+
+	return imageBytes, mimeType, nil
 }
 
 // GenerateTTS calls Gemini TTS to generate speech audio.

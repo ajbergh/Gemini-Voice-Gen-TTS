@@ -35,4 +35,21 @@ func TestNormalizedCachedAudioPath(t *testing.T) {
 			t.Fatal("expected non-raw file to be rejected")
 		}
 	})
+
+	t.Run("accepts relative image filenames inside cache", func(t *testing.T) {
+		normalized, ok := normalizedCachedImagePath(cacheDir, "portrait.png")
+		if !ok {
+			t.Fatal("expected relative image path to be accepted")
+		}
+		expected := filepath.Join(cacheDir, "portrait.png")
+		if normalized != expected {
+			t.Fatalf("expected normalized path %q, got %q", expected, normalized)
+		}
+	})
+
+	t.Run("rejects image traversal outside cache", func(t *testing.T) {
+		if _, ok := normalizedCachedImagePath(cacheDir, filepath.Join("..", "portrait.png")); ok {
+			t.Fatal("expected outside-cache image path to be rejected")
+		}
+	})
 }

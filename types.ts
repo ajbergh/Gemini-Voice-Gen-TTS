@@ -48,6 +48,29 @@ export interface AiRecommendation {
   systemInstruction: string;
   sampleText: string;
   sourceQuery?: string;
+  personDescription?: string;
+}
+
+export interface PresetCastingDirectorMetadata {
+  sourceQuery?: string;
+  personDescription?: string;
+}
+
+export interface PresetHeadshotMetadata {
+  status?: string;
+  prompt?: string;
+  mimeType?: string;
+  path?: string;
+  error?: string;
+  generatedAt?: string;
+  aspectRatio?: string;
+  imageSize?: string;
+  model?: string;
+}
+
+export interface PresetMetadata {
+  castingDirector?: PresetCastingDirectorMetadata;
+  headshot?: PresetHeadshotMetadata;
 }
 
 /** A user-saved voice preset created from an AI recommendation. */

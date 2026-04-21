@@ -32,7 +32,7 @@ func New(addr string, st *store.Store, cryptoKey []byte, frontendFS fs.FS, audio
 	historyH := &handler.HistoryHandler{Store: st, AudioCacheDir: audioCacheDir}
 	progressH := handler.NewProgressHub()
 	voicesH := &handler.VoicesHandler{Store: st, KeysHandler: keysH, AudioCacheDir: audioCacheDir, ProgressHub: progressH}
-	presetsH := &handler.PresetsHandler{Store: st, AudioCacheDir: audioCacheDir}
+	presetsH := &handler.PresetsHandler{Store: st, AudioCacheDir: audioCacheDir, KeysHandler: keysH}
 	favoritesH := &handler.FavoritesHandler{Store: st}
 	cacheH := &handler.CacheHandler{AudioCacheDir: audioCacheDir}
 	backupH := &handler.BackupHandler{Store: st}

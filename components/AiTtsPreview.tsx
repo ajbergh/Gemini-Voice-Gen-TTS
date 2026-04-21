@@ -75,6 +75,7 @@ interface AiTtsPreviewProps {
   voices: Voice[];
   systemInstruction?: string;
   sourceQuery?: string;
+  personDescription?: string;
   hideVoiceSelector?: boolean;
   voiceDisplayNames?: Record<string, string>;
   /** Optional accent dropdown options rendered next to the voice selector. */
@@ -84,7 +85,7 @@ interface AiTtsPreviewProps {
   /** When set, overrides the language selector (e.g. force en-US for accent mode). */
   forceLanguageCode?: string;
   onVoiceChange?: (voiceName: string) => void;
-  onSavePreset?: (data: { voiceName: string; text: string; systemInstruction: string; audioBase64: string | null; sourceQuery: string }) => void;
+  onSavePreset?: (data: { voiceName: string; text: string; systemInstruction: string; audioBase64: string | null; sourceQuery: string; personDescription?: string }) => void;
 }
 
 /** Decode a base64 string into a raw Uint8Array of bytes. */
@@ -211,7 +212,7 @@ function detectLanguageCode(input: string): string {
   return '';
 }
 
-const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruction, sourceQuery, hideVoiceSelector, voiceDisplayNames, accentOptions, selectedAccentId, onAccentChange, forceLanguageCode, onVoiceChange, onSavePreset }) => {
+const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruction, sourceQuery, personDescription, hideVoiceSelector, voiceDisplayNames, accentOptions, selectedAccentId, onAccentChange, forceLanguageCode, onVoiceChange, onSavePreset }) => {
   const [selectedVoiceName, setSelectedVoiceName] = useState(voices[0]?.name || '');
   const [languageCode, setLanguageCode] = useState('');
   const [autoDetectedLang, setAutoDetectedLang] = useState('');
@@ -717,6 +718,7 @@ const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruc
                                 systemInstruction: systemInstruction || '',
                                 audioBase64: audioData,
                                 sourceQuery: sourceQuery || '',
+                              personDescription,
                             });
                         }}
                         disabled={isLoading || isDownloading}

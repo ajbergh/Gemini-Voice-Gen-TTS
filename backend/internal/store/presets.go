@@ -89,8 +89,8 @@ func (s *Store) UpdateCustomPreset(id int64, p CustomPreset) error {
 		color = "#6366f1"
 	}
 	result, err := s.db.Exec(
-		"UPDATE custom_presets SET name = ?, sample_text = ?, audio_path = COALESCE(?, audio_path), metadata_json = ?, color = ?, updated_at = ? WHERE id = ?",
-		p.Name, p.SampleText, p.AudioPath, p.MetadataJSON, color, now, id,
+		"UPDATE custom_presets SET name = ?, system_instruction = ?, sample_text = ?, audio_path = COALESCE(?, audio_path), metadata_json = ?, color = ?, updated_at = ? WHERE id = ?",
+		p.Name, p.SystemInstruction, p.SampleText, p.AudioPath, p.MetadataJSON, color, now, id,
 	)
 	if err != nil {
 		return fmt.Errorf("update custom_preset %d: %w", id, err)

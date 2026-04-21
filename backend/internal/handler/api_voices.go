@@ -77,6 +77,7 @@ func (h *VoicesHandler) Recommend(w http.ResponseWriter, r *http.Request) {
 		"voiceNames":        result.RecommendedVoices,
 		"systemInstruction": result.SystemInstruction,
 		"sampleText":        result.SampleText,
+		"personDescription": result.PersonDescription,
 	})
 }
 
