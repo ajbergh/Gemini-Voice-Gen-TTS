@@ -1,0 +1,192 @@
+- generic [ref=e3]:
+  - navigation "Main navigation" [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e7]
+      - heading "Gemini Voice" [level=1] [ref=e10]
+    - button "AI Casting" [ref=e12] [cursor=pointer]:
+      - img [ref=e13]
+      - generic [ref=e16]: AI Casting
+    - navigation [ref=e17]:
+      - button "Voices" [ref=e18] [cursor=pointer]:
+        - img [ref=e20]
+        - generic [ref=e23]: Voices
+      - button "6 My Presets" [ref=e265] [cursor=pointer]:
+        - generic [ref=e25]:
+          - img [ref=e26]
+          - generic [ref=e266]: "6"
+        - generic [ref=e29]: My Presets
+      - button "Projects" [ref=e30] [cursor=pointer]:
+        - img [ref=e32]
+        - generic [ref=e34]: Projects
+      - button "Script Reader" [ref=e35] [cursor=pointer]:
+        - img [ref=e37]
+        - generic [ref=e40]: Script Reader
+      - button "History" [ref=e41] [cursor=pointer]:
+        - img [ref=e43]
+        - generic [ref=e46]: History
+    - generic [ref=e47]:
+      - button "Light Mode" [ref=e267] [cursor=pointer]:
+        - img [ref=e268]
+        - generic [ref=e51]: Light Mode
+      - generic [ref=e52]:
+        - img [ref=e53]
+        - generic [ref=e59]:
+          - button "Set accent color to indigo" [ref=e60] [cursor=pointer]
+          - button "Set accent color to blue" [ref=e61] [cursor=pointer]
+          - button "Set accent color to violet" [ref=e62] [cursor=pointer]
+          - button "Set accent color to rose" [ref=e63] [cursor=pointer]
+          - button "Set accent color to emerald" [ref=e64] [cursor=pointer]
+          - button "Set accent color to amber" [ref=e65] [cursor=pointer]
+      - button "High Contrast" [ref=e66] [cursor=pointer]:
+        - img [ref=e67]
+        - generic [ref=e70]: High Contrast
+      - button "Jobs" [ref=e71] [cursor=pointer]:
+        - img [ref=e73]
+        - generic [ref=e76]: Jobs
+      - button "Settings" [ref=e77] [cursor=pointer]:
+        - img [ref=e78]
+        - generic [ref=e81]: Settings
+      - button "Collapse sidebar" [expanded] [ref=e82] [cursor=pointer]:
+        - img [ref=e83]
+        - generic [ref=e86]: Collapse
+  - generic [ref=e275]:
+    - banner [ref=e276]:
+      - generic [ref=e277]:
+        - generic [ref=e278]:
+          - img [ref=e280]
+          - generic [ref=e282]:
+            - heading "Projects" [level=2] [ref=e283]
+            - paragraph [ref=e284]: 4 saved production workspaces
+        - generic [ref=e285]:
+          - button "Quick Script" [ref=e286] [cursor=pointer]:
+            - img [ref=e287]
+            - generic [ref=e289]: Quick Script
+          - button "Refresh" [ref=e290] [cursor=pointer]:
+            - img [ref=e291]
+            - generic [ref=e296]: Refresh
+    - generic [ref=e297]:
+      - complementary [ref=e298]:
+        - generic [ref=e299]:
+          - textbox "New project title" [ref=e300]
+          - generic [ref=e301]:
+            - combobox [ref=e302]:
+              - option "Audiobook" [selected]
+              - option "Voiceover"
+              - option "Podcast"
+              - option "Training"
+              - option "Character Reel"
+              - option "Other"
+            - button "Create project" [disabled] [ref=e303]:
+              - img [ref=e304]
+        - generic [ref=e305]:
+          - generic [ref=e308]:
+            - button "UX Review Sample Project Audiobook 3 seg" [ref=e309] [cursor=pointer]:
+              - generic [ref=e311]:
+                - paragraph [ref=e312]: UX Review Sample Project
+                - generic [ref=e313]:
+                  - generic [ref=e314]: Audiobook
+                  - generic [ref=e315]: 3 seg
+            - button "Project options" [ref=e316] [cursor=pointer]:
+              - img [ref=e317]
+          - generic [ref=e323]:
+            - button "test Voiceover" [ref=e324] [cursor=pointer]:
+              - generic [ref=e326]:
+                - paragraph [ref=e327]: test
+                - generic [ref=e329]: Voiceover
+            - button "Project options" [ref=e330] [cursor=pointer]:
+              - img [ref=e331]
+          - button "Show archived (2)" [ref=e336] [cursor=pointer]:
+            - img [ref=e337]
+            - text: Show archived (2)
+      - main [ref=e339]:
+        - generic [ref=e340]:
+          - generic [ref=e341]:
+            - generic [ref=e342]:
+              - generic [ref=e343]: Audiobook
+              - generic [ref=e344]: active
+            - heading "UX Review Sample Project" [level=3] [ref=e345]
+            - paragraph [ref=e346]: "Default voice: Zephyr"
+            - generic [ref=e347]:
+              - generic [ref=e348]:
+                - img [ref=e349]
+                - text: Scripted
+                - generic [ref=e351]: 3 segs
+              - img [ref=e352]
+              - generic [ref=e354]: Cast
+              - img [ref=e355]
+              - generic [ref=e357]:
+                - text: Rendered
+                - generic [ref=e358]: 0/3
+              - img [ref=e359]
+              - generic [ref=e361]: Reviewed
+              - img [ref=e362]
+              - generic [ref=e364]: Export ready
+          - generic [ref=e366]:
+            - tablist "Project workspace" [ref=e367]:
+              - tab "Script" [ref=e368] [cursor=pointer]:
+                - img [ref=e369]
+                - generic [ref=e372]: Script
+              - tab "Cast" [ref=e373] [cursor=pointer]:
+                - img [ref=e374]
+                - generic [ref=e379]: Cast
+              - tab "Review" [ref=e380] [cursor=pointer]:
+                - img [ref=e381]
+                - generic [ref=e385]: Review
+              - tab "Timeline" [active] [selected] [ref=e386] [cursor=pointer]:
+                - img [ref=e387]
+                - generic [ref=e389]: Timeline
+              - tab "Export" [ref=e390] [cursor=pointer]:
+                - img [ref=e391]
+                - generic [ref=e395]: Export
+            - button "More actions" [ref=e412] [cursor=pointer]:
+              - img [ref=e413]
+          - generic [ref=e750]:
+            - generic [ref=e751]:
+              - generic [ref=e752]: Timeline Review
+              - generic [ref=e753]: 0 of 3 segments with audio
+              - generic [ref=e754]:
+                - combobox "Export profile" [ref=e755]:
+                  - option "No finishing profile" [selected]
+                  - option "Audiobook"
+                  - option "Podcast"
+                  - option "Broadcast"
+                  - option "Web Video VO"
+                  - option "Raw (No Process)"
+                - button "Stitch & Export WAV" [disabled] [ref=e756]:
+                  - img [ref=e757]
+                  - text: Stitch & Export WAV
+            - generic [ref=e760]:
+              - generic [ref=e761]:
+                - generic [ref=e762]: Chapter One
+                - generic [ref=e764]:
+                  - button "Collapse waveform" [ref=e765] [cursor=pointer]:
+                    - img [ref=e766]
+                  - button "Play" [disabled] [ref=e768]:
+                    - img [ref=e769]
+                  - generic [ref=e771]:
+                    - generic [ref=e772]:
+                      - generic [ref=e773]: Segment 5
+                      - generic [ref=e774]: draft
+                    - paragraph [ref=e775]: Mara checked the recorder twice before opening the studio door.
+                - generic [ref=e780]:
+                  - button "Collapse waveform" [ref=e781] [cursor=pointer]:
+                    - img [ref=e782]
+                  - button "Play" [disabled] [ref=e784]:
+                    - img [ref=e785]
+                  - generic [ref=e787]:
+                    - generic [ref=e788]:
+                      - generic [ref=e789]: Segment 6
+                      - generic [ref=e790]: draft
+                    - paragraph [ref=e791]: The room was quiet except for the low hum of the preamp.
+              - generic [ref=e795]:
+                - generic [ref=e796]: Chapter Two
+                - generic [ref=e798]:
+                  - button "Collapse waveform" [ref=e799] [cursor=pointer]:
+                    - img [ref=e800]
+                  - button "Play" [disabled] [ref=e802]:
+                    - img [ref=e803]
+                  - generic [ref=e805]:
+                    - generic [ref=e806]:
+                      - generic [ref=e807]: Segment 7
+                      - generic [ref=e808]: draft
+                    - paragraph [ref=e809]: By noon, the client had approved the narrator but asked for a warmer second pass.

@@ -1,4 +1,4 @@
-# Gemini Voice Library — Windows Build Script (PowerShell)
+# Gemini Voice Studio — Windows Build Script (PowerShell)
 # Builds the frontend and compiles the Go backend into a single binary.
 # Usage: .\scripts\build-windows.ps1 [-Arch amd64|arm64] [-Clean]
 #
@@ -16,7 +16,7 @@ $BinDir = Join-Path $ProjectRoot "bin"
 $EmbedDir = Join-Path $ProjectRoot "backend" "internal" "embed" "dist"
 $BinaryName = "gemini-voice-library-windows-$Arch.exe"
 
-Write-Host "=== Gemini Voice Library — Windows Build ===" -ForegroundColor Cyan
+Write-Host "=== Gemini Voice Studio — Windows Build ===" -ForegroundColor Cyan
 Write-Host "Architecture: $Arch"
 Write-Host "Project root: $ProjectRoot"
 

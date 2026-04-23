@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Gemini Voice Studio">
+  <rect width="64" height="64" rx="14" fill="#18181b"/>
+  <path d="M18 39V25c0-7.7 6.3-14 14-14s14 6.3 14 14v14c0 7.7-6.3 14-14 14s-14-6.3-14-14Z" fill="#6366f1"/>
+  <path d="M25 25c0-3.9 3.1-7 7-7s7 3.1 7 7v14c0 3.9-3.1 7-7 7s-7-3.1-7-7V25Z" fill="#f8fafc"/>
+  <path d="M12 32h6m28 0h6M32 8v6m0 36v6" stroke="#a5b4fc" stroke-width="4" stroke-linecap="round"/>
+</svg>

@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="Gemini Voice Library — Powered by Gemini 3.1 Flash TTS — 70+ Languages — Multi-Speaker Dialogue" width="100%">
+  <img src="assets/banner.svg" alt="Gemini Voice Studio - Gemini 3.1 Flash TTS production suite with AI casting, projects, cast bible, review and QC, and export workflows" width="100%">
 </p>
 
-# Gemini Voice Library
+# Gemini Voice Studio
 
 An interactive web application for discovering, previewing, and casting AI voices using Google's Gemini Text-to-Speech API. Browse 30 curated voices, get AI-powered voice recommendations, generate speech from custom scripts in 70+ languages, create multi-speaker dialogues, and download audio — all in a polished, accessible interface.
 

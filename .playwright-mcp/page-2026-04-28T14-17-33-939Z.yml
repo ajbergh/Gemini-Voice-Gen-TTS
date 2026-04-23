@@ -1,0 +1,247 @@
+- generic [ref=e3]:
+  - navigation "Main navigation" [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e7]
+      - heading "Gemini Voice" [level=1] [ref=e10]
+    - button "AI Casting" [ref=e12] [cursor=pointer]:
+      - img [ref=e13]
+      - generic [ref=e16]: AI Casting
+    - navigation [ref=e17]:
+      - button "Voices" [ref=e18] [cursor=pointer]:
+        - img [ref=e20]
+        - generic [ref=e23]: Voices
+      - button "6 My Presets" [ref=e265] [cursor=pointer]:
+        - generic [ref=e25]:
+          - img [ref=e26]
+          - generic [ref=e266]: "6"
+        - generic [ref=e29]: My Presets
+      - button "Projects" [ref=e30] [cursor=pointer]:
+        - img [ref=e32]
+        - generic [ref=e34]: Projects
+      - button "Script Reader" [ref=e35] [cursor=pointer]:
+        - img [ref=e37]
+        - generic [ref=e40]: Script Reader
+      - button "History" [ref=e41] [cursor=pointer]:
+        - img [ref=e43]
+        - generic [ref=e46]: History
+    - generic [ref=e47]:
+      - button "Light Mode" [ref=e267] [cursor=pointer]:
+        - img [ref=e268]
+        - generic [ref=e51]: Light Mode
+      - generic [ref=e52]:
+        - img [ref=e53]
+        - generic [ref=e59]:
+          - button "Set accent color to indigo" [ref=e60] [cursor=pointer]
+          - button "Set accent color to blue" [ref=e61] [cursor=pointer]
+          - button "Set accent color to violet" [ref=e62] [cursor=pointer]
+          - button "Set accent color to rose" [ref=e63] [cursor=pointer]
+          - button "Set accent color to emerald" [ref=e64] [cursor=pointer]
+          - button "Set accent color to amber" [ref=e65] [cursor=pointer]
+      - button "High Contrast" [ref=e66] [cursor=pointer]:
+        - img [ref=e67]
+        - generic [ref=e70]: High Contrast
+      - button "Jobs" [ref=e71] [cursor=pointer]:
+        - img [ref=e73]
+        - generic [ref=e76]: Jobs
+      - button "Settings" [ref=e77] [cursor=pointer]:
+        - img [ref=e78]
+        - generic [ref=e81]: Settings
+      - button "Collapse sidebar" [expanded] [ref=e82] [cursor=pointer]:
+        - img [ref=e83]
+        - generic [ref=e86]: Collapse
+  - generic [ref=e275]:
+    - banner [ref=e276]:
+      - generic [ref=e277]:
+        - generic [ref=e278]:
+          - img [ref=e280]
+          - generic [ref=e282]:
+            - heading "Projects" [level=2] [ref=e283]
+            - paragraph [ref=e284]: 4 saved production workspaces
+        - generic [ref=e285]:
+          - button "Quick Script" [ref=e286] [cursor=pointer]:
+            - img [ref=e287]
+            - generic [ref=e289]: Quick Script
+          - button "Refresh" [ref=e290] [cursor=pointer]:
+            - img [ref=e291]
+            - generic [ref=e296]: Refresh
+    - generic [ref=e297]:
+      - complementary [ref=e298]:
+        - generic [ref=e299]:
+          - textbox "New project title" [ref=e300]
+          - generic [ref=e301]:
+            - combobox [ref=e302]:
+              - option "Audiobook" [selected]
+              - option "Voiceover"
+              - option "Podcast"
+              - option "Training"
+              - option "Character Reel"
+              - option "Other"
+            - button "Create project" [disabled] [ref=e303]:
+              - img [ref=e304]
+        - generic [ref=e305]:
+          - generic [ref=e308]:
+            - button "UX Review Sample Project Audiobook 3 seg" [ref=e309] [cursor=pointer]:
+              - generic [ref=e311]:
+                - paragraph [ref=e312]: UX Review Sample Project
+                - generic [ref=e313]:
+                  - generic [ref=e314]: Audiobook
+                  - generic [ref=e315]: 3 seg
+            - button "Project options" [ref=e316] [cursor=pointer]:
+              - img [ref=e317]
+          - generic [ref=e323]:
+            - button "test Voiceover" [ref=e324] [cursor=pointer]:
+              - generic [ref=e326]:
+                - paragraph [ref=e327]: test
+                - generic [ref=e329]: Voiceover
+            - button "Project options" [ref=e330] [cursor=pointer]:
+              - img [ref=e331]
+          - button "Show archived (2)" [ref=e336] [cursor=pointer]:
+            - img [ref=e337]
+            - text: Show archived (2)
+      - main [ref=e339]:
+        - generic [ref=e340]:
+          - generic [ref=e341]:
+            - generic [ref=e342]:
+              - generic [ref=e343]: Audiobook
+              - generic [ref=e344]: active
+            - heading "UX Review Sample Project" [level=3] [ref=e345]
+            - paragraph [ref=e346]: "Default voice: Zephyr"
+            - generic [ref=e347]:
+              - generic [ref=e348]:
+                - img [ref=e349]
+                - text: Scripted
+                - generic [ref=e351]: 3 segs
+              - img [ref=e352]
+              - generic [ref=e354]: Cast
+              - img [ref=e355]
+              - generic [ref=e357]:
+                - text: Rendered
+                - generic [ref=e358]: 0/3
+              - img [ref=e359]
+              - generic [ref=e361]: Reviewed
+              - img [ref=e362]
+              - generic [ref=e364]: Export ready
+          - generic [ref=e366]:
+            - tablist "Project workspace" [ref=e367]:
+              - tab "Script" [ref=e368] [cursor=pointer]:
+                - img [ref=e369]
+                - generic [ref=e372]: Script
+              - tab "Cast" [selected] [ref=e373] [cursor=pointer]:
+                - img [ref=e374]
+                - generic [ref=e379]: Cast
+              - tab "Review" [ref=e380] [cursor=pointer]:
+                - img [ref=e381]
+                - generic [ref=e385]: Review
+              - tab "Timeline" [ref=e386] [cursor=pointer]:
+                - img [ref=e387]
+                - generic [ref=e389]: Timeline
+              - tab "Export" [ref=e390] [cursor=pointer]:
+                - img [ref=e391]
+                - generic [ref=e395]: Export
+            - button "More actions" [ref=e412] [cursor=pointer]:
+              - img [ref=e413]
+          - generic [ref=e597]:
+            - generic [ref=e598]:
+              - generic [ref=e599]:
+                - img [ref=e600]
+                - heading "Cast Bible" [level=3] [ref=e605]
+                - generic [ref=e606]: "0"
+              - generic [ref=e607]:
+                - button "Add character" [ref=e608] [cursor=pointer]:
+                  - img [ref=e609]
+                  - text: Add character
+                - button "Close cast board" [ref=e610] [cursor=pointer]:
+                  - img [ref=e611]
+            - generic [ref=e615]:
+              - img [ref=e616]
+              - paragraph [ref=e621]: No characters yet
+              - paragraph [ref=e622]: Add your first narrator or character to build the cast bible.
+              - button "Add first character" [ref=e623] [cursor=pointer]:
+                - img [ref=e624]
+                - text: Add first character
+            - dialog "New character" [ref=e625]:
+              - generic [ref=e627]:
+                - generic [ref=e628]:
+                  - heading "New character" [level=2] [ref=e629]
+                  - button "Close editor" [ref=e630] [cursor=pointer]:
+                    - img [ref=e631]
+                - generic [ref=e634]:
+                  - generic [ref=e635]:
+                    - generic [ref=e636]: Name *
+                    - textbox "Character or narrator name" [active] [ref=e637]
+                  - generic [ref=e638]:
+                    - generic [ref=e639]: Role
+                    - combobox [ref=e640]:
+                      - option "Narrator" [selected]
+                      - option "Protagonist"
+                      - option "Antagonist"
+                      - option "Supporting"
+                      - option "Extra"
+                      - option "Brand Voice"
+                      - option "Archived"
+                  - generic [ref=e641]:
+                    - generic [ref=e642]: Voice
+                    - combobox [ref=e643]:
+                      - option "— None (use project default) —" [selected]
+                      - option "Dom (Vindemiatrix)"
+                      - option "Rocky Balboa Apologizing (Zubenelgenubi)"
+                      - option "Shaft (Charon)"
+                      - option "David Attenborough (Algenib)"
+                      - option "Mei Lin (Zephyr)"
+                      - option "Dundee (Algenib)"
+                      - option "Zephyr"
+                      - option "Puck"
+                      - option "Charon"
+                      - option "Kore"
+                      - option "Fenrir"
+                      - option "Leda"
+                      - option "Orus"
+                      - option "Aoede"
+                      - option "Callirrhoe"
+                      - option "Autonoe"
+                      - option "Enceladus"
+                      - option "Iapetus"
+                      - option "Umbriel"
+                      - option "Algieba"
+                      - option "Despina"
+                      - option "Erinome"
+                      - option "Algenib"
+                      - option "Rasalgethi"
+                      - option "Laomedeia"
+                      - option "Achernar"
+                      - option "Alnilam"
+                      - option "Schedar"
+                      - option "Gacrux"
+                      - option "Pulcherrima"
+                      - option "Achird"
+                      - option "Zubenelgenubi"
+                      - option "Vindemiatrix"
+                      - option "Sadachbia"
+                      - option "Sadaltager"
+                      - option "Sulafat"
+                  - generic [ref=e644]:
+                    - generic [ref=e645]: Description
+                    - textbox "Who is this character? What's their personality and speech pattern?" [ref=e646]
+                  - generic [ref=e647]:
+                    - generic [ref=e648]:
+                      - generic [ref=e649]: Age impression
+                      - textbox "e.g. Mid-40s, world-weary" [ref=e650]
+                    - generic [ref=e651]:
+                      - generic [ref=e652]: Emotional range
+                      - textbox "e.g. Warm, dry humour" [ref=e653]
+                  - generic [ref=e654]:
+                    - generic [ref=e655]: Language code
+                    - textbox "e.g. en-US (overrides project default)" [ref=e656]:
+                      - /placeholder: e.g. en-US  (overrides project default)
+                  - generic [ref=e657]:
+                    - generic [ref=e658]: Sample lines (one per line — used for auditions)
+                    - textbox "e.g. The silence before dawn holds its breath. We are none of us what we appear." [ref=e659]:
+                      - /placeholder: "e.g. The silence before dawn holds its breath.\nWe are none of us what we appear."
+                  - generic [ref=e660]:
+                    - generic [ref=e661]: Pronunciation notes
+                    - textbox "e.g. Emphasise the second syllable in 'Aelindra'. Stress 'NOT' in negatives." [ref=e662]
+                - generic [ref=e663]:
+                  - button "Cancel" [ref=e664] [cursor=pointer]
+                  - button "Create character" [ref=e665] [cursor=pointer]:
+                    - img [ref=e666]
+                    - text: Create character

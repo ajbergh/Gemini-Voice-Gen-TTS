@@ -1,0 +1,179 @@
+- generic [ref=e3]:
+  - navigation "Main navigation" [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e7]
+      - heading "Gemini Voice" [level=1] [ref=e10]
+    - button "AI Casting" [ref=e12] [cursor=pointer]:
+      - img [ref=e13]
+      - generic [ref=e16]: AI Casting
+    - navigation [ref=e17]:
+      - button "Voices" [ref=e18] [cursor=pointer]:
+        - img [ref=e20]
+        - generic [ref=e23]: Voices
+      - button "My Presets" [ref=e24] [cursor=pointer]:
+        - img [ref=e26]
+        - generic [ref=e29]: My Presets
+      - button "Projects" [ref=e30] [cursor=pointer]:
+        - img [ref=e32]
+        - generic [ref=e34]: Projects
+      - button "Script Reader" [ref=e35] [cursor=pointer]:
+        - img [ref=e37]
+        - generic [ref=e40]: Script Reader
+      - button "History" [ref=e41] [cursor=pointer]:
+        - img [ref=e43]
+        - generic [ref=e46]: History
+    - generic [ref=e47]:
+      - button "Dark Mode" [ref=e48] [cursor=pointer]:
+        - img [ref=e49]
+        - generic [ref=e51]: Dark Mode
+      - generic [ref=e52]:
+        - img [ref=e53]
+        - generic [ref=e59]:
+          - button "Set accent color to indigo" [ref=e60] [cursor=pointer]
+          - button "Set accent color to blue" [ref=e61] [cursor=pointer]
+          - button "Set accent color to violet" [ref=e62] [cursor=pointer]
+          - button "Set accent color to rose" [ref=e63] [cursor=pointer]
+          - button "Set accent color to emerald" [ref=e64] [cursor=pointer]
+          - button "Set accent color to amber" [ref=e65] [cursor=pointer]
+      - button "High Contrast" [ref=e66] [cursor=pointer]:
+        - img [ref=e67]
+        - generic [ref=e70]: High Contrast
+      - button "Jobs" [ref=e71] [cursor=pointer]:
+        - img [ref=e73]
+        - generic [ref=e76]: Jobs
+      - button "Settings" [ref=e77] [cursor=pointer]:
+        - img [ref=e78]
+        - generic [ref=e81]: Settings
+      - button "Collapse sidebar" [expanded] [ref=e82] [cursor=pointer]:
+        - img [ref=e83]
+        - generic [ref=e86]: Collapse
+  - generic [ref=e87]:
+    - generic [ref=e90]:
+      - generic [ref=e91]:
+        - heading "Voice Library" [level=2] [ref=e92]
+        - button "AI Casting Director" [ref=e93] [cursor=pointer]:
+          - img [ref=e94]
+          - generic [ref=e97]: AI Casting Director
+      - generic [ref=e98]:
+        - generic [ref=e99]:
+          - generic:
+            - img
+          - textbox "Search voices..." [ref=e100]
+        - generic [ref=e101]:
+          - generic [ref=e102]:
+            - combobox [ref=e103] [cursor=pointer]:
+              - option "All Genders" [selected]
+              - option "Female"
+              - option "Male"
+            - generic:
+              - img
+          - generic [ref=e104]:
+            - combobox [ref=e105] [cursor=pointer]:
+              - option "All Pitches" [selected]
+              - option "Low"
+              - option "Medium"
+              - option "Medium-High"
+              - option "Medium-Low"
+            - generic:
+              - img
+        - generic [ref=e106]:
+          - button "Carousel View" [ref=e107] [cursor=pointer]:
+            - img [ref=e108]
+          - button "Grid View" [ref=e110] [cursor=pointer]:
+            - img [ref=e111]
+    - main [ref=e116]:
+      - generic [ref=e118]:
+        - generic:
+          - button "Previous voice" [disabled] [ref=e119]:
+            - img [ref=e120]
+          - button "Next voice" [ref=e122] [cursor=pointer]:
+            - img [ref=e123]
+        - generic [ref=e126]:
+          - button "Voice card for Zephyr. Press Enter to play." [ref=e127] [cursor=pointer]:
+            - generic [ref=e128]:
+              - generic [ref=e129]:
+                - img "Zephyr" [ref=e130]
+                - img [ref=e136]
+              - generic [ref=e138]:
+                - generic [ref=e139]:
+                  - generic [ref=e140]:
+                    - heading "Zephyr" [level=2] [ref=e141]
+                    - generic [ref=e143]: Female
+                  - generic [ref=e144]:
+                    - generic [ref=e145]: Higher Pitch
+                    - generic [ref=e146]: •
+                    - generic [ref=e147]: Enthusiastic
+                - paragraph [ref=e150]: Enthusiastic, Young Adult, Clear Articulation, Upbeat, General American Accent
+          - button "Voice card for Puck. Click to select." [ref=e151] [cursor=pointer]:
+            - generic [ref=e152]:
+              - generic [ref=e153]:
+                - img "Puck" [ref=e154]
+                - img [ref=e160]
+              - generic [ref=e162]:
+                - generic [ref=e163]:
+                  - generic [ref=e164]:
+                    - heading "Puck" [level=2] [ref=e165]
+                    - generic [ref=e167]: Male
+                  - generic [ref=e168]:
+                    - generic [ref=e169]: Middle Pitch
+                    - generic [ref=e170]: •
+                    - generic [ref=e171]: Young Adult
+                - paragraph [ref=e174]: Young Adult, Casual, Energetic, Approachable, American Accent
+          - button "Voice card for Charon. Click to select." [ref=e175] [cursor=pointer]:
+            - generic [ref=e176]:
+              - generic [ref=e177]:
+                - img "Charon" [ref=e178]
+                - img [ref=e184]
+              - generic [ref=e186]:
+                - generic [ref=e187]:
+                  - generic [ref=e188]:
+                    - heading "Charon" [level=2] [ref=e189]
+                    - generic [ref=e191]: Male
+                  - generic [ref=e192]:
+                    - generic [ref=e193]: Lower Pitch
+                    - generic [ref=e194]: •
+                    - generic [ref=e195]: Deep
+                - paragraph [ref=e198]: Deep, American accent, Calm, Resonant, Professional
+          - button "Voice card for Kore. Click to select." [ref=e199] [cursor=pointer]:
+            - generic [ref=e200]:
+              - generic [ref=e201]:
+                - img "Kore" [ref=e202]
+                - img [ref=e208]
+              - generic [ref=e210]:
+                - generic [ref=e211]:
+                  - generic [ref=e212]:
+                    - heading "Kore" [level=2] [ref=e213]
+                    - generic [ref=e215]: Female
+                  - generic [ref=e216]:
+                    - generic [ref=e217]: Middle Pitch
+                    - generic [ref=e218]: •
+                    - generic [ref=e219]: Enthusiastic
+                - paragraph [ref=e222]: Enthusiastic, Bright, Young Adult, Clear, Optimistic
+        - generic [ref=e223]:
+          - button "Go to voice 1" [ref=e224] [cursor=pointer]
+          - button "Go to voice 2" [ref=e225] [cursor=pointer]
+          - button "Go to voice 3" [ref=e226] [cursor=pointer]
+          - button "Go to voice 4" [ref=e227] [cursor=pointer]
+          - button "Go to voice 5" [ref=e228] [cursor=pointer]
+          - button "Go to voice 6" [ref=e229] [cursor=pointer]
+          - button "Go to voice 7" [ref=e230] [cursor=pointer]
+          - button "Go to voice 8" [ref=e231] [cursor=pointer]
+          - button "Go to voice 9" [ref=e232] [cursor=pointer]
+      - generic:
+        - paragraph: 1 / 30
+  - dialog "Onboarding tour" [ref=e234]:
+    - generic [ref=e236]:
+      - button "Skip tour" [ref=e239] [cursor=pointer]:
+        - img [ref=e240]
+      - generic [ref=e243]:
+        - img [ref=e245]
+        - heading "Welcome to Gemini Voice Library" [level=3] [ref=e248]
+        - paragraph [ref=e249]: Browse 30 unique AI voices, test them with custom scripts, and find the perfect voice for your project. Let's take a quick tour!
+        - generic [ref=e257]:
+          - button "Back" [disabled] [ref=e258]:
+            - img [ref=e259]
+            - text: Back
+          - button "Skip tour" [ref=e261] [cursor=pointer]
+          - button "Next" [ref=e262] [cursor=pointer]:
+            - text: Next
+            - img [ref=e263]

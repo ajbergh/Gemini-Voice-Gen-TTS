@@ -1,0 +1,135 @@
+- generic [ref=e3]:
+  - navigation "Main navigation" [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e7]
+      - heading "Gemini Voice" [level=1] [ref=e10]
+    - button "AI Casting" [ref=e12] [cursor=pointer]:
+      - img [ref=e13]
+      - generic [ref=e16]: AI Casting
+    - navigation [ref=e17]:
+      - button "Voices" [ref=e18] [cursor=pointer]:
+        - img [ref=e20]
+        - generic [ref=e23]: Voices
+      - button "6 My Presets" [ref=e265] [cursor=pointer]:
+        - generic [ref=e25]:
+          - img [ref=e26]
+          - generic [ref=e266]: "6"
+        - generic [ref=e29]: My Presets
+      - button "Projects" [ref=e30] [cursor=pointer]:
+        - img [ref=e32]
+        - generic [ref=e34]: Projects
+      - button "Script Reader" [ref=e35] [cursor=pointer]:
+        - img [ref=e37]
+        - generic [ref=e40]: Script Reader
+      - button "History" [ref=e41] [cursor=pointer]:
+        - img [ref=e43]
+        - generic [ref=e46]: History
+    - generic [ref=e47]:
+      - button "Light Mode" [ref=e267] [cursor=pointer]:
+        - img [ref=e268]
+        - generic [ref=e51]: Light Mode
+      - generic [ref=e52]:
+        - img [ref=e53]
+        - generic [ref=e59]:
+          - button "Set accent color to indigo" [ref=e60] [cursor=pointer]
+          - button "Set accent color to blue" [ref=e61] [cursor=pointer]
+          - button "Set accent color to violet" [ref=e62] [cursor=pointer]
+          - button "Set accent color to rose" [ref=e63] [cursor=pointer]
+          - button "Set accent color to emerald" [ref=e64] [cursor=pointer]
+          - button "Set accent color to amber" [ref=e65] [cursor=pointer]
+      - button "High Contrast" [ref=e66] [cursor=pointer]:
+        - img [ref=e67]
+        - generic [ref=e70]: High Contrast
+      - button "Jobs" [ref=e71] [cursor=pointer]:
+        - img [ref=e73]
+        - generic [ref=e76]: Jobs
+      - button "Settings" [ref=e77] [cursor=pointer]:
+        - img [ref=e78]
+        - generic [ref=e81]: Settings
+      - button "Collapse sidebar" [expanded] [ref=e82] [cursor=pointer]:
+        - img [ref=e83]
+        - generic [ref=e86]: Collapse
+  - generic [ref=e275]:
+    - banner [ref=e276]:
+      - generic [ref=e277]:
+        - generic [ref=e278]:
+          - img [ref=e280]
+          - generic [ref=e282]:
+            - heading "Projects" [level=2] [ref=e283]
+            - paragraph [ref=e284]: 4 saved production workspaces
+        - generic [ref=e285]:
+          - button "Quick Script" [ref=e286] [cursor=pointer]:
+            - img [ref=e287]
+            - generic [ref=e289]: Quick Script
+          - button "Refresh" [ref=e290] [cursor=pointer]:
+            - img [ref=e291]
+            - generic [ref=e296]: Refresh
+    - generic [ref=e297]:
+      - complementary [ref=e298]:
+        - generic [ref=e299]:
+          - textbox "New project title" [ref=e300]
+          - generic [ref=e301]:
+            - combobox [ref=e302]:
+              - option "Audiobook" [selected]
+              - option "Voiceover"
+              - option "Podcast"
+              - option "Training"
+              - option "Character Reel"
+              - option "Other"
+            - button "Create project" [disabled] [ref=e303]:
+              - img [ref=e304]
+        - generic [ref=e305]:
+          - generic [ref=e308]:
+            - button "UX Review Sample Project Audiobook" [ref=e309] [cursor=pointer]:
+              - generic [ref=e311]:
+                - paragraph [ref=e312]: UX Review Sample Project
+                - generic [ref=e314]: Audiobook
+            - button "Project options" [ref=e315] [cursor=pointer]:
+              - img [ref=e316]
+          - generic [ref=e322]:
+            - button "test Voiceover" [ref=e323] [cursor=pointer]:
+              - generic [ref=e325]:
+                - paragraph [ref=e326]: test
+                - generic [ref=e328]: Voiceover
+            - button "Project options" [ref=e329] [cursor=pointer]:
+              - img [ref=e330]
+          - button "Show archived (2)" [ref=e335] [cursor=pointer]:
+            - img [ref=e336]
+            - text: Show archived (2)
+      - main [ref=e338]:
+        - generic [ref=e339]:
+          - generic [ref=e340]:
+            - generic [ref=e341]:
+              - generic [ref=e342]: Audiobook
+              - generic [ref=e343]: active
+            - heading "UX Review Sample Project" [level=3] [ref=e344]
+            - paragraph [ref=e345]: "Default voice: Zephyr"
+          - generic [ref=e347]:
+            - tablist "Project workspace" [ref=e348]:
+              - tab "Script" [ref=e349] [cursor=pointer]:
+                - img [ref=e350]
+                - generic [ref=e353]: Script
+              - tab "Cast" [active] [selected] [ref=e354] [cursor=pointer]:
+                - img [ref=e355]
+                - generic [ref=e360]: Cast
+              - tab "Review" [ref=e361] [cursor=pointer]:
+                - img [ref=e362]
+                - generic [ref=e366]: Review
+              - tab "Timeline" [ref=e367] [cursor=pointer]:
+                - img [ref=e368]
+                - generic [ref=e370]: Timeline
+              - tab "Export" [ref=e371] [cursor=pointer]:
+                - img [ref=e372]
+                - generic [ref=e376]: Export
+            - button "More actions" [ref=e393] [cursor=pointer]:
+              - img [ref=e394]
+          - tabpanel "Cast" [ref=e457]:
+            - generic [ref=e458]:
+              - generic [ref=e459]:
+                - generic [ref=e460]:
+                  - img [ref=e461]
+                  - heading "Cast Bible" [level=3] [ref=e466]
+                - button "Add character" [ref=e468] [cursor=pointer]:
+                  - img [ref=e469]
+                  - text: Add character
+              - img [ref=e472]

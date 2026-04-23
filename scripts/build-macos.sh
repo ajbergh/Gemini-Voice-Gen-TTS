@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Gemini Voice Library — macOS Build Script
+# Gemini Voice Studio — macOS Build Script
 # Builds the frontend and compiles the Go backend into a single binary.
 # Usage: ./scripts/build-macos.sh [--arch amd64|arm64] [--clean] [--universal]
 #
@@ -31,7 +31,7 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BIN_DIR="$PROJECT_ROOT/bin"
 EMBED_DIR="$PROJECT_ROOT/backend/internal/embed/dist"
 
-echo "=== Gemini Voice Library — macOS Build ==="
+echo "=== Gemini Voice Studio — macOS Build ==="
 if [ "$UNIVERSAL" = true ]; then
     echo "Architecture: universal (amd64 + arm64)"
 else

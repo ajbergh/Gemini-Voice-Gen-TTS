@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Gemini Voice Library — Linux Build Script
+# Gemini Voice Studio — Linux Build Script
 # Builds the frontend and compiles the Go backend into a single binary.
 # Usage: ./scripts/build-linux.sh [--arch amd64|arm64] [--clean]
 #
@@ -28,7 +28,7 @@ BIN_DIR="$PROJECT_ROOT/bin"
 EMBED_DIR="$PROJECT_ROOT/backend/internal/embed/dist"
 BINARY_NAME="gemini-voice-library-linux-$ARCH"
 
-echo "=== Gemini Voice Library — Linux Build ==="
+echo "=== Gemini Voice Studio — Linux Build ==="
 echo "Architecture: $ARCH"
 echo "Project root: $PROJECT_ROOT"
 

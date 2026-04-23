@@ -1,0 +1,131 @@
+- generic [ref=e3]:
+  - navigation "Main navigation" [ref=e553]:
+    - generic [ref=e554]:
+      - button "Voices" [ref=e555] [cursor=pointer]:
+        - img [ref=e557]
+        - generic [ref=e560]: Voices
+      - button "My Presets" [ref=e561] [cursor=pointer]:
+        - generic [ref=e562]:
+          - img [ref=e563]
+          - generic [ref=e566]: "6"
+        - generic [ref=e567]: Presets
+      - button "Projects" [ref=e568] [cursor=pointer]:
+        - img [ref=e570]
+        - generic [ref=e572]: Projects
+      - button "Script Reader" [ref=e574] [cursor=pointer]:
+        - img [ref=e576]
+        - generic [ref=e579]: Script
+      - button "History" [ref=e580] [cursor=pointer]:
+        - img [ref=e582]
+        - generic [ref=e585]: History
+      - button "Settings" [ref=e586] [cursor=pointer]:
+        - img [ref=e587]
+        - generic [ref=e590]: Settings
+  - generic [ref=e275]:
+    - banner [ref=e276]:
+      - generic [ref=e277]:
+        - generic [ref=e278]:
+          - img [ref=e280]
+          - generic [ref=e282]:
+            - heading "Projects" [level=2] [ref=e283]
+            - paragraph [ref=e284]: 4 saved production workspaces
+        - generic [ref=e285]:
+          - button [ref=e591] [cursor=pointer]:
+            - img [ref=e287]
+          - button [ref=e592] [cursor=pointer]:
+            - img [ref=e291]
+    - generic [ref=e297]:
+      - complementary [ref=e298]:
+        - generic [ref=e299]:
+          - textbox "New project title" [ref=e300]
+          - generic [ref=e301]:
+            - combobox [ref=e302]:
+              - option "Audiobook" [selected]
+              - option "Voiceover"
+              - option "Podcast"
+              - option "Training"
+              - option "Character Reel"
+              - option "Other"
+            - button "Create project" [disabled] [ref=e303]:
+              - img [ref=e304]
+        - generic [ref=e305]:
+          - generic [ref=e308]:
+            - button "UX Review Sample Project Audiobook" [ref=e309] [cursor=pointer]:
+              - generic [ref=e311]:
+                - paragraph [ref=e312]: UX Review Sample Project
+                - generic [ref=e314]: Audiobook
+            - button "Project options" [ref=e315] [cursor=pointer]:
+              - img [ref=e316]
+          - generic [ref=e322]:
+            - button "test Voiceover" [ref=e323] [cursor=pointer]:
+              - generic [ref=e325]:
+                - paragraph [ref=e326]: test
+                - generic [ref=e328]: Voiceover
+            - button "Project options" [ref=e329] [cursor=pointer]:
+              - img [ref=e330]
+          - button "Show archived (2)" [ref=e335] [cursor=pointer]:
+            - img [ref=e336]
+            - text: Show archived (2)
+      - main [ref=e338]:
+        - generic [ref=e339]:
+          - generic [ref=e340]:
+            - generic [ref=e341]:
+              - generic [ref=e342]: Audiobook
+              - generic [ref=e343]: active
+            - heading "UX Review Sample Project" [level=3] [ref=e344]
+            - paragraph [ref=e345]: "Default voice: Zephyr"
+          - generic [ref=e347]:
+            - tablist "Project workspace" [ref=e348]:
+              - tab [ref=e593] [cursor=pointer]:
+                - img [ref=e350]
+              - tab [ref=e594] [cursor=pointer]:
+                - img [ref=e355]
+              - tab [ref=e595] [cursor=pointer]:
+                - img [ref=e362]
+              - tab [ref=e596] [cursor=pointer]:
+                - img [ref=e368]
+              - tab [active] [selected] [ref=e597] [cursor=pointer]:
+                - img [ref=e372]
+            - button "More actions" [ref=e393] [cursor=pointer]:
+              - img [ref=e394]
+          - tabpanel [ref=e598]:
+            - generic "Export Project" [ref=e627]:
+              - generic [ref=e628]:
+                - generic [ref=e630]:
+                  - img [ref=e631]
+                  - heading "Export Project" [level=2] [ref=e635]
+                - generic [ref=e636]:
+                  - generic [ref=e637]: Finishing Profile (optional)
+                  - combobox "Export profile" [ref=e638]:
+                    - option "No finishing profile" [selected]
+                    - option "Audiobook"
+                    - option "Podcast"
+                    - option "Broadcast"
+                    - option "Web Video VO"
+                    - option "Raw (No Process)"
+                  - paragraph [ref=e639]: Applies silence trim, normalization, and inter-segment padding to the exported audio.
+                - generic [ref=e640]:
+                  - img [ref=e641]
+                  - generic [ref=e645]:
+                    - paragraph [ref=e646]: 0 of 0 segments have audio
+                    - paragraph [ref=e647]: Add script segments before exporting.
+                - generic [ref=e648]:
+                  - paragraph [ref=e649]: Add at least one segment before exporting.
+                  - button "Start Export" [disabled] [ref=e651]
+    - navigation "Project workspace tabs" [ref=e599]:
+      - generic [ref=e600]:
+        - button "Script" [ref=e601] [cursor=pointer]:
+          - img [ref=e602]
+          - generic [ref=e605]: Script
+        - button "Cast" [ref=e606] [cursor=pointer]:
+          - img [ref=e607]
+          - generic [ref=e612]: Cast
+        - button "Takes" [ref=e613] [cursor=pointer]:
+          - img [ref=e614]
+          - generic [ref=e616]: Takes
+        - button "Jobs" [ref=e617] [cursor=pointer]:
+          - img [ref=e618]
+          - generic [ref=e620]: Jobs
+        - button "Review" [ref=e621] [cursor=pointer]:
+          - img [ref=e622]
+          - generic [ref=e626]: Review

@@ -1,7 +1,7 @@
 // Copyright 2025 ajbergh
 // SPDX-License-Identifier: Apache-2.0
 
-// Package main is the entry point for the Gemini Voice Library server.
+// Package main is the entry point for the Gemini Voice Studio server.
 //
 // It parses CLI flags (--port, --db, --passphrase, --log-level, --open),
 // loads configuration with platform-aware defaults, derives the AES-256

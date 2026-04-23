@@ -26,8 +26,8 @@ interface TourStep {
 
 const STEPS: TourStep[] = [
   {
-    title: 'Welcome to Gemini Voice Library',
-    description: 'Browse 30 unique AI voices, test them with custom scripts, and find the perfect voice for your project. Let\'s take a quick tour!',
+    title: 'Welcome to Gemini Voice Studio',
+    description: 'Cast voices, prepare scripts, manage production projects, review takes, and export finished audio. Let\'s take a quick tour!',
     icon: <Sparkles size={24} />,
     position: 'center',
   },

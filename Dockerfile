@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for Gemini Voice Library
+# Multi-stage Dockerfile for Gemini Voice Studio
 # Stage 1: Build frontend
 # Stage 2: Build Go binary with embedded frontend
 # Stage 3: Minimal runtime image
