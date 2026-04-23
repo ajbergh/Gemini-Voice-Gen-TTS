@@ -7,7 +7,7 @@
  * available, generates the Gemini portrait.
  */
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Loader2, Save, Sparkles, X } from 'lucide-react';
 
 interface SavePresetDialogProps {
@@ -42,6 +42,54 @@ const SavePresetDialog: React.FC<SavePresetDialogProps> = ({
   const trimmedQuery = sourceQuery?.trim();
   const trimmedPersonDescription = personDescription?.trim();
   const shouldGenerateHeadshot = !!trimmedPersonDescription;
+  const modalRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const onCloseRef = useRef(onClose);
+  const isSavingRef = useRef(isSaving);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    isSavingRef.current = isSaving;
+  }, [isSaving]);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (!isSavingRef.current) {
+          onCloseRef.current();
+        }
+        return;
+      }
+
+      if (event.key !== 'Tab' || !modalRef.current) return;
+
+      const focusable = modalRef.current.querySelectorAll(
+        'button, input, [tabindex]:not([tabindex="-1"])'
+      );
+      const first = focusable[0] as HTMLElement | undefined;
+      const last = focusable[focusable.length - 1] as HTMLElement | undefined;
+
+      if (!first || !last) return;
+
+      if (event.shiftKey) {
+        if (document.activeElement === first) {
+          last.focus();
+          event.preventDefault();
+        }
+      } else if (document.activeElement === last) {
+        first.focus();
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <div
@@ -51,7 +99,11 @@ const SavePresetDialog: React.FC<SavePresetDialogProps> = ({
       aria-labelledby="save-preset-title"
     >
       <div className="absolute inset-0" onClick={isSaving ? undefined : onClose}></div>
-      <div className="relative w-full max-w-lg overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-950">
+      <div
+        ref={modalRef}
+        tabIndex={-1}
+        className="relative w-full max-w-lg overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-2xl outline-none dark:border-zinc-800 dark:bg-zinc-950"
+      >
         <button
           onClick={onClose}
           disabled={isSaving}
@@ -101,12 +153,12 @@ const SavePresetDialog: React.FC<SavePresetDialogProps> = ({
               Preset Name
             </label>
             <input
+              ref={inputRef}
               id="save-preset-name"
               type="text"
               value={presetName}
               onChange={(event) => onNameChange(event.target.value)}
               disabled={isSaving}
-              autoFocus
               maxLength={100}
               className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-base font-medium text-zinc-900 outline-none transition focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:focus:border-indigo-700 dark:focus:ring-indigo-950"
             />

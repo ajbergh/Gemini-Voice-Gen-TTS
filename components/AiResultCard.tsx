@@ -28,6 +28,11 @@ interface AiResultCardProps {
 const AiResultCard: React.FC<AiResultCardProps> = ({ result, voices, onClose, onSavePreset }) => {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   // Focus trap implementation
   useEffect(() => {
@@ -35,7 +40,7 @@ const AiResultCard: React.FC<AiResultCardProps> = ({ result, voices, onClose, on
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -64,7 +69,7 @@ const AiResultCard: React.FC<AiResultCardProps> = ({ result, voices, onClose, on
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, []);
 
   const handleCopy = (text: string, section: string) => {
     navigator.clipboard.writeText(text);
