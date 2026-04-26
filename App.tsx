@@ -29,13 +29,14 @@ import FilterBar from './components/FilterBar';
 import NavigationSidebar, { AppSection } from './components/NavigationSidebar';
 import VoiceFinder from './components/VoiceFinder';
 import AiResultCard from './components/AiResultCard';
-import ScriptReaderModal from './components/ScriptReaderModal';
+import ProjectWorkspace from './components/ProjectWorkspace';
 import SettingsModal from './components/SettingsModal';
 import HistoryPanel from './components/HistoryPanel';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import MiniPlayer from './components/MiniPlayer';
 import CommandPalette from './components/CommandPalette';
 import OnboardingTour from './components/OnboardingTour';
+import JobCenter from './components/JobCenter';
 import { FilterState, AiRecommendation, CustomPreset } from './types';
 import { Info, Sparkles, X } from 'lucide-react';
 import { getConfig, updateConfig, listPresets, deletePreset as apiDeletePreset, createPreset as apiCreatePreset, updatePreset as apiUpdatePreset, listFavorites, toggleFavorite as apiToggleFavorite, exportPresets as apiExportPresets, importPresets as apiImportPresets, reorderPresets as apiReorderPresets, regeneratePresetImage as apiRegeneratePresetImage } from './api';
@@ -68,7 +69,7 @@ function toTitleCase(value: string): string {
 
 function buildSuggestedPresetName(data: PendingPresetSave): string {
   const tokenSource = `${data.sourceQuery || ''} ${data.personDescription || ''}`.toLowerCase();
-  const tokens = tokenSource.match(/[a-z0-9]+/g) ?? [];
+  const tokens: string[] = tokenSource.match(/[a-z0-9]+/g) ?? [];
   const meaningful = tokens.filter(token => token.length > 2 && !PRESET_NAME_STOPWORDS.has(token));
   const role = meaningful.find(token => PRESET_NAME_ROLE_WORDS.has(token));
   const descriptors = meaningful
@@ -548,7 +549,7 @@ const App: React.FC = () => {
         onFilterChange={setFilters}
         uniqueGenders={uniqueGenders}
         uniquePitches={uniquePitches}
-        onOpenAiCasting={() => setShowVoiceFinder(true)}
+        onAiCasting={() => setShowVoiceFinder(true)}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         activeSection="voices"
@@ -635,7 +636,7 @@ const App: React.FC = () => {
         onFilterChange={setFilters}
         uniqueGenders={uniqueGenders}
         uniquePitches={uniquePitches}
-        onOpenAiCasting={() => setShowVoiceFinder(true)}
+        onAiCasting={() => setShowVoiceFinder(true)}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         activeSection="presets"
@@ -692,7 +693,7 @@ const App: React.FC = () => {
                 onEdit={handlePresetEdit}
                 onDelete={handlePresetDelete}
                 onDuplicate={handlePresetDuplicate}
-                onOpenAiCasting={() => setShowVoiceFinder(true)}
+                onAiCasting={() => setShowVoiceFinder(true)}
                 onExport={handleExportPresets}
                 onImport={handleImportPresets}
                 onInlineEdit={handlePresetInlineEdit}
@@ -710,7 +711,7 @@ const App: React.FC = () => {
               onEdit={handlePresetEdit}
               onDelete={handlePresetDelete}
               onDuplicate={handlePresetDuplicate}
-              onOpenAiCasting={() => setShowVoiceFinder(true)}
+              onAiCasting={() => setShowVoiceFinder(true)}
               onExport={handleExportPresets}
               onImport={handleImportPresets}
               onInlineEdit={handlePresetInlineEdit}
@@ -745,7 +746,7 @@ const App: React.FC = () => {
         activeSection={activeSection}
         onSectionChange={handleSectionChange}
         onOpenSettings={() => setShowSettings(true)}
-        onOpenAiCasting={() => setShowVoiceFinder(true)}
+        onAiCasting={() => setShowVoiceFinder(true)}
         isDarkMode={isDarkMode}
         toggleTheme={toggleTheme}
         customPresetCount={customPresets.length}
@@ -767,7 +768,7 @@ const App: React.FC = () => {
         {activeSection === 'presets' && renderPresetsSection()}
         {activeSection === 'script' && (
           <div className="flex-1 overflow-hidden flex flex-col">
-            <ScriptReaderModal
+            <ProjectWorkspace
               voices={VOICE_DATA}
               customPresets={customPresets}
               initialVoiceName={scriptVoiceName}
@@ -805,7 +806,15 @@ const App: React.FC = () => {
       )}
 
       {showSettings && (
-        <SettingsModal onClose={() => setShowSettings(false)} />
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
+          isDarkMode={isDarkMode}
+          onToggleDark={toggleTheme}
+          accentColor={accentColor}
+          onAccentChange={setAccentColor}
+          highContrast={highContrast}
+          onHighContrastChange={setHighContrast}
+        />
       )}
 
       {aiResult && isAiCardVisible && (
@@ -858,6 +867,7 @@ const App: React.FC = () => {
       )}
 
       {/* Floating mini-player */}
+      {!isModalOpen && <JobCenter />}
       <MiniPlayer />
 
       {/* Command palette */}

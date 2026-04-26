@@ -11,29 +11,39 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ajbergh/gemini-voice-gen-tts/backend/internal/store"
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
 )
 
 // ProgressEvent represents a real-time progress update sent to clients.
 type ProgressEvent struct {
-	JobID   string `json:"job_id"`
-	Type    string `json:"type"`   // "tts", "recommend", "multi_tts"
-	Status  string `json:"status"` // "queued", "processing", "complete", "error"
-	Message string `json:"message,omitempty"`
-	Percent int    `json:"percent"` // 0-100
+	JobID          string `json:"job_id,omitempty"`
+	Type           string `json:"type"`   // "tts", "recommend", "multi_tts", "batch_render", etc.
+	Status         string `json:"status"` // "queued", "processing", "running", "complete", "error", etc.
+	Message        string `json:"message,omitempty"`
+	Percent        int    `json:"percent"` // 0-100
+	ItemID         string `json:"item_id,omitempty"`
+	ProjectID      string `json:"project_id,omitempty"`
+	SegmentID      string `json:"segment_id,omitempty"`
+	CompletedItems int    `json:"completed_items,omitempty"`
+	TotalItems     int    `json:"total_items,omitempty"`
+	FailedItems    int    `json:"failed_items,omitempty"`
+	ErrorCode      string `json:"error_code,omitempty"`
 }
 
 // ProgressHub manages WebSocket connections and broadcasts progress events.
 type ProgressHub struct {
 	mu      sync.RWMutex
 	clients map[*websocket.Conn]context.CancelFunc
+	Store   *store.Store
 }
 
 // NewProgressHub creates a new ProgressHub.
-func NewProgressHub() *ProgressHub {
+func NewProgressHub(st *store.Store) *ProgressHub {
 	return &ProgressHub{
 		clients: make(map[*websocket.Conn]context.CancelFunc),
+		Store:   st,
 	}
 }
 
@@ -80,6 +90,8 @@ func (h *ProgressHub) HandleWS(w http.ResponseWriter, r *http.Request) {
 
 // Broadcast sends a progress event to all connected WebSocket clients.
 func (h *ProgressHub) Broadcast(event ProgressEvent) {
+	h.persistEvent(event)
+
 	h.mu.RLock()
 	clients := make(map[*websocket.Conn]context.CancelFunc, len(h.clients))
 	for c, cancel := range h.clients {
@@ -129,4 +141,25 @@ func (h *ProgressHub) EmitProgress(jobID, jobType, status, message string, perce
 		Message: message,
 		Percent: percent,
 	})
+}
+
+func (h *ProgressHub) persistEvent(event ProgressEvent) {
+	if h.Store == nil || event.JobID == "" || event.Type == "system" {
+		return
+	}
+	if err := h.Store.UpsertJobProgress(store.JobProgressUpdate{
+		ID:             event.JobID,
+		Type:           event.Type,
+		Status:         event.Status,
+		Message:        event.Message,
+		Percent:        event.Percent,
+		ProjectID:      event.ProjectID,
+		SegmentID:      event.SegmentID,
+		TotalItems:     event.TotalItems,
+		CompletedItems: event.CompletedItems,
+		FailedItems:    event.FailedItems,
+		ErrorCode:      event.ErrorCode,
+	}); err != nil {
+		slog.Warn("failed to persist progress event", "job_id", event.JobID, "error", err)
+	}
 }

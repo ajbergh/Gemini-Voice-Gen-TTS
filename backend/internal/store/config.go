@@ -11,6 +11,29 @@ import (
 	"time"
 )
 
+// Config key constants for well-known configuration entries.
+// Use these instead of raw string literals to avoid typos.
+const (
+	ConfigKeyDefaultModel            = "default_model"
+	ConfigKeyDefaultLanguageCode     = "default_language_code"
+	ConfigKeyDefaultBatchConcurrency = "default_batch_concurrency"
+	ConfigKeyDefaultRetryCount       = "default_retry_count"
+	ConfigKeyContinueBatchOnError    = "continue_batch_on_error"
+	ConfigKeyDefaultProvider         = "default_provider"
+	ConfigKeyFallbackProvider        = "fallback_provider"
+	ConfigKeyFallbackModel           = "fallback_model"
+	ConfigKeyLastOpenProjectID       = "last_open_project_id"
+	ConfigKeyDefaultExportProfileID  = "default_export_profile_id"
+	ConfigKeyQcDefaultSeverity       = "qc_default_severity"
+	ConfigKeyQcAutoFlagClipping      = "qc_auto_flag_clipping"
+	ConfigKeyQcClippingThresholdDb   = "qc_clipping_threshold_db"
+	ConfigKeyQcExportOnlyApproved    = "qc_export_only_approved"
+	ConfigKeyQcExportNotesFormat     = "qc_export_notes_format"
+	ConfigKeyAppearanceTheme         = "appearance_theme"
+	ConfigKeyAppearanceAccentColor   = "appearance_accent_color"
+	ConfigKeyAppearanceHighContrast  = "appearance_high_contrast"
+)
+
 // ConfigEntry represents a key-value config row.
 type ConfigEntry struct {
 	Key       string `json:"key"`
@@ -48,6 +71,17 @@ func (s *Store) GetConfig(key string) (string, error) {
 		return "", fmt.Errorf("query config key %s: %w", key, err)
 	}
 	return value, nil
+}
+
+// GetConfigValue returns the config value for the given key, or defaultVal
+// if the key is not set or an error occurs. Useful for single-key lookups
+// where a sensible default is always acceptable.
+func (s *Store) GetConfigValue(key, defaultVal string) string {
+	v, err := s.GetConfig(key)
+	if err != nil || v == "" {
+		return defaultVal
+	}
+	return v
 }
 
 // SetConfig upserts a config key-value pair.

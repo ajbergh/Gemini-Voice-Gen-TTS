@@ -15,6 +15,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import ToastProvider from './components/ToastProvider';
 import { AudioProvider } from './components/AudioProvider';
+import { JobProvider } from './components/JobProvider';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -26,7 +27,9 @@ root.render(
   <React.StrictMode>
     <AudioProvider>
       <ToastProvider>
-        <App />
+        <JobProvider>
+          <App />
+        </JobProvider>
       </ToastProvider>
     </AudioProvider>
   </React.StrictMode>

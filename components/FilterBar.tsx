@@ -22,7 +22,7 @@ interface FilterBarProps {
   onFilterChange: (newFilters: FilterState) => void;
   uniqueGenders: string[];
   uniquePitches: string[];
-  onOpenAiCasting: () => void;
+  onAiCasting: () => void;
   viewMode: 'carousel' | 'grid';
   onViewModeChange: (mode: 'carousel' | 'grid') => void;
   activeSection: AppSection;
@@ -35,7 +35,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
   onFilterChange, 
   uniqueGenders, 
   uniquePitches,
-  onOpenAiCasting,
+  onAiCasting,
   viewMode,
   onViewModeChange,
   activeSection,
@@ -69,7 +69,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                     </h2>
 
                     <button 
-                        onClick={onOpenAiCasting}
+                        onClick={onAiCasting}
                         className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-zinc-900 dark:bg-[var(--accent-600)] hover:bg-zinc-800 dark:hover:bg-[var(--accent-500)] text-white rounded-full text-xs sm:text-sm font-medium shadow-md transition-all hover:scale-105 active:scale-95 group shrink-0"
                     >
                         <Sparkles size={14} className="text-indigo-300 dark:text-indigo-100 group-hover:text-indigo-200 transition-colors" />

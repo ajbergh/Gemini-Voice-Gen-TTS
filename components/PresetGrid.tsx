@@ -24,7 +24,7 @@ interface PresetGridProps {
   onEdit: (preset: CustomPreset) => void;
   onDelete: (preset: CustomPreset) => void;
   onDuplicate?: (preset: CustomPreset) => void;
-  onOpenAiCasting: () => void;
+  onAiCasting: () => void;
   onExport?: () => void;
   onImport?: (file: File) => void;
   onInlineEdit?: (id: number, data: { name?: string; system_instruction?: string }) => Promise<void>;
@@ -38,7 +38,7 @@ const presetGridClasses: Record<GridDensity, string> = {
   spacious: 'grid-cols-1 sm:grid-cols-2 md:landscape:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-8',
 };
 
-const PresetGrid: React.FC<PresetGridProps> = ({ presets, playingPresetId, onPlayToggle, onEdit, onDelete, onDuplicate, onOpenAiCasting, onExport, onImport, onInlineEdit, onReorder, gridDensity = 'comfortable' }) => {
+const PresetGrid: React.FC<PresetGridProps> = ({ presets, playingPresetId, onPlayToggle, onEdit, onDelete, onDuplicate, onAiCasting, onExport, onImport, onInlineEdit, onReorder, gridDensity = 'comfortable' }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
   const dragItemRef = useRef<number | null>(null);
@@ -92,7 +92,7 @@ const PresetGrid: React.FC<PresetGridProps> = ({ presets, playingPresetId, onPla
             Use the AI Casting Director to find your perfect voice, then save it as a preset for quick access.
           </p>
           <button
-            onClick={onOpenAiCasting}
+            onClick={onAiCasting}
             className="px-5 py-2.5 bg-zinc-900 dark:bg-indigo-600 text-white rounded-full text-sm font-medium hover:bg-zinc-800 dark:hover:bg-indigo-500 transition-colors shadow-md"
           >
             Open AI Casting Director

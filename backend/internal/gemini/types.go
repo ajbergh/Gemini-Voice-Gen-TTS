@@ -25,7 +25,7 @@ type TTSRequest struct {
 	SystemInstruction string `json:"systemInstruction,omitempty"`
 	LanguageCode      string `json:"languageCode,omitempty"`
 	Model             string `json:"model,omitempty"`
-	Provider          string `json:"provider,omitempty"` // "gemini" (default) or "openai"
+	Provider          string `json:"provider,omitempty"` // reserved; this application is Gemini-only
 }
 
 // TTSResponse is the response back to the frontend.
@@ -54,3 +54,50 @@ type SpeakerConfig struct {
 	Speaker   string `json:"speaker"`
 	VoiceName string `json:"voiceName"`
 }
+
+// ScriptPrepOptions controls which analysis passes are enabled.
+type ScriptPrepOptions struct {
+	ProjectKind           string `json:"project_kind"`
+	DetectSpeakers        bool   `json:"detect_speakers"`
+	SuggestPronunciations bool   `json:"suggest_pronunciations"`
+	SuggestStyles         bool   `json:"suggest_styles"`
+	MaxSegmentLength      int    `json:"max_segment_length"`
+}
+
+// ScriptPrepSegment is a single proposed segment from AI script prep.
+type ScriptPrepSegment struct {
+	ScriptText   string  `json:"script_text"`
+	SpeakerLabel string  `json:"speaker_label,omitempty"`
+	Confidence   float64 `json:"confidence,omitempty"`
+}
+
+// ScriptPrepSection is a proposed chapter/scene section.
+type ScriptPrepSection struct {
+	Title    string              `json:"title"`
+	Kind     string              `json:"kind"`
+	Segments []ScriptPrepSegment `json:"segments"`
+}
+
+// ScriptPrepSpeakerCandidate is an inferred speaker identity.
+type ScriptPrepSpeakerCandidate struct {
+	Label       string   `json:"label"`
+	Occurrences int      `json:"occurrences"`
+	SampleLines []string `json:"sample_lines"`
+}
+
+// ScriptPrepPronunciationCandidate is a word that may need a pronunciation rule.
+type ScriptPrepPronunciationCandidate struct {
+	Word     string `json:"word"`
+	Phonetic string `json:"phonetic,omitempty"`
+	Notes    string `json:"notes,omitempty"`
+}
+
+// ScriptPrepResult is the structured response from PrepareScriptForNarration.
+type ScriptPrepResult struct {
+	Sections               []ScriptPrepSection              `json:"sections"`
+	SpeakerCandidates      []ScriptPrepSpeakerCandidate     `json:"speaker_candidates"`
+	PronunciationCandidates []ScriptPrepPronunciationCandidate `json:"pronunciation_candidates"`
+	StyleSuggestions       []string                         `json:"style_suggestions"`
+	Warnings               []string                         `json:"warnings"`
+}
+

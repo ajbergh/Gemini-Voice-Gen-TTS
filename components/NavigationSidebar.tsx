@@ -20,7 +20,7 @@ interface NavigationSidebarProps {
   activeSection: AppSection;
   onSectionChange: (section: AppSection) => void;
   onOpenSettings: () => void;
-  onOpenAiCasting: () => void;
+  onAiCasting: () => void;
   isDarkMode: boolean;
   toggleTheme: () => void;
   customPresetCount: number;
@@ -51,7 +51,7 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   activeSection,
   onSectionChange,
   onOpenSettings,
-  onOpenAiCasting,
+  onAiCasting,
   isDarkMode,
   toggleTheme,
   customPresetCount,
@@ -149,7 +149,7 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
       {/* AI Casting Button */}
       <div className="px-3 pt-4 pb-2">
         <button
-          onClick={onOpenAiCasting}
+          onClick={onAiCasting}
           className={`w-full flex items-center gap-2 py-2 bg-zinc-900 dark:bg-[var(--accent-600)] hover:bg-zinc-800 dark:hover:bg-[var(--accent-500)] text-white rounded-xl text-sm font-medium shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] ${
             collapsed ? 'justify-center px-2' : 'px-3'
           }`}
