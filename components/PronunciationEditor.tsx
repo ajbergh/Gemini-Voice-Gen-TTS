@@ -43,6 +43,7 @@ interface PronunciationEditorProps {
   onClose: () => void;
 }
 
+/** Render project-scoped pronunciation dictionary and entry management. */
 const PronunciationEditor: React.FC<PronunciationEditorProps> = ({ projectId, onClose }) => {
   const { showToast } = useToast();
   const isMounted = useRef(true);

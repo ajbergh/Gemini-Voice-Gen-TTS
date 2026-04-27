@@ -25,6 +25,7 @@ interface HistoryPanelProps {
   inline?: boolean;
 }
 
+/** Render generation history with filters, playback, export, and deletion actions. */
 const HistoryPanel: React.FC<HistoryPanelProps> = ({ onClose, inline = false }) => {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);

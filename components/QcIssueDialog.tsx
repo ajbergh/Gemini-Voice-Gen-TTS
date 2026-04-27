@@ -3,6 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * QcIssueDialog.tsx - Create/edit dialog for segment QC issues.
+ *
+ * Handles issue type, severity, optional take/time-offset metadata, keyboard
+ * focus management, and persistence through the QC API.
+ */
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { CONFIG_KEYS, createQcIssue, getConfig, updateQcIssue } from '../api';
@@ -46,6 +53,7 @@ const SEVERITY_OPTIONS: { value: QcIssueSeverity; label: string; color: string }
   { value: 'high', label: 'High', color: 'text-red-500' },
 ];
 
+/** Render a modal form for creating or updating a single QC issue. */
 export default function QcIssueDialog({
   projectId,
   segmentId,

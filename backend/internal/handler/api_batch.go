@@ -538,6 +538,7 @@ func (h *BatchHandler) renderOneSegment(
 	return h.Store.UpdateSegmentStatus(projectID, seg.ID, "rendered")
 }
 
+// shouldCreateClippingIssue applies QC config to rendered audio metrics.
 func (h *BatchHandler) shouldCreateClippingIssue(metrics audioanalysis.Analysis) bool {
 	if !strings.EqualFold(h.Store.GetConfigValue(store.ConfigKeyQcAutoFlagClipping, "true"), "true") {
 		return false
@@ -594,6 +595,7 @@ func derefStr(s *string) string {
 	return *s
 }
 
+// finiteFloatPtr converts invalid floating-point metrics to nil for JSON/database use.
 func finiteFloatPtr(value float64) *float64 {
 	if math.IsNaN(value) || math.IsInf(value, 0) {
 		return nil
@@ -601,6 +603,7 @@ func finiteFloatPtr(value float64) *float64 {
 	return &value
 }
 
+// optionalStringPtr trims empty strings to nil for nullable render metadata.
 func optionalStringPtr(value string) *string {
 	if strings.TrimSpace(value) == "" {
 		return nil
@@ -608,6 +611,7 @@ func optionalStringPtr(value string) *string {
 	return &value
 }
 
+// marshalRenderSettings stores reproducible render settings as JSON.
 func marshalRenderSettings(value map[string]any) *string {
 	data, err := json.Marshal(value)
 	if err != nil {
@@ -617,6 +621,7 @@ func marshalRenderSettings(value map[string]any) *string {
 	return &out
 }
 
+// hashPronunciationEntries fingerprints enabled pronunciation rules used for a render.
 func hashPronunciationEntries(entries []store.PronunciationEntry) string {
 	if len(entries) == 0 {
 		return ""
@@ -629,6 +634,7 @@ func hashPronunciationEntries(entries []store.PronunciationEntry) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
+// resolveProvider selects the effective TTS provider from segment, project, client, or global defaults.
 func (h *BatchHandler) resolveProvider(project *store.ScriptProject, seg store.ScriptSegment) string {
 	if value := derefStr(seg.Provider); value != "" {
 		return normalizeProvider(value)
@@ -649,6 +655,7 @@ func (h *BatchHandler) resolveProvider(project *store.ScriptProject, seg store.S
 	return "gemini"
 }
 
+// resolveModel selects a provider-compatible model from segment, project, client, or global defaults.
 func (h *BatchHandler) resolveModel(provider string, project *store.ScriptProject, seg store.ScriptSegment) string {
 	if value := derefStr(seg.Model); value != "" {
 		return value
@@ -679,6 +686,7 @@ func (h *BatchHandler) resolveModel(provider string, project *store.ScriptProjec
 	return defaultModelForProvider(provider)
 }
 
+// resolveFallbackProvider selects the optional fallback provider for failed renders.
 func (h *BatchHandler) resolveFallbackProvider(project *store.ScriptProject, seg store.ScriptSegment) string {
 	if value := derefStr(seg.FallbackProvider); value != "" {
 		return normalizeProvider(value)
@@ -699,6 +707,7 @@ func (h *BatchHandler) resolveFallbackProvider(project *store.ScriptProject, seg
 	return ""
 }
 
+// resolveFallbackModel selects a provider-compatible fallback model.
 func (h *BatchHandler) resolveFallbackModel(provider string, project *store.ScriptProject, seg store.ScriptSegment) string {
 	if provider == "" {
 		return ""
@@ -732,6 +741,7 @@ func (h *BatchHandler) resolveFallbackModel(provider string, project *store.Scri
 	return defaultModelForProvider(provider)
 }
 
+// resolveProviderVoice maps the app voice to the selected provider voice.
 func (h *BatchHandler) resolveProviderVoice(projectID int64, sourceProvider, sourceVoice, targetProvider string) (string, error) {
 	// This application is Gemini-only. The source voice is always a Gemini voice
 	// and is passed through unchanged — no cross-provider mapping is needed.
@@ -741,6 +751,7 @@ func (h *BatchHandler) resolveProviderVoice(projectID int64, sourceProvider, sou
 	return sourceVoice, nil
 }
 
+// generateWithFallback attempts primary TTS first, then the configured fallback when allowed.
 func (h *BatchHandler) generateWithFallback(
 	ctx context.Context,
 	seg store.ScriptSegment,
@@ -771,6 +782,7 @@ func (h *BatchHandler) generateWithFallback(
 	return audioBase64, fallbackProvider, fallbackModel, fallbackVoice, true, nil
 }
 
+// generateProviderTTS performs the provider-specific TTS call for one segment.
 func (h *BatchHandler) generateProviderTTS(
 	ctx context.Context,
 	provider string,
@@ -793,6 +805,7 @@ func (h *BatchHandler) generateProviderTTS(
 	return gemini.NewClient(apiKey).GenerateTTS(text, voice, systemInstruction, languageCode, model)
 }
 
+// fallbackAllowedForSegment prevents fallback replacement for approved or locked work.
 func fallbackAllowedForSegment(seg store.ScriptSegment) bool {
 	switch strings.ToLower(seg.Status) {
 	case "approved", "locked":
@@ -802,6 +815,7 @@ func fallbackAllowedForSegment(seg store.ScriptSegment) bool {
 	}
 }
 
+// defaultModelForProvider returns the registry default for a normalized provider ID.
 func defaultModelForProvider(provider string) string {
 	provider = normalizeProvider(provider)
 	for _, p := range registry {
@@ -812,6 +826,7 @@ func defaultModelForProvider(provider string) string {
 	return "gemini-2.5-flash-preview-tts"
 }
 
+// defaultModelUsableForProvider checks whether an inherited model matches the selected provider.
 func defaultModelUsableForProvider(provider, configuredProvider, model string) bool {
 	if configuredProvider = normalizeProviderIfSet(configuredProvider); configuredProvider != "" && configuredProvider != provider {
 		return false
@@ -819,6 +834,7 @@ func defaultModelUsableForProvider(provider, configuredProvider, model string) b
 	return modelCompatibleWithProvider(provider, model)
 }
 
+// modelCompatibleWithProvider rejects known models that belong to a different provider.
 func modelCompatibleWithProvider(provider, model string) bool {
 	model = strings.TrimSpace(model)
 	if model == "" {
@@ -848,6 +864,7 @@ func modelCompatibleWithProvider(provider, model string) bool {
 	return !modelBelongsToOtherProvider
 }
 
+// normalizeProvider canonicalizes provider IDs and migrates legacy values to Gemini.
 func normalizeProvider(provider string) string {
 	switch strings.ToLower(strings.TrimSpace(provider)) {
 	case "", "google", "google-gemini", "openai":
@@ -859,6 +876,7 @@ func normalizeProvider(provider string) string {
 	}
 }
 
+// normalizeProviderIfSet preserves an unset provider while normalizing non-empty values.
 func normalizeProviderIfSet(provider string) string {
 	if strings.TrimSpace(provider) == "" {
 		return ""

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -76,10 +76,14 @@ import {
 import { useToast } from './ToastProvider';
 import ScriptReaderModal from './ScriptReaderModal';
 import ScriptPrepDialog from './ScriptPrepDialog';
-import SegmentTakeList from './SegmentTakeList';
 import StylePresetPicker from './StylePresetPicker';
 import ExportDialog from './ExportDialog';
 import { useResponsiveMode } from './useResponsiveMode';
+import ProjectStatsBar from './ProjectStatsBar';
+import ProjectSettingsPanel from './ProjectSettingsPanel';
+import ProjectImportPanel from './ProjectImportPanel';
+import SectionBlock from './SectionBlock';
+import SegmentRow from './SegmentRow';
 
 interface ProjectWorkspaceProps {
   voices: Voice[];
@@ -120,10 +124,12 @@ const STATUS_BADGE: Record<string, string> = {
   locked:    'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300',
 };
 
+/** Convert project kind identifiers into display text. */
 function formatKind(kind: string): string {
   return PROJECT_KINDS.find(item => item.value === kind)?.label ?? kind.replace(/_/g, ' ');
 }
 
+/** Return badge color classes for segment/project status values. */
 function statusBadge(status: string): string {
   return STATUS_BADGE[status] ?? STATUS_BADGE.draft;
 }
@@ -198,16 +204,21 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
   // ---- edit segment inline ----
   const [editingSegmentId, setEditingSegmentId] = useState<number | null>(null);
-  const [editingSegmentText, setEditingSegmentText] = useState('');
-  const [editingSegmentSpeaker, setEditingSegmentSpeaker] = useState('');
-  const [editingSegmentVoice, setEditingSegmentVoice] = useState('');
-  const [editingSegmentCastProfileId, setEditingSegmentCastProfileId] = useState<number | null>(null);
-  const [editingSegmentStyleId, setEditingSegmentStyleId] = useState<number | null>(null);
-  const [editingSegmentProvider, setEditingSegmentProvider] = useState('');
-  const [editingSegmentModel, setEditingSegmentModel] = useState('');
-  const [editingSegmentFallbackProvider, setEditingSegmentFallbackProvider] = useState('');
-  const [editingSegmentFallbackModel, setEditingSegmentFallbackModel] = useState('');
+  const [segmentEditState, setSegmentEditState] = useState({
+    text: '',
+    speaker: '',
+    voice: '',
+    castProfileId: null as number | null,
+    styleId: null as number | null,
+    provider: '',
+    model: '',
+    fallbackProvider: '',
+    fallbackModel: '',
+  });
   const [savingSegmentEdit, setSavingSegmentEdit] = useState(false);
+
+  const patchSegmentEditState = (patch: Partial<typeof segmentEditState>) =>
+    setSegmentEditState(prev => ({ ...prev, ...patch }));
 
   // ---- import ----
   const [showImport, setShowImport] = useState(false);
@@ -545,21 +556,21 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   };
 
   const handleSaveSegmentEdit = async (segment: ScriptSegment) => {
-    const text = editingSegmentText.trim();
     if (!selectedProjectId) return;
+    const { text, speaker, voice, castProfileId, styleId, provider, model, fallbackProvider, fallbackModel } = segmentEditState;
     setSavingSegmentEdit(true);
     try {
       await updateProjectSegment(selectedProjectId, segment.id, {
         ...segment,
-        script_text: text,
-        speaker_label: editingSegmentSpeaker.trim() || undefined,
-        voice_name: editingSegmentCastProfileId ? undefined : (editingSegmentVoice.trim() || undefined),
-        cast_profile_id: editingSegmentCastProfileId ?? undefined,
-        style_id: editingSegmentStyleId ?? undefined,
-        provider: editingSegmentProvider.trim() || undefined,
-        model: editingSegmentModel.trim() || undefined,
-        fallback_provider: editingSegmentFallbackProvider.trim() || undefined,
-        fallback_model: editingSegmentFallbackModel.trim() || undefined,
+        script_text: text.trim(),
+        speaker_label: speaker.trim() || undefined,
+        voice_name: castProfileId ? undefined : (voice.trim() || undefined),
+        cast_profile_id: castProfileId ?? undefined,
+        style_id: styleId ?? undefined,
+        provider: provider.trim() || undefined,
+        model: model.trim() || undefined,
+        fallback_provider: fallbackProvider.trim() || undefined,
+        fallback_model: fallbackModel.trim() || undefined,
       });
       await loadProjectContents(selectedProjectId);
       setEditingSegmentId(null);
@@ -632,394 +643,22 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   };
 
   // ---------------------------------------------------------------------------
-  // Render helpers
+  // Segment edit start helper
   // ---------------------------------------------------------------------------
 
-  const renderSegmentRow = (segment: ScriptSegment) => {
-    const isEditing = editingSegmentId === segment.id;
-    return (
-      <div
-        key={segment.id}
-        className="group rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-3"
-      >
-        {isEditing ? (
-          <div className="space-y-2">
-            <textarea
-              autoFocus
-              rows={4}
-              value={editingSegmentText}
-              onChange={e => setEditingSegmentText(e.target.value)}
-              className="w-full resize-y rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-            />
-            {/* Metadata row: speaker label + voice/cast-profile assignment */}
-            <div className="flex flex-wrap gap-2">
-              <input
-                value={editingSegmentSpeaker}
-                onChange={e => setEditingSegmentSpeaker(e.target.value)}
-                placeholder="Speaker label (optional)"
-                className="h-8 min-w-0 flex-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-2.5 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-              />
-              <select
-                value={
-                  editingSegmentCastProfileId
-                    ? `cast:${editingSegmentCastProfileId}`
-                    : editingSegmentVoice
-                      ? `voice:${editingSegmentVoice}`
-                      : ''
-                }
-                onChange={e => {
-                  const val = e.target.value;
-                  if (val.startsWith('cast:')) {
-                    const id = parseInt(val.slice(5), 10);
-                    setEditingSegmentCastProfileId(id);
-                    setEditingSegmentVoice('');
-                    if (!editingSegmentSpeaker.trim()) {
-                      const p = castProfiles.find(cp => cp.id === id);
-                      if (p) setEditingSegmentSpeaker(p.name);
-                    }
-                  } else if (val.startsWith('voice:')) {
-                    setEditingSegmentCastProfileId(null);
-                    setEditingSegmentVoice(val.slice(6));
-                  } else {
-                    setEditingSegmentCastProfileId(null);
-                    setEditingSegmentVoice('');
-                  }
-                }}
-                className="h-8 min-w-0 flex-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-2.5 text-xs text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-              >
-                <option value="">— No voice override —</option>
-                {castProfiles.length > 0 && (
-                  <optgroup label="Cast Profiles">
-                    {castProfiles.map(p => (
-                      <option key={`cast:${p.id}`} value={`cast:${p.id}`}>
-                        {p.name}{p.voice_name ? ` (${p.voice_name})` : ''}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                <optgroup label="Individual Voices">
-                  {voices.map(v => (
-                    <option key={`voice:${v.name}`} value={`voice:${v.name}`}>{v.name}</option>
-                  ))}
-                </optgroup>
-              </select>
-            </div>
-            {/* Style preset picker */}
-            <StylePresetPicker
-              styles={styles}
-              value={editingSegmentStyleId}
-              onChange={setEditingSegmentStyleId}
-              projectId={selectedProjectId ?? undefined}
-              onStyleCreated={s => setStyles(prev => [...prev, s])}
-            />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <input
-                value={editingSegmentProvider}
-                onChange={e => setEditingSegmentProvider(e.target.value)}
-                placeholder="Provider override"
-                className="h-8 min-w-0 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-2.5 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-              />
-              <input
-                value={editingSegmentModel}
-                onChange={e => setEditingSegmentModel(e.target.value)}
-                placeholder="Model override"
-                className="h-8 min-w-0 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-2.5 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-              />
-              <input
-                value={editingSegmentFallbackProvider}
-                onChange={e => setEditingSegmentFallbackProvider(e.target.value)}
-                placeholder="Fallback provider"
-                className="h-8 min-w-0 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-2.5 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-              />
-              <input
-                value={editingSegmentFallbackModel}
-                onChange={e => setEditingSegmentFallbackModel(e.target.value)}
-                placeholder="Fallback model"
-                className="h-8 min-w-0 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-2.5 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-              />
-            </div>
-            <div className="flex items-center gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => setEditingSegmentId(null)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
-              >
-                <X size={12} /> Cancel
-              </button>
-              <button
-                type="button"
-                disabled={savingSegmentEdit}
-                onClick={() => handleSaveSegmentEdit(segment)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-[var(--accent-600)] px-3 text-xs font-semibold text-white hover:bg-zinc-700 dark:hover:bg-[var(--accent-500)] transition-colors disabled:opacity-50"
-              >
-                {savingSegmentEdit ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                Save
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-start gap-2">
-            <div className="min-w-0 flex-1">
-              <p className="text-xs leading-relaxed text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">{segment.script_text}</p>
-              {(segment.speaker_label || segment.voice_name || segment.cast_profile_id || segment.style_id || segment.provider || segment.fallback_provider) && (
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {segment.speaker_label && (
-                    <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">
-                      {segment.speaker_label}
-                    </span>
-                  )}
-                  {segment.cast_profile_id && (
-                    <span className="rounded-full bg-violet-100 dark:bg-violet-900/40 border border-violet-200 dark:border-violet-700 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:text-violet-300">
-                      ◈ {castProfiles.find(p => p.id === segment.cast_profile_id)?.name ?? `Profile #${segment.cast_profile_id}`}
-                    </span>
-                  )}
-                  {segment.voice_name && !segment.cast_profile_id && (
-                    <span className="rounded-full bg-[var(--accent-50)] dark:bg-zinc-900 border border-[var(--accent-100)] dark:border-zinc-700 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-700)] dark:text-[var(--accent-300)]">
-                      {segment.voice_name}
-                    </span>
-                  )}
-                  {segment.provider && (
-                    <span className="rounded-full bg-sky-100 dark:bg-sky-900/40 border border-sky-200 dark:border-sky-700 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:text-sky-300">
-                      {segment.provider}{segment.model ? ` / ${segment.model}` : ''}
-                    </span>
-                  )}
-                  {segment.fallback_provider && (
-                    <span className="rounded-full bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-700 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
-                      fallback {segment.fallback_provider}{segment.fallback_model ? ` / ${segment.fallback_model}` : ''}
-                    </span>
-                  )}
-                  {segment.style_id && (
-                    <span className="rounded-full bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-700 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
-                      ✦ {styles.find(s => s.id === segment.style_id)?.name ?? `Style #${segment.style_id}`}
-                    </span>
-                  )}
-                </div>
-              )}
-              <SegmentTakeList
-                projectId={selectedProjectId!}
-                segment={segment}
-                onTakesChanged={() => loadProjectContents(selectedProjectId!)}
-              />
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusBadge(segment.status)}`}>
-                {segment.status}
-              </span>
-              {/* Re-render button — only when a voice is available */}
-              {(segment.voice_name || segment.cast_profile_id || selectedProject?.default_voice_name) && (
-                <button
-                  type="button"
-                  title="Re-render segment"
-                  disabled={renderingSegmentId === segment.id}
-                  onClick={async () => {
-                    if (!selectedProjectId) return;
-                    setRenderingSegmentId(segment.id);
-                    try {
-                      await reRenderSegment(selectedProjectId, segment.id);
-                      showToast('Segment rendered', 'success');
-                      loadProjectContents(selectedProjectId);
-                    } catch (err: any) {
-                      showToast(err?.message ?? 'Render failed.', 'error');
-                    } finally {
-                      if (isMounted.current) setRenderingSegmentId(null);
-                    }
-                  }}
-                  className="hidden group-hover:inline-flex h-6 w-6 items-center justify-center rounded-md text-zinc-400 hover:text-[var(--accent-500)] transition-colors disabled:opacity-50"
-                >
-                  {renderingSegmentId === segment.id
-                    ? <Loader2 size={12} className="animate-spin" />
-                    : <RefreshCw size={12} />}
-                </button>
-              )}
-              <button
-                type="button"
-                title="Edit segment"
-                onClick={() => {
-                  setEditingSegmentId(segment.id);
-                  setEditingSegmentText(segment.script_text);
-                  setEditingSegmentSpeaker(segment.speaker_label ?? '');
-                  setEditingSegmentCastProfileId(segment.cast_profile_id ?? null);
-                  setEditingSegmentVoice(segment.cast_profile_id ? '' : (segment.voice_name ?? ''));
-                  setEditingSegmentStyleId(segment.style_id ?? null);
-                  setEditingSegmentProvider(segment.provider ?? '');
-                  setEditingSegmentModel(segment.model ?? '');
-                  setEditingSegmentFallbackProvider(segment.fallback_provider ?? '');
-                  setEditingSegmentFallbackModel(segment.fallback_model ?? '');
-                }}
-                className="hidden group-hover:inline-flex h-6 w-6 items-center justify-center rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-100 transition-colors"
-              >
-                <Pencil size={12} />
-              </button>
-              <button
-                type="button"
-                title="Delete segment"
-                onClick={() => handleDeleteSegment(segment.id)}
-                className="hidden group-hover:inline-flex h-6 w-6 items-center justify-center rounded-md text-zinc-400 hover:text-red-500 transition-colors"
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderAddSegmentForm = (sectionId: number | null) => {
-    const addingKey = sectionId === null ? 'unsectioned' : sectionId;
-    const isAdding = addingToSectionId === addingKey;
-    if (!isAdding) {
-      return (
-        <button
-          type="button"
-          onClick={() => {
-            setAddingToSectionId(addingKey);
-            setNewSegmentText('');
-          }}
-          className="mt-2 w-full flex items-center gap-2 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 px-3 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
-        >
-          <Plus size={12} /> Add segment
-        </button>
-      );
-    }
-    return (
-      <form
-        onSubmit={e => handleAddSegment(e, sectionId)}
-        className="mt-2 space-y-2"
-      >
-        <textarea
-          autoFocus
-          rows={3}
-          value={newSegmentText}
-          onChange={e => setNewSegmentText(e.target.value)}
-          placeholder="Enter segment text..."
-          className="w-full resize-y rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-        />
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setAddingToSectionId(null)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
-          >
-            <X size={12} /> Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={savingSegment || !newSegmentText.trim()}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-[var(--accent-600)] px-3 text-xs font-semibold text-white hover:bg-zinc-700 dark:hover:bg-[var(--accent-500)] transition-colors disabled:opacity-50"
-          >
-            {savingSegment ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-            Add
-          </button>
-        </div>
-      </form>
-    );
-  };
-
-  const renderSection = (section: ScriptSection) => {
-    const isExpanded = expandedSections.has(section.id);
-    const sectionSegments = segmentsBySection.get(section.id) ?? [];
-    const isEditingTitle = editingSectionId === section.id;
-
-    return (
-      <div key={section.id} className="group/section rounded-xl border border-zinc-200 dark:border-zinc-800">
-        {/* Section header */}
-        <div className="flex items-center gap-2 px-3 py-2.5">
-          <button
-            type="button"
-            onClick={() => toggleSection(section.id)}
-            className="flex items-center gap-2 min-w-0 flex-1 text-left"
-          >
-            {isExpanded
-              ? <ChevronDown size={14} className="shrink-0 text-zinc-400" />
-              : <ChevronRight size={14} className="shrink-0 text-zinc-400" />}
-            {isEditingTitle ? (
-              <div className="flex min-w-0 flex-1 items-center gap-2" onClick={e => e.stopPropagation()}>
-                <select
-                  value={editingSectionKind}
-                  onChange={e => setEditingSectionKind(e.target.value)}
-                  className="h-7 shrink-0 rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-1.5 text-xs text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-                >
-                  <option value="chapter">Chapter</option>
-                  <option value="scene">Scene</option>
-                  <option value="folder">Folder</option>
-                </select>
-                <input
-                  autoFocus
-                  value={editingSectionTitle}
-                  onChange={e => setEditingSectionTitle(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') { e.preventDefault(); handleSaveSectionEdit(section); }
-                    if (e.key === 'Escape') setEditingSectionId(null);
-                  }}
-                  className="min-w-0 flex-1 rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-2 py-0.5 text-sm font-semibold text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-                />
-              </div>
-            ) : (
-              <span className="truncate text-sm font-semibold text-zinc-800 dark:text-zinc-100">{section.title}</span>
-            )}
-            <span className="shrink-0 rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">
-              {sectionSegments.length}
-            </span>
-          </button>
-
-          {isEditingTitle ? (
-            <div className="flex shrink-0 items-center gap-1">
-              <button
-                type="button"
-                disabled={savingSectionEdit}
-                onClick={() => handleSaveSectionEdit(section)}
-                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors disabled:opacity-50"
-              >
-                {savingSectionEdit ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditingSectionId(null)}
-                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-100 transition-colors"
-              >
-                <X size={12} />
-              </button>
-            </div>
-          ) : (
-            <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover/section:opacity-100 focus-within:opacity-100">
-              <button
-                type="button"
-                title="Rename section"
-                onClick={() => {
-                  setEditingSectionId(section.id);
-                  setEditingSectionTitle(section.title);
-                  setEditingSectionKind(section.kind ?? 'chapter');
-                }}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-100 transition-colors"
-              >
-                <Pencil size={13} />
-              </button>
-              <button
-                type="button"
-                title="Delete section"
-                onClick={() => handleDeleteSection(section.id)}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 hover:text-red-500 transition-colors"
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Section body */}
-        {isExpanded && (
-          <div className="border-t border-zinc-200 dark:border-zinc-800 px-3 pb-3 pt-2 space-y-2">
-            {sectionSegments.length === 0 && addingToSectionId !== section.id ? (
-              <p className="text-xs text-zinc-400 dark:text-zinc-500 italic">No segments yet.</p>
-            ) : (
-              sectionSegments.map(seg => renderSegmentRow(seg))
-            )}
-            {renderAddSegmentForm(section.id)}
-          </div>
-        )}
-      </div>
-    );
+  const handleEditSegmentStart = (segment: ScriptSegment) => {
+    setEditingSegmentId(segment.id);
+    setSegmentEditState({
+      text: segment.script_text,
+      speaker: segment.speaker_label ?? '',
+      castProfileId: segment.cast_profile_id ?? null,
+      voice: segment.cast_profile_id ? '' : (segment.voice_name ?? ''),
+      styleId: segment.style_id ?? null,
+      provider: segment.provider ?? '',
+      model: segment.model ?? '',
+      fallbackProvider: segment.fallback_provider ?? '',
+      fallbackModel: segment.fallback_model ?? '',
+    });
   };
 
   const renderMobileTabs = () => {
@@ -1376,121 +1015,30 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               </div>
 
               {/* Project settings panel */}
-              {showProjectSettings && (
-                <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4 space-y-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">Project defaults</p>
-                    <button
-                      type="button"
-                      onClick={() => setShowProjectSettings(false)}
-                      className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-100 transition-colors"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="block text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        Default voice
-                      </label>
-                      <select
-                        value={settingsVoice}
-                        onChange={e => setSettingsVoice(e.target.value)}
-                        className="h-9 w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-2.5 text-sm text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-                      >
-                        <option value="">— None —</option>
-                        {voices.map(v => (
-                          <option key={v.name} value={v.name}>{v.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="block text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        Language code
-                      </label>
-                      <input
-                        value={settingsLang}
-                        onChange={e => setSettingsLang(e.target.value)}
-                        placeholder="e.g. en-US"
-                        className="h-9 w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="block text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        Provider
-                      </label>
-                      <input
-                        value={settingsProvider}
-                        onChange={e => setSettingsProvider(e.target.value)}
-                        placeholder="e.g. google"
-                        className="h-9 w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="block text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        Model
-                      </label>
-                      <input
-                        value={settingsModel}
-                        onChange={e => setSettingsModel(e.target.value)}
-                        placeholder="e.g. gemini-2.5-pro-preview-tts"
-                        className="h-9 w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="block text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        Fallback provider
-                      </label>
-                      <input
-                        value={settingsFallbackProvider}
-                        onChange={e => setSettingsFallbackProvider(e.target.value)}
-                        placeholder="e.g. gemini"
-                        className="h-9 w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="block text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        Fallback model
-                      </label>
-                      <input
-                        value={settingsFallbackModel}
-                        onChange={e => setSettingsFallbackModel(e.target.value)}
-                        placeholder="e.g. tts-1"
-                        className="h-9 w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-                      />
-                    </div>
-                    <div className="space-y-1 col-span-2">
-                      <label className="block text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        Default performance style
-                      </label>
-                      <StylePresetPicker
-                        styles={styles}
-                        value={settingsStyleId}
-                        onChange={setSettingsStyleId}
-                        projectId={selectedProjectId ?? undefined}
-                        onStyleCreated={s => setStyles(prev => [...prev, s])}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setShowProjectSettings(false)}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      disabled={savingSettings}
-                      onClick={handleSaveProjectSettings}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-[var(--accent-600)] px-4 text-xs font-semibold text-white hover:bg-zinc-700 dark:hover:bg-[var(--accent-500)] transition-colors disabled:opacity-50"
-                    >
-                      {savingSettings ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-                      Save settings
-                    </button>
-                  </div>
-                </div>
+              {showProjectSettings && selectedProject && (
+                <ProjectSettingsPanel
+                  selectedProject={selectedProject}
+                  voices={voices}
+                  styles={styles}
+                  settingsVoice={settingsVoice}
+                  settingsLang={settingsLang}
+                  settingsProvider={settingsProvider}
+                  settingsModel={settingsModel}
+                  settingsFallbackProvider={settingsFallbackProvider}
+                  settingsFallbackModel={settingsFallbackModel}
+                  settingsStyleId={settingsStyleId}
+                  savingSettings={savingSettings}
+                  onChangeVoice={setSettingsVoice}
+                  onChangeLang={setSettingsLang}
+                  onChangeProvider={setSettingsProvider}
+                  onChangeModel={setSettingsModel}
+                  onChangeFallbackProvider={setSettingsFallbackProvider}
+                  onChangeFallbackModel={setSettingsFallbackModel}
+                  onChangeStyleId={setSettingsStyleId}
+                  onStyleCreated={s => setStyles(prev => [...prev, s])}
+                  onSave={handleSaveProjectSettings}
+                  onClose={() => setShowProjectSettings(false)}
+                />
               )}
 
               {/* Pronunciation editor panel */}
@@ -1553,89 +1101,22 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
               {/* Import panel */}
               {showImport && (
-                <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4 space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">Import from text</p>
-                      <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                        Paste Markdown or plain text. Lines starting with{' '}
-                        <code className="rounded bg-zinc-200 dark:bg-zinc-800 px-1 text-[11px]">#</code>{' '}
-                        become sections; paragraphs become segments.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowImport(false)}
-                      className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-100 transition-colors"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-
-                  <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-700 px-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-white dark:hover:bg-zinc-800 transition-colors">
-                    <FileText size={13} />
-                    Load from file (.txt / .md)
-                    <input
-                      type="file"
-                      accept=".txt,.md,.markdown"
-                      className="sr-only"
-                      onChange={handleFileImport}
-                    />
-                  </label>
-
-                  <form onSubmit={handleImport} className="space-y-2">
-                    <textarea
-                      rows={10}
-                      value={importText}
-                      onChange={e => setImportText(e.target.value)}
-                      placeholder={"# Chapter One\n\nThe story begins here...\n\n# Chapter Two\n\nThe adventure continues..."}
-                      className="w-full resize-y rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-                    />
-                    <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => { setShowImport(false); setImportText(''); }}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={importing || !importText.trim()}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-[var(--accent-600)] px-4 text-xs font-semibold text-white hover:bg-zinc-700 dark:hover:bg-[var(--accent-500)] transition-colors disabled:opacity-50"
-                      >
-                        {importing ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-                        Import
-                      </button>
-                    </div>
-                  </form>
-                </div>
+                <ProjectImportPanel
+                  importText={importText}
+                  importing={importing}
+                  onChangeText={setImportText}
+                  onSubmit={handleImport}
+                  onFileImport={handleFileImport}
+                  onClose={() => { setShowImport(false); setImportText(''); }}
+                />
               )}
 
               {/* Stats */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
-                  <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
-                    <Layers size={16} />
-                    <span className="text-xs font-semibold uppercase tracking-wide">Sections</span>
-                  </div>
-                  <p className="mt-3 text-2xl font-bold text-zinc-900 dark:text-white">{sections.length}</p>
-                </div>
-                <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
-                  <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
-                    <Rows3 size={16} />
-                    <span className="text-xs font-semibold uppercase tracking-wide">Segments</span>
-                  </div>
-                  <p className="mt-3 text-2xl font-bold text-zinc-900 dark:text-white">{segments.length}</p>
-                </div>
-                <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
-                  <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
-                    <FileText size={16} />
-                    <span className="text-xs font-semibold uppercase tracking-wide">Draft</span>
-                  </div>
-                  <p className="mt-3 text-2xl font-bold text-zinc-900 dark:text-white">{draftCount}</p>
-                </div>
-              </div>
+              <ProjectStatsBar
+                sectionCount={sections.length}
+                segmentCount={segments.length}
+                draftCount={draftCount}
+              />
 
               {/* Sections and segments */}
               <section className="space-y-3">
@@ -1645,15 +1126,130 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  {sections.map(section => renderSection(section))}
+                  {sections.map(section => (
+                    <SectionBlock
+                      key={section.id}
+                      section={section}
+                      sectionSegments={segmentsBySection.get(section.id) ?? []}
+                      projectId={selectedProjectId!}
+                      isExpanded={expandedSections.has(section.id)}
+                      editingSectionId={editingSectionId}
+                      editingSectionTitle={editingSectionTitle}
+                      editingSectionKind={editingSectionKind}
+                      savingSectionEdit={savingSectionEdit}
+                      addingToSectionId={addingToSectionId}
+                      newSegmentText={newSegmentText}
+                      savingSegment={savingSegment}
+                      editingSegmentId={editingSegmentId}
+                      editState={segmentEditState}
+                      savingSegmentEdit={savingSegmentEdit}
+                      renderingSegmentId={renderingSegmentId}
+                      castProfiles={castProfiles}
+                      voices={voices}
+                      styles={styles}
+                      statusBadge={statusBadge}
+                      defaultVoiceName={selectedProject?.default_voice_name}
+                      onToggle={id => setExpandedSections(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; })}
+                      onEditSection={s => { setEditingSectionId(s.id); setEditingSectionTitle(s.title); setEditingSectionKind(s.kind ?? 'chapter'); }}
+                      onCancelSectionEdit={() => setEditingSectionId(null)}
+                      onSaveSectionEdit={handleSaveSectionEdit}
+                      onDeleteSection={handleDeleteSection}
+                      onSectionTitleChange={setEditingSectionTitle}
+                      onSectionKindChange={setEditingSectionKind}
+                      onSetAddingToSection={setAddingToSectionId}
+                      onNewSegmentTextChange={setNewSegmentText}
+                      onAddSegment={handleAddSegment}
+                      onEditSegment={handleEditSegmentStart}
+                      onCancelSegmentEdit={() => setEditingSegmentId(null)}
+                      onSaveSegmentEdit={handleSaveSegmentEdit}
+                      onDeleteSegment={handleDeleteSegment}
+                      onReRenderSegment={async (seg) => {
+                        if (!selectedProjectId) return;
+                        setRenderingSegmentId(seg.id);
+                        try {
+                          await reRenderSegment(selectedProjectId, seg.id);
+                          showToast('Segment rendered', 'success');
+                          loadProjectContents(selectedProjectId);
+                        } catch (err: any) {
+                          showToast(err?.message ?? 'Render failed.', 'error');
+                        } finally {
+                          if (isMounted.current) setRenderingSegmentId(null);
+                        }
+                      }}
+                      onTakesChanged={() => loadProjectContents(selectedProjectId!)}
+                      onSegmentEditStateChange={patchSegmentEditState}
+                      onStyleCreated={s => setStyles(prev => [...prev, s])}
+                    />
+                  ))}
                 </div>
 
                 {/* Unsectioned segments */}
                 {(unsectionedSegments.length > 0 || addingToSectionId === 'unsectioned') && (
                   <div className="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 p-3 space-y-2">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Unsectioned</p>
-                    {unsectionedSegments.map(seg => renderSegmentRow(seg))}
-                    {renderAddSegmentForm(null)}
+                    {unsectionedSegments.map(seg => (
+                      <SegmentRow
+                        key={seg.id}
+                        segment={seg}
+                        projectId={selectedProjectId!}
+                        isEditing={editingSegmentId === seg.id}
+                        editState={segmentEditState}
+                        savingEdit={savingSegmentEdit}
+                        renderingId={renderingSegmentId}
+                        castProfiles={castProfiles}
+                        voices={voices}
+                        styles={styles}
+                        statusBadge={statusBadge}
+                        defaultVoiceName={selectedProject?.default_voice_name}
+                        onEdit={handleEditSegmentStart}
+                        onCancelEdit={() => setEditingSegmentId(null)}
+                        onSaveEdit={handleSaveSegmentEdit}
+                        onDelete={handleDeleteSegment}
+                        onReRender={async (s) => {
+                          if (!selectedProjectId) return;
+                          setRenderingSegmentId(s.id);
+                          try {
+                            await reRenderSegment(selectedProjectId, s.id);
+                            showToast('Segment rendered', 'success');
+                            loadProjectContents(selectedProjectId);
+                          } catch (err: any) {
+                            showToast(err?.message ?? 'Render failed.', 'error');
+                          } finally {
+                            if (isMounted.current) setRenderingSegmentId(null);
+                          }
+                        }}
+                        onTakesChanged={() => loadProjectContents(selectedProjectId!)}
+                        onEditStateChange={patchSegmentEditState}
+                        onStyleCreated={s => setStyles(prev => [...prev, s])}
+                      />
+                    ))}
+                    {/* Add unsectioned segment */}
+                    {addingToSectionId === 'unsectioned' ? (
+                      <form onSubmit={e => handleAddSegment(e, null)} className="mt-2 space-y-2">
+                        <textarea
+                          autoFocus rows={3} value={newSegmentText}
+                          onChange={e => setNewSegmentText(e.target.value)}
+                          placeholder="Enter segment text..."
+                          className="w-full resize-y rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button type="button" onClick={() => setAddingToSectionId(null)}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors">
+                            Cancel
+                          </button>
+                          <button type="submit" disabled={savingSegment || !newSegmentText.trim()}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-[var(--accent-600)] px-3 text-xs font-semibold text-white hover:bg-zinc-700 dark:hover:bg-[var(--accent-500)] transition-colors disabled:opacity-50">
+                            {savingSegment ? <Loader2 size={12} className="animate-spin" /> : null} Add
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <button type="button"
+                        onClick={() => { setAddingToSectionId('unsectioned'); setNewSegmentText(''); }}
+                        className="w-full flex items-center gap-2 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 px-3 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors">
+                        <Plus size={12} /> Add segment
+                      </button>
+                    )}
                   </div>
                 )}
 

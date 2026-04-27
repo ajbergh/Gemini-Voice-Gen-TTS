@@ -54,6 +54,7 @@ func (h *PronunciationHandler) requireProjectAndDict(
 	return
 }
 
+// requireGlobalDict validates a global dictionary path value before entry operations.
 func (h *PronunciationHandler) requireGlobalDict(
 	w http.ResponseWriter, r *http.Request,
 ) (dictID int64, ok bool) {

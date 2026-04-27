@@ -1,11 +1,10 @@
 // Copyright 2025 ajbergh
 // SPDX-License-Identifier: Apache-2.0
 
-// Package handler implements the HTTP handlers for all /api/* endpoints.
+// Package handler implements shared HTTP helpers and endpoint handlers.
 //
-// Each handler group (Config, Keys, History, Voices, Presets) is a struct
-// holding its dependencies (Store, CryptoKey, etc.). Shared helpers writeJSON,
-// writeError, and decodeJSON live in this file.
+// api_health.go defines the health endpoint plus common JSON, error, decode,
+// filename, and cache-path helpers reused by the other handler files.
 package handler
 
 import (

@@ -30,6 +30,7 @@ interface ControlBarProps {
   onViewModeChange: (mode: 'carousel' | 'grid') => void;
 }
 
+/** Render the main toolbar for view, density, AI, script, settings, and history actions. */
 const ControlBar: React.FC<ControlBarProps> = ({
   filters,
   onFilterChange,

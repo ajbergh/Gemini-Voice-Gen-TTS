@@ -32,12 +32,14 @@ interface ScriptPrepDialogProps {
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
+/** Parse a script-prep job result payload, returning null for missing or invalid JSON. */
 function parseResult(job: ScriptPrepJob): ScriptPrepResult | null {
   if (!job.result_json) return null;
   try { return JSON.parse(job.result_json) as ScriptPrepResult; }
   catch { return null; }
 }
 
+/** Render the AI-prepared section/segment preview tree. */
 function SectionTree({ sections }: { sections: ScriptPrepSection[] }) {
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set([0]));
   const toggle = (i: number) => setExpanded(prev => {

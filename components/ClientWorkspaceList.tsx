@@ -3,6 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * ClientWorkspaceList.tsx - Client selector for brand/workspace context.
+ *
+ * Renders selectable client rows with edit/delete affordances and an empty
+ * state for creating the first client workspace.
+ */
+
 import React from 'react';
 import { Building2, Pen, Trash2, Plus, ChevronRight } from 'lucide-react';
 import type { Client } from '../types';
@@ -17,6 +24,7 @@ interface ClientWorkspaceListProps {
   isDarkMode?: boolean;
 }
 
+/** Render the client list used to switch project brand/workspace context. */
 export default function ClientWorkspaceList({
   clients,
   selectedClientId,

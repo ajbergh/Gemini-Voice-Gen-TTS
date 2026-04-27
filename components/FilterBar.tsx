@@ -30,6 +30,7 @@ interface FilterBarProps {
   onGridDensityChange?: (density: GridDensity) => void;
 }
 
+/** Render search, filter, and section-specific collection actions. */
 const FilterBar: React.FC<FilterBarProps> = ({ 
   filters, 
   onFilterChange, 

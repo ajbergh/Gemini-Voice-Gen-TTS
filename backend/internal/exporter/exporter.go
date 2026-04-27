@@ -57,6 +57,7 @@ func Run(ctx context.Context, cfg Config, jobID, projectID int64) {
 	slog.Info("export: job complete", "job_id", jobID, "output", outputPath)
 }
 
+// run gathers project assets and writes the completed deliverable ZIP to disk.
 func run(ctx context.Context, cfg Config, jobID, projectID int64) (string, error) {
 	if err := os.MkdirAll(cfg.ExportCacheDir, 0o700); err != nil {
 		return "", fmt.Errorf("create export cache dir: %w", err)
@@ -271,6 +272,7 @@ func encodePCM16MonoWAV(pcm []byte, sampleRate int) []byte {
 
 var unsafeChars = regexp.MustCompile(`[^a-zA-Z0-9_-]`)
 
+// sanitizeFilename converts voice or preset labels into stable ZIP entry names.
 func sanitizeFilename(name string) string {
 	s := strings.ToLower(strings.TrimSpace(name))
 	s = unsafeChars.ReplaceAllString(s, "_")
@@ -283,6 +285,7 @@ func sanitizeFilename(name string) string {
 	return s
 }
 
+// derefStr dereferences optional store strings for export metadata.
 func derefStr(p *string) string {
 	if p == nil {
 		return ""
@@ -290,6 +293,7 @@ func derefStr(p *string) string {
 	return *p
 }
 
+// writeJSON adds an indented JSON document to the export ZIP.
 func writeJSON(zw *zip.Writer, name string, v any) error {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
@@ -303,6 +307,7 @@ func writeJSON(zw *zip.Writer, name string, v any) error {
 	return err
 }
 
+// writeQcCSV adds the project's QC issues as qc-notes.csv.
 func writeQcCSV(zw *zip.Writer, issues []store.QcIssue) error {
 	fw, err := zw.Create("qc-notes.csv")
 	if err != nil {
@@ -330,6 +335,7 @@ func writeQcCSV(zw *zip.Writer, issues []store.QcIssue) error {
 	return w.Error()
 }
 
+// buildReadme creates the human-readable manifest shipped in each export ZIP.
 func buildReadme(projectTitle string, audioCount int) string {
 	return fmt.Sprintf(`Project: %s
 Exported: %s

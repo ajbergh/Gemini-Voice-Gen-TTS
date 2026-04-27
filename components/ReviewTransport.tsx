@@ -3,6 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * ReviewTransport.tsx - Playback and approval controls for take review.
+ *
+ * Provides previous/next, replay, play/pause, marker, approve, and flag actions
+ * plus compact hotkey hints for the current review session.
+ */
+
 import React from 'react';
 import {
   CheckCircle,
@@ -40,6 +47,7 @@ const HOTKEYS = [
   { key: 'M', label: 'Marker' },
 ];
 
+/** Render transport controls for navigating and reviewing the active segment take. */
 export default function ReviewTransport({
   onPlay,
   onPause,

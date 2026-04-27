@@ -53,6 +53,7 @@ const EMOTION_OPTIONS   = ['neutral', 'warm', 'authoritative', 'intimate', 'dram
 const ARTICULATION_OPTS = ['relaxed', 'clear', 'crisp', 'heightened'];
 const PAUSE_OPTIONS     = ['sparse', 'moderate', 'frequent', 'dramatic'];
 
+/** Render the modal editor for reusable performance style presets. */
 const StylePresetEditor: React.FC<StylePresetEditorProps> = ({
   style,
   projectId,

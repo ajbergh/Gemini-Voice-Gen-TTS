@@ -61,6 +61,7 @@ const ROLE_LABELS: Record<CastRole, string> = {
 // have obvious entry points.
 const ALWAYS_VISIBLE: Set<CastRole> = new Set(['narrator', 'protagonist']);
 
+/** Render the project cast board for managing character and narrator profiles. */
 const CastBoard: React.FC<CastBoardProps> = ({ projectId, voices, onClose }) => {
   const { showToast } = useToast();
   const isMounted = useRef(true);

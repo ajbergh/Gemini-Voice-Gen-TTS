@@ -12,11 +12,13 @@ import { Activity, AlertCircle, Ban, CheckCircle2, Clock, Loader2, Trash2, X } f
 import { formatJobType, isJobActive, isJobComplete, isJobFailed, JobRecord, useJobs } from './JobProvider';
 import { cancelJob } from '../api';
 
+/** Clamp progress values to the 0-100 range used by the UI. */
 function clampPercent(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, value));
 }
 
+/** Format a timestamp as a compact relative age label. */
 function formatRelativeTime(value: string): string {
   const then = new Date(value).getTime();
   if (!Number.isFinite(then)) return '';
@@ -29,6 +31,7 @@ function formatRelativeTime(value: string): string {
   return new Date(value).toLocaleDateString();
 }
 
+/** Convert a job status into display text. */
 function statusLabel(job: JobRecord): string {
   const status = job.status.toLowerCase();
   if (status === 'processing' || status === 'running' || status === 'rendering') return 'Running';
@@ -38,6 +41,7 @@ function statusLabel(job: JobRecord): string {
   return job.status.charAt(0).toUpperCase() + job.status.slice(1);
 }
 
+/** Return badge color classes for a job status. */
 function statusClasses(job: JobRecord): string {
   if (isJobFailed(job)) return 'bg-red-50 dark:bg-red-900/25 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800';
   if (isJobComplete(job)) return 'bg-emerald-50 dark:bg-emerald-900/25 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
@@ -45,6 +49,7 @@ function statusClasses(job: JobRecord): string {
   return 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700';
 }
 
+/** Render the icon that represents a job's current status. */
 function JobIcon({ job }: { job: JobRecord }) {
   if (isJobFailed(job)) return <AlertCircle size={16} className="text-red-500 dark:text-red-400" />;
   if (isJobComplete(job)) return <CheckCircle2 size={16} className="text-emerald-500 dark:text-emerald-400" />;
@@ -52,6 +57,7 @@ function JobIcon({ job }: { job: JobRecord }) {
   return <Clock size={16} className="text-zinc-400" />;
 }
 
+/** Render one row in the job center popover. */
 function JobRow({ job, onDismiss }: { job: JobRecord; onDismiss: (id: string) => void }) {
   const percent = clampPercent(job.percent);
   const hasItemProgress = typeof job.completed_items === 'number' && typeof job.total_items === 'number' && job.total_items > 0;
@@ -127,6 +133,7 @@ function JobRow({ job, onDismiss }: { job: JobRecord; onDismiss: (id: string) =>
   );
 }
 
+/** Render the floating job/progress center backed by persisted job state. */
 const JobCenter: React.FC = () => {
   const { jobs, activeJobs, failedJobs, finishedJobs, clearFinished, dismissJob } = useJobs();
   const [open, setOpen] = useState(false);
@@ -226,4 +233,3 @@ const JobCenter: React.FC = () => {
 };
 
 export default JobCenter;
-

@@ -31,6 +31,7 @@ interface Mismatch {
   kind: 'label_drift' | 'profile_override';
 }
 
+/** Render warnings when a cast profile and segment assignment drift apart. */
 const CastContinuityWarnings: React.FC<CastContinuityWarningsProps> = ({
   projectId,
   castProfiles,

@@ -150,6 +150,7 @@ export interface FinishingOptions {
   trailingMs?: number;
 }
 
+/** Apply the selected trim, normalization, and padding operations in order. */
 export function applyFinishing(
   samples: Float32Array,
   opts: FinishingOptions = {},

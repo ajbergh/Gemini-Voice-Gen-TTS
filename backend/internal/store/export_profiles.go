@@ -148,6 +148,7 @@ type exportProfileScanner interface {
 	Scan(dest ...any) error
 }
 
+// scanExportProfile maps an export_profiles row into an ExportProfile.
 func scanExportProfile(scanner exportProfileScanner) (ExportProfile, error) {
 	var p ExportProfile
 	var trim, builtin int

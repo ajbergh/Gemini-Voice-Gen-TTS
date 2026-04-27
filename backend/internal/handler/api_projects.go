@@ -405,6 +405,7 @@ func splitParagraphs(text string) []string {
 	return paragraphs
 }
 
+// requireProject validates the path project ID and confirms the project exists.
 func (h *ProjectsHandler) requireProject(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	projectID, ok := parsePathInt64(w, r, "id", "invalid project ID")
 	if !ok {
@@ -417,6 +418,7 @@ func (h *ProjectsHandler) requireProject(w http.ResponseWriter, r *http.Request)
 	return projectID, true
 }
 
+// parsePathInt64 reads a positive int64 route value or writes a bad-request response.
 func parsePathInt64(w http.ResponseWriter, r *http.Request, name, invalidMessage string) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue(name), 10, 64)
 	if err != nil || id <= 0 {
@@ -426,6 +428,7 @@ func parsePathInt64(w http.ResponseWriter, r *http.Request, name, invalidMessage
 	return id, true
 }
 
+// writeStoreError maps sql.ErrNoRows to 404 and all other store errors to 500.
 func writeStoreError(w http.ResponseWriter, err error, notFoundMessage, internalMessage string) {
 	if errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusNotFound, notFoundMessage)

@@ -101,6 +101,7 @@ interface ScriptReaderModalProps {
   inline?: boolean;
 }
 
+/** Render a script-input modal for single- or multi-speaker TTS generation. */
 const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPresets = [], initialVoiceName, onClose, inline = false }) => {
   const [script, setScript] = useState('Hello! I am ready to read your script. Type something here and click Listen.');
   const [showTemplates, setShowTemplates] = useState(false);

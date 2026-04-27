@@ -305,6 +305,7 @@ func (h *VoicesHandler) getVoiceData() ([]gemini.VoiceData, error) {
 	return voices, rows.Err()
 }
 
+// strPtr returns a pointer to s for store fields that require nullable strings.
 func strPtr(s string) *string {
 	return &s
 }

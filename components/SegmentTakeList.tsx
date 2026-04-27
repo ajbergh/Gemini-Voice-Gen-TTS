@@ -59,10 +59,12 @@ const TAKE_STATUS_BADGE: Record<string, string> = {
   draft:     'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400',
 };
 
+/** Return badge color classes for a take status. */
 function takeBadge(status: string): string {
   return TAKE_STATUS_BADGE[status] ?? TAKE_STATUS_BADGE.draft;
 }
 
+/** Format a take duration in seconds for display. */
 function formatDuration(secs?: number): string {
   if (secs === undefined || secs === null) return '—';
   const m = Math.floor(secs / 60);
@@ -70,6 +72,7 @@ function formatDuration(secs?: number): string {
   return m > 0 ? `${m}:${s.padStart(4, '0')}` : `${s}s`;
 }
 
+/** Format a stored timestamp for the take list. */
 function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleString(undefined, {

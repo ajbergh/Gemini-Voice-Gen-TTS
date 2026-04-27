@@ -57,6 +57,7 @@ const STATUS_COLORS: Record<string, string> = {
   changed: 'text-amber-600 dark:text-amber-400',
 };
 
+/** Render the stitched-project timeline review and waveform download workflow. */
 export default function TimelineReview({ projectId, sections, segments }: TimelineReviewProps) {
   const { playPcm, stop, isPlaying, currentTrack, progress } = useAudio();
   const { showToast } = useToast();
@@ -357,6 +358,7 @@ export default function TimelineReview({ projectId, sections, segments }: Timeli
   );
 }
 
+/** Format a duration in seconds for compact timeline labels. */
 function formatDuration(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);

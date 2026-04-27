@@ -51,27 +51,33 @@ const COMPLETE_STATUSES = new Set(['complete', 'completed', 'done']);
 const FAILED_STATUSES = new Set(['error', 'failed']);
 const CANCELED_STATUSES = new Set(['cancelled', 'canceled']);
 
+/** Normalize backend status strings for comparisons. */
 function normalizeStatus(status: string | undefined): string {
   return (status || '').toLowerCase();
 }
 
+/** Return true while a job is queued or actively running. */
 export function isJobActive(job: Pick<JobRecord, 'status'>): boolean {
   return ACTIVE_STATUSES.has(normalizeStatus(job.status));
 }
 
+/** Return true when a job has completed successfully. */
 export function isJobComplete(job: Pick<JobRecord, 'status'>): boolean {
   return COMPLETE_STATUSES.has(normalizeStatus(job.status));
 }
 
+/** Return true when a job ended in an error or cancellation state. */
 export function isJobFailed(job: Pick<JobRecord, 'status'>): boolean {
   return FAILED_STATUSES.has(normalizeStatus(job.status));
 }
 
+/** Return true when a job no longer needs active polling or progress updates. */
 export function isJobFinished(job: Pick<JobRecord, 'status'>): boolean {
   const status = normalizeStatus(job.status);
   return COMPLETE_STATUSES.has(status) || FAILED_STATUSES.has(status) || CANCELED_STATUSES.has(status);
 }
 
+/** Convert backend job type identifiers into compact UI labels. */
 export function formatJobType(type: string): string {
   switch (type) {
     case 'tts':
@@ -101,12 +107,14 @@ export function formatJobType(type: string): string {
   }
 }
 
+/** Access persisted job state and progress helpers from JobProvider. */
 export function useJobs(): JobContextValue {
   const ctx = useContext(JobContext);
   if (!ctx) throw new Error('useJobs must be used within a JobProvider');
   return ctx;
 }
 
+/** Convert a backend job payload into the UI job record shape. */
 function fromApiJob(job: ApiJob): JobRecord {
   return {
     id: job.id,
@@ -126,6 +134,7 @@ function fromApiJob(job: ApiJob): JobRecord {
   };
 }
 
+/** Provide persisted job state, websocket progress, and refresh helpers. */
 export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { showToast } = useToast();
   const [jobsById, setJobsById] = useState<Record<string, JobRecord>>({});

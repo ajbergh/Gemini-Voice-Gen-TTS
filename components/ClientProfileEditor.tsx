@@ -3,6 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * ClientProfileEditor.tsx - Modal editor for client workspace defaults.
+ *
+ * Captures client identity, brand notes, and default voice/provider/model
+ * values used by project creation and render fallback workflows.
+ */
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { X, Loader2, Building2 } from 'lucide-react';
 import type { Client, CreateClientInput } from '../types';
@@ -16,6 +23,7 @@ interface ClientProfileEditorProps {
   isDarkMode?: boolean;
 }
 
+/** Render the create/edit form for a client workspace profile. */
 export default function ClientProfileEditor({
   client,
   onSave,

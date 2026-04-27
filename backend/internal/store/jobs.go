@@ -188,6 +188,7 @@ type jobScanner interface {
 	Scan(dest ...any) error
 }
 
+// scanJob maps a jobs row into the API-facing Job shape.
 func scanJob(scanner jobScanner) (Job, error) {
 	var job Job
 	if err := scanner.Scan(
@@ -214,6 +215,7 @@ func scanJob(scanner jobScanner) (Job, error) {
 	return job, nil
 }
 
+// nullableString converts empty or whitespace-only fields to SQL NULL values.
 func nullableString(value string) any {
 	if strings.TrimSpace(value) == "" {
 		return nil
@@ -221,6 +223,7 @@ func nullableString(value string) any {
 	return value
 }
 
+// clampPercent keeps progress updates within the persisted 0-100 range.
 func clampPercent(value int) int {
 	if value < 0 {
 		return 0
@@ -231,6 +234,7 @@ func clampPercent(value int) int {
 	return value
 }
 
+// isTerminalJobStatus identifies statuses that should stamp completed_at.
 func isTerminalJobStatus(status string) bool {
 	switch status {
 	case "complete", "completed", "done", "error", "failed", "canceled", "cancelled":

@@ -3,6 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * ReviewQueue.tsx - Filterable segment queue for take review.
+ *
+ * Shows the selected project's segments with approval/flag status and open-QC
+ * badges so reviewers can jump between unreviewed, flagged, and issue-bearing items.
+ */
+
 import React from 'react';
 import { AlertTriangle, CheckCircle, Flag } from 'lucide-react';
 import type { ReviewFilter, ScriptSegment, SegmentTake, SegmentQcStatus } from '../types';
@@ -27,6 +34,7 @@ const FILTER_LABELS: { value: ReviewFilter; label: string }[] = [
   { value: 'open_issues', label: 'Open Issues' },
 ];
 
+/** Return the compact status icon for a segment's selected/best take. */
 function getTakeStatusIcon(take: SegmentTake | undefined) {
   if (!take) return null;
   if (take.status === 'approved') return <CheckCircle size={13} className="text-green-500 shrink-0" />;
@@ -34,6 +42,7 @@ function getTakeStatusIcon(take: SegmentTake | undefined) {
   return null;
 }
 
+/** Decide whether a segment belongs in the currently selected review filter. */
 function matchesFilter(
   segment: ScriptSegment,
   take: SegmentTake | undefined,
@@ -49,6 +58,7 @@ function matchesFilter(
   }
 }
 
+/** Render the review queue and filter controls for a project's segments. */
 export default function ReviewQueue({
   segments,
   takesMap,

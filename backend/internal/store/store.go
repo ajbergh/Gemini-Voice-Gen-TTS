@@ -1,10 +1,12 @@
 // Copyright 2025 ajbergh
 // SPDX-License-Identifier: Apache-2.0
 
-// Package store provides a SQLite-backed persistence layer using
-// modernc.org/sqlite (pure Go, no CGo). It manages schema migrations,
-// WAL journaling, and exposes typed CRUD methods for config, API keys,
-// history entries, and custom voice presets.
+// Package store provides the SQLite-backed persistence layer.
+//
+// It manages schema migrations, WAL journaling, compatibility checks, and
+// typed CRUD methods for config, API keys, history, presets, script projects,
+// takes, pronunciation, cast profiles, clients, QC, provider mappings, export
+// profiles, export jobs, and AI script-prep jobs.
 package store
 
 import (
@@ -122,6 +124,7 @@ func (s *Store) DB() *sql.DB {
 	return s.db
 }
 
+// openDatabase opens SQLite with the pragmas that need to be encoded into the DSN.
 func openDatabase(dbPath string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite", dbPath+"?_journal_mode=WAL&_busy_timeout=5000")
 	if err != nil {
@@ -130,6 +133,8 @@ func openDatabase(dbPath string) (*sql.DB, error) {
 	return db, nil
 }
 
+// prepareDatabase enables required pragmas, runs migrations, applies compatibility
+// columns for older databases, and verifies that the expected schema is present.
 func prepareDatabase(db *sql.DB) error {
 	if _, err := db.Exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;"); err != nil {
 		return fmt.Errorf("set pragmas: %w", err)
@@ -177,6 +182,7 @@ func prepareDatabase(db *sql.DB) error {
 	return nil
 }
 
+// prepareDatabase runs database preparation against this Store's connection.
 func (s *Store) prepareDatabase() error {
 	return prepareDatabase(s.db)
 }
@@ -244,6 +250,7 @@ func addColumnIfMissing(db *sql.DB, table, column, colDef string) {
 	}
 }
 
+// validateSchema verifies the minimum table/column contract expected by handlers.
 func validateSchema(db *sql.DB) error {
 	required := map[string][]string{
 		"api_keys":                          {"id", "provider", "encrypted", "nonce"},
@@ -290,6 +297,7 @@ func validateSchema(db *sql.DB) error {
 	return nil
 }
 
+// tableColumns returns lower-cased column names for a required SQLite table.
 func tableColumns(db *sql.DB, table string) (map[string]struct{}, error) {
 	rows, err := db.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
 	if err != nil {

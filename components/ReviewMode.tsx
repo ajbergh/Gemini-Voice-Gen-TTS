@@ -3,6 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * ReviewMode.tsx - Full-screen take review workspace.
+ *
+ * Loads project segments, best takes, and QC issues, then coordinates the
+ * review queue, transport controls, approve/flag actions, and marker creation.
+ */
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import {
@@ -32,6 +39,7 @@ interface ReviewModeProps {
   isDarkMode?: boolean;
 }
 
+/** Render the modal review workflow for approving, flagging, and annotating takes. */
 export default function ReviewMode({ project, onClose, isDarkMode = false }: ReviewModeProps) {
   const { playUrl, stop, isPlaying } = useAudio();
 

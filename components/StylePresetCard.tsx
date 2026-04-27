@@ -31,10 +31,12 @@ const CATEGORY_BADGE: Record<string, string> = {
   custom:       'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400',
 };
 
+/** Return badge color classes for a performance style category. */
 function categoryBadgeClass(category: string): string {
   return CATEGORY_BADGE[category] ?? CATEGORY_BADGE.custom;
 }
 
+/** Convert a style category identifier into display text. */
 function formatCategory(category: string): string {
   return category.charAt(0).toUpperCase() + category.slice(1).replace(/_/g, ' ');
 }
@@ -47,6 +49,7 @@ const DESCRIPTOR_LABEL: Record<string, string> = {
   pause_density: 'Pauses',
 };
 
+/** Render one performance style card with edit/delete/version actions. */
 const StylePresetCard: React.FC<StylePresetCardProps> = ({ style, onEdit, onDelete }) => {
   const descriptors: Array<{ key: string; value: string }> = (
     ['pacing', 'energy', 'emotion', 'articulation', 'pause_density'] as const

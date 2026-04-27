@@ -6,15 +6,18 @@
 /**
  * api.ts — Frontend API Client
  *
- * Typed abstraction layer for every Go backend endpoint. All Gemini AI calls
- * are proxied through the backend — the frontend never contacts Gemini directly.
+ * Typed abstraction layer for the Go backend. All Gemini AI and media-generation
+ * calls are proxied through the backend so API keys and generated assets stay
+ * server-side.
  *
- * Endpoint groups:
- *   /api/voices      — voice listing, AI recommendations, TTS generation
- *   /api/keys        — encrypted API key CRUD and validation
- *   /api/config      — key-value app config (theme, etc.)
- *   /api/history     — generation history with cached audio retrieval
- *   /api/health      — backend health check
+ * Main endpoint groups:
+ *   /api/voices             — voice listing, casting recommendations, TTS, script formatting
+ *   /api/projects           — project, section, segment, render, stitch, and prep workflows
+ *   /api/presets            — saved voice presets, tags, versions, headshots, import/export
+ *   /api/keys and /providers — API-key pool management and provider metadata
+ *   /api/history and /jobs  — generation history, progress events, and persisted jobs
+ *   /api/qc, /api/clients,
+ *   /api/export-profiles    — review, client workspace, and deliverable settings
  *
  * In development, Vite proxies /api to http://localhost:8080. In production,
  * the Go binary serves both the SPA and API on the same port.

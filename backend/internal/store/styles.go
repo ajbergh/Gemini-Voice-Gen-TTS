@@ -56,6 +56,7 @@ const styleSelectCols = `id, scope, project_id, name, description, category,
 	director_notes, audio_tags_json, is_builtin, sort_order, metadata_json,
 	created_at, updated_at`
 
+// scanStyle maps the shared performance style SELECT columns into a value object.
 func scanStyle(row interface{ Scan(...any) error }) (PerformanceStyle, error) {
 	var s PerformanceStyle
 	var isBuiltin int

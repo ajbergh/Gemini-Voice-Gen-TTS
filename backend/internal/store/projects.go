@@ -456,6 +456,7 @@ func (s *Store) GetProjectSegment(projectID, segmentID int64) (*ScriptSegment, e
 	return s.getProjectSegment(projectID, segmentID)
 }
 
+// getProjectSegment loads a segment only when it belongs to the requested project.
 func (s *Store) getProjectSegment(projectID, segmentID int64) (*ScriptSegment, error) {
 	row := s.db.QueryRow(
 		`SELECT id, project_id, section_id, title, script_text, speaker_label, voice_name,
@@ -478,6 +479,7 @@ type scriptScanner interface {
 	Scan(dest ...any) error
 }
 
+// scanScriptProject maps a script_projects row into a ScriptProject.
 func scanScriptProject(scanner scriptScanner) (ScriptProject, error) {
 	var project ScriptProject
 	if err := scanner.Scan(
@@ -505,6 +507,7 @@ func scanScriptProject(scanner scriptScanner) (ScriptProject, error) {
 	return project, nil
 }
 
+// scanScriptSection maps a script_sections row into a ScriptSection.
 func scanScriptSection(scanner scriptScanner) (ScriptSection, error) {
 	var section ScriptSection
 	if err := scanner.Scan(
@@ -523,6 +526,7 @@ func scanScriptSection(scanner scriptScanner) (ScriptSection, error) {
 	return section, nil
 }
 
+// scanScriptSegment maps a script_segments row into a ScriptSegment.
 func scanScriptSegment(scanner scriptScanner) (ScriptSegment, error) {
 	var segment ScriptSegment
 	if err := scanner.Scan(
@@ -554,6 +558,7 @@ func scanScriptSegment(scanner scriptScanner) (ScriptSegment, error) {
 	return segment, nil
 }
 
+// defaultString returns fallback when value is blank after trimming.
 func defaultString(value, fallback string) string {
 	if strings.TrimSpace(value) == "" {
 		return fallback
@@ -561,11 +566,13 @@ func defaultString(value, fallback string) string {
 	return value
 }
 
+// hashScriptText creates the content hash used to detect dirty rendered segments.
 func hashScriptText(value string) string {
 	sum := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(sum[:])
 }
 
+// isRenderedLikeStatus marks statuses whose rendered audio becomes stale on text edits.
 func isRenderedLikeStatus(status string) bool {
 	switch strings.ToLower(status) {
 	case "rendered", "approved", "locked":

@@ -1,6 +1,7 @@
 // Copyright 2025 ajbergh
 // SPDX-License-Identifier: Apache-2.0
 
+// Package server - ratelimit.go applies coarse token-bucket limits per route group.
 package server
 
 import (
@@ -44,6 +45,7 @@ type tokenBucket struct {
 	lastTime time.Time
 }
 
+// newTokenBucket creates a full bucket so short startup bursts are allowed.
 func newTokenBucket(rate float64, burst int) *tokenBucket {
 	return &tokenBucket{
 		tokens:   float64(burst),

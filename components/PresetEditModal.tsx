@@ -50,6 +50,7 @@ const PRESET_COLORS = [
   '#06b6d4', // cyan
 ];
 
+/** Render the modal editor for saved custom voice presets. */
 const PresetEditModal: React.FC<PresetEditModalProps> = ({ preset, onSave, onClose, onRegenerateHeadshot }) => {
   const [name, setName] = useState(preset.name);
   const [systemInstruction, setSystemInstruction] = useState(preset.system_instruction || '');

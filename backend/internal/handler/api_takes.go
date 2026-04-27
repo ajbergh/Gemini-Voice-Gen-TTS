@@ -41,6 +41,7 @@ func (h *TakesHandler) requireProjectAndSegment(w http.ResponseWriter, r *http.R
 	return projectID, segmentID, true
 }
 
+// requireTake validates project, segment, and take path values before take operations.
 func (h *TakesHandler) requireTake(w http.ResponseWriter, r *http.Request) (int64, int64, *store.SegmentTake, bool) {
 	projectID, segmentID, ok := h.requireProjectAndSegment(w, r)
 	if !ok {

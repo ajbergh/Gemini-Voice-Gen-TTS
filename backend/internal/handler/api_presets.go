@@ -31,6 +31,7 @@ type presetWithTags struct {
 	Tags []store.PresetTag `json:"tags"`
 }
 
+// enrichWithTags adds the preset's tag collection for API responses.
 func (h *PresetsHandler) enrichWithTags(p store.CustomPreset) presetWithTags {
 	tags, err := h.Store.ListTagsForPreset(p.ID)
 	if err != nil {

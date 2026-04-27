@@ -95,6 +95,7 @@ type exportJobScanner interface {
 	Scan(dest ...any) error
 }
 
+// scanExportJob maps an export_jobs row into an ExportJob.
 func scanExportJob(sc exportJobScanner) (ExportJob, error) {
 	var j ExportJob
 	if err := sc.Scan(

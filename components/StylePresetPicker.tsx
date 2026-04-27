@@ -25,10 +25,12 @@ interface StylePresetPickerProps {
   className?: string;
 }
 
+/** Convert a style category identifier into display text. */
 function formatCategory(category: string): string {
   return category.charAt(0).toUpperCase() + category.slice(1).replace(/_/g, ' ');
 }
 
+/** Render a project-aware performance-style selector with optional create flow. */
 const StylePresetPicker: React.FC<StylePresetPickerProps> = ({
   styles,
   value,

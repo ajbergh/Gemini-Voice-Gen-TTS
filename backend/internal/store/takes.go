@@ -284,6 +284,7 @@ type takesScanner interface {
 	Scan(dest ...any) error
 }
 
+// scanSegmentTake maps a segment_takes row into a SegmentTake and normalizes booleans.
 func scanSegmentTake(scanner takesScanner) (SegmentTake, error) {
 	var t SegmentTake
 	var clipping int

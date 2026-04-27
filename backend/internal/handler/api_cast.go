@@ -222,6 +222,7 @@ func (h *CastHandler) AuditionCastProfile(w http.ResponseWriter, r *http.Request
 	})
 }
 
+// requireProject validates the path project ID before cast operations.
 func (h *CastHandler) requireProject(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	projectID, ok := parsePathInt64(w, r, "id", "invalid project ID")
 	if !ok {
@@ -234,6 +235,7 @@ func (h *CastHandler) requireProject(w http.ResponseWriter, r *http.Request) (in
 	return projectID, true
 }
 
+// requireCastProfile validates the path profile ID and loads the cast profile.
 func (h *CastHandler) requireCastProfile(w http.ResponseWriter, r *http.Request) (*store.CastProfile, bool) {
 	profileID, ok := parsePathInt64(w, r, "profileId", "invalid cast profile ID")
 	if !ok {

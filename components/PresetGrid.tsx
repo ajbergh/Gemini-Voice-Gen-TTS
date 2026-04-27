@@ -38,6 +38,7 @@ const presetGridClasses: Record<GridDensity, string> = {
   spacious: 'grid-cols-1 sm:grid-cols-2 md:landscape:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-8',
 };
 
+/** Render the saved-preset grid with playback, import/export, and reorder actions. */
 const PresetGrid: React.FC<PresetGridProps> = ({ presets, playingPresetId, onPlayToggle, onEdit, onDelete, onDuplicate, onAiCasting, onExport, onImport, onInlineEdit, onReorder, gridDensity = 'comfortable' }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);

@@ -47,6 +47,7 @@ const ACCENT_COLORS = [
   { name: 'amber', bg: 'bg-amber-500' },
 ];
 
+/** Render the primary app navigation sidebar and quick status controls. */
 const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   activeSection,
   onSectionChange,

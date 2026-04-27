@@ -3,10 +3,9 @@
 
 // Package gemini implements a raw HTTP client for the Google Gemini API.
 //
-// It supports two operations: voice recommendation (using gemini-3-flash-preview
-// with structured JSON output) and text-to-speech generation (using
-// gemini-3.1-flash-tts-preview with AUDIO response modality). API key
-// validation is provided via a lightweight models.list call.
+// It supports voice recommendation, script formatting/prep, text-to-speech
+// generation, streaming TTS, multi-speaker TTS, and image generation for preset
+// headshots. API key validation is provided via a lightweight models.list call.
 package gemini
 
 import (
@@ -73,6 +72,7 @@ type ttsResponseEnvelope struct {
 	} `json:"promptFeedback"`
 }
 
+// summarizeTTSResponseText compacts non-audio Gemini responses for diagnostics.
 func summarizeTTSResponseText(text string) string {
 	text = strings.Join(strings.Fields(text), " ")
 	if len(text) > 160 {
@@ -81,6 +81,7 @@ func summarizeTTSResponseText(text string) string {
 	return text
 }
 
+// parseTTSAudioResponse extracts the first inline audio part or returns diagnostics.
 func parseTTSAudioResponse(body []byte) (string, string, error) {
 	var envelope ttsResponseEnvelope
 	if err := json.Unmarshal(body, &envelope); err != nil {
@@ -125,6 +126,7 @@ func parseTTSAudioResponse(body []byte) (string, string, error) {
 	return "", strings.Join(diagnostics, "; "), nil
 }
 
+// parseImageResponse extracts a generated image and preserves text-only diagnostics.
 func parseImageResponse(body []byte) ([]byte, string, string, error) {
 	var envelope ttsResponseEnvelope
 	if err := json.Unmarshal(body, &envelope); err != nil {
@@ -188,6 +190,7 @@ func parseImageResponse(body []byte) ([]byte, string, string, error) {
 }
 
 // resolveTTSModel returns a validated TTS model name or the default.
+// resolveTTSModel accepts allowed frontend overrides and falls back to the default.
 func resolveTTSModel(model string) string {
 	if model != "" && allowedTTSModels[model] {
 		return model
@@ -196,6 +199,7 @@ func resolveTTSModel(model string) string {
 }
 
 // resolveImageModel returns a validated image model name or the default.
+// resolveImageModel accepts allowed image-model overrides and falls back to the default.
 func resolveImageModel(model string) string {
 	if model != "" && allowedImageModels[model] {
 		return model
@@ -963,4 +967,3 @@ Raw Script:
 
 	return &result, nil
 }
-

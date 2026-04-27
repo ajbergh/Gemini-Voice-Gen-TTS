@@ -44,6 +44,7 @@ const ROLES: { value: CastRole; label: string }[] = [
   { value: 'archived',    label: 'Archived' },
 ];
 
+/** Render the modal editor for cast profile voice/style defaults. */
 const CastProfileEditor: React.FC<CastProfileEditorProps> = ({
   projectId,
   profile,

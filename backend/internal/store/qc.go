@@ -43,6 +43,7 @@ const qcSelectCols = `id, project_id, section_id, segment_id, take_id,
 	issue_type, severity, note, time_offset_seconds, status,
 	created_at, updated_at`
 
+// scanQcIssue maps the shared QC issue SELECT columns into a QcIssue.
 func scanQcIssue(row interface{ Scan(...any) error }) (QcIssue, error) {
 	var q QcIssue
 	return q, row.Scan(

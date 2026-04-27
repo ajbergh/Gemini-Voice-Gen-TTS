@@ -1,6 +1,8 @@
 // Copyright 2025 ajbergh
 // SPDX-License-Identifier: Apache-2.0
 
+// Package handler - ws_progress.go manages progress WebSocket connections and
+// mirrors job progress events into the persistent job store.
 package handler
 
 import (
@@ -143,6 +145,7 @@ func (h *ProgressHub) EmitProgress(jobID, jobType, status, message string, perce
 	})
 }
 
+// persistEvent writes non-system progress updates to the job table for reload recovery.
 func (h *ProgressHub) persistEvent(event ProgressEvent) {
 	if h.Store == nil || event.JobID == "" || event.Type == "system" {
 		return

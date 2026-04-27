@@ -25,6 +25,7 @@ interface ExportProfilePickerProps {
   disabled?: boolean;
 }
 
+/** Render the export profile selector and inline custom-profile editor. */
 export default function ExportProfilePicker({
   value,
   onChange,

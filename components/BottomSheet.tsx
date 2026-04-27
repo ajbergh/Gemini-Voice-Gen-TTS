@@ -26,6 +26,7 @@ interface BottomSheetProps {
 const SWIPE_DISMISS_THRESHOLD = 100;
 const SWIPE_VELOCITY_THRESHOLD = 0.5;
 
+/** Render a mobile-friendly modal sheet with backdrop and escape handling. */
 const BottomSheet: React.FC<BottomSheetProps> = ({ onClose, children, zIndex = 'z-[100]', ariaLabel }) => {
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
   const sheetRef = useRef<HTMLDivElement>(null);

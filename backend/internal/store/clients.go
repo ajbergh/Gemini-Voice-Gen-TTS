@@ -44,6 +44,7 @@ const clientSelectCols = `id, name, description, brand_notes,
   default_preset_id, default_style_id, default_export_profile_id,
   metadata_json, created_at, updated_at`
 
+// scanClient maps the shared client SELECT columns into a Client.
 func scanClient(row interface{ Scan(...any) error }) (*Client, error) {
 	c := &Client{}
 	err := row.Scan(

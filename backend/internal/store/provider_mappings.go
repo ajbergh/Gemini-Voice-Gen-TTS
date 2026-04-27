@@ -165,6 +165,7 @@ type providerVoiceMappingScanner interface {
 	Scan(dest ...any) error
 }
 
+// scanProviderVoiceMapping maps a provider_voice_mappings row into a value object.
 func scanProviderVoiceMapping(scanner providerVoiceMappingScanner) (ProviderVoiceMapping, error) {
 	var m ProviderVoiceMapping
 	if err := scanner.Scan(

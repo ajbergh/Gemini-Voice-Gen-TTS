@@ -10,7 +10,9 @@
  */
 
 export const PCM_SAMPLE_RATE = 24000;
+/** Gemini TTS PCM bit depth. */
 export const PCM_BIT_DEPTH = 16;
+/** Gemini TTS channel count; generated audio is mono. */
 export const PCM_CHANNELS = 1;
 /** Bytes per sample (16-bit = 2 bytes). */
 export const PCM_BYTES_PER_SAMPLE = 2;

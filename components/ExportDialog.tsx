@@ -23,6 +23,7 @@ interface ExportDialogProps {
   onClose: () => void;
 }
 
+/** Render the deliverable export modal and job polling workflow. */
 export default function ExportDialog({ projectId, onClose }: ExportDialogProps) {
   const [profileId, setProfileId] = useState<number | null>(null);
   const [job, setJob] = useState<ExportJob | null>(null);

@@ -63,10 +63,12 @@ const PRESET_NAME_ROLE_WORDS = new Set([
   'commentator', 'storyteller', 'companion', 'caster', 'director', 'reader', 'performer'
 ]);
 
+/** Convert a token to title case for generated preset names. */
 function toTitleCase(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
+/** Build a short, human-readable preset name from casting context. */
 function buildSuggestedPresetName(data: PendingPresetSave): string {
   const tokenSource = `${data.sourceQuery || ''} ${data.personDescription || ''}`.toLowerCase();
   const tokens: string[] = tokenSource.match(/[a-z0-9]+/g) ?? [];
@@ -83,6 +85,7 @@ function buildSuggestedPresetName(data: PendingPresetSave): string {
   return `${data.voiceName} Signature`;
 }
 
+/** Render the root application shell, global state, navigation, and modal stack. */
 const App: React.FC = () => {
   const { showToast } = useToast();
 

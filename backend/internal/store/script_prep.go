@@ -261,6 +261,7 @@ func (s *Store) ApplyScriptPrepResult(projectID int64, result ScriptPrepResult, 
 	return summary, nil
 }
 
+// applyScriptPrepCastCandidates materializes unique AI-detected speakers as cast profiles.
 func (s *Store) applyScriptPrepCastCandidates(tx *sql.Tx, projectID int64, candidates []ScriptPrepSpeakerCandidate, now string) (int, error) {
 	rows, err := tx.Query(`SELECT LOWER(name), sort_order FROM cast_profiles WHERE project_id = ?`, projectID)
 	if err != nil {
@@ -313,6 +314,8 @@ func (s *Store) applyScriptPrepCastCandidates(tx *sql.Tx, projectID int64, candi
 	return created, nil
 }
 
+// applyScriptPrepPronunciationCandidates upserts the AI Script Prep dictionary
+// and appends unique pronunciation candidates as enabled entries.
 func (s *Store) applyScriptPrepPronunciationCandidates(tx *sql.Tx, projectID int64, candidates []ScriptPrepPronunciationCandidate, now string) (int, error) {
 	if len(candidates) == 0 {
 		return 0, nil

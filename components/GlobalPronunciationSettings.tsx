@@ -3,6 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * GlobalPronunciationSettings.tsx - Global pronunciation dictionary manager.
+ *
+ * Lets users create, rename, delete, preview, and edit dictionaries that apply
+ * across projects before any project-scoped pronunciation rules are applied.
+ */
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BookOpen, Check, Loader2, Pencil, Plus, ToggleLeft, ToggleRight, Trash2, X } from 'lucide-react';
 import {
@@ -18,6 +25,7 @@ import {
 } from '../api';
 import { PronunciationDictionary, PronunciationEntry } from '../types';
 
+/** Render the settings-panel UI for app-wide pronunciation dictionaries. */
 export default function GlobalPronunciationSettings() {
   const isMounted = useRef(true);
   const [dicts, setDicts] = useState<PronunciationDictionary[]>([]);

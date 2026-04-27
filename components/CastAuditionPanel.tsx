@@ -24,6 +24,7 @@ interface CastAuditionPanelProps {
   onClose: () => void;
 }
 
+/** Render the cast-profile audition form and generated audio preview. */
 const CastAuditionPanel: React.FC<CastAuditionPanelProps> = ({
   profile,
   voices,

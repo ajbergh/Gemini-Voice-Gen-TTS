@@ -128,6 +128,7 @@ function drawPlaceholder(canvas: HTMLCanvasElement, isDark: boolean): void {
   }
 }
 
+/** Render an auto-resizing waveform canvas with optional playback seeking. */
 export default function WaveformCanvas({
   samples,
   height = 56,

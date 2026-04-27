@@ -3,6 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * QcRulesSettings.tsx - Settings panel for default review/QC behavior.
+ *
+ * Reads and writes backend config keys that control default issue severity,
+ * clipping warnings, approval export policy, and QC note export format.
+ */
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, ClipboardCheck, Loader2, Save } from 'lucide-react';
 import { CONFIG_KEYS, getConfig, updateConfig } from '../api';
@@ -24,6 +31,7 @@ const DEFAULT_QC_RULES: QcRules = {
   qc_export_notes_format: 'csv',
 };
 
+/** Render the configurable QC defaults used by review and export flows. */
 export default function QcRulesSettings() {
   const isMounted = useRef(true);
   const [rules, setRules] = useState<QcRules>(DEFAULT_QC_RULES);

@@ -207,6 +207,7 @@ func (s *Store) DeleteCastProfile(profileID int64) error {
 	return nil
 }
 
+// snapshotCastProfileVersion preserves the current profile before mutation or deletion.
 func (s *Store) snapshotCastProfileVersion(profileID int64) error {
 	profile, err := s.GetCastProfile(profileID)
 	if err != nil {
@@ -326,6 +327,7 @@ type castProfileScanner interface {
 	Scan(dest ...any) error
 }
 
+// scanCastProfile maps a cast_profiles row into a CastProfile.
 func scanCastProfile(scanner castProfileScanner) (CastProfile, error) {
 	var profile CastProfile
 	if err := scanner.Scan(
@@ -354,6 +356,7 @@ func scanCastProfile(scanner castProfileScanner) (CastProfile, error) {
 	return profile, nil
 }
 
+// scanCastProfileVersion maps a cast_profile_versions row into a snapshot.
 func scanCastProfileVersion(scanner castProfileScanner) (CastProfileVersion, error) {
 	var version CastProfileVersion
 	if err := scanner.Scan(

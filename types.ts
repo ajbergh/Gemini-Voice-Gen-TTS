@@ -6,10 +6,12 @@
 /**
  * types.ts — Shared TypeScript Interfaces
  *
- * Central type definitions used across all frontend components. Voice and
- * VoiceAnalysis model the 30-voice library from constants.ts. FilterState
- * drives the search/filter bar. AiRecommendation captures structured output
- * from the Gemini recommendation endpoint.
+ * Central frontend data contracts for the voice library, saved presets,
+ * script-project workspace, take review, QC, clients, providers, export
+ * packaging, and AI script-prep workflows.
+ *
+ * These interfaces mirror the JSON payloads returned by the Go backend and are
+ * intentionally snake_case where the persisted API schema uses snake_case.
  */
 
 /** Detailed analysis metadata for a single voice. */
@@ -51,11 +53,13 @@ export interface AiRecommendation {
   personDescription?: string;
 }
 
+/** Stored metadata for AI casting-director context attached to a preset. */
 export interface PresetCastingDirectorMetadata {
   sourceQuery?: string;
   personDescription?: string;
 }
 
+/** Stored metadata for a generated preset portrait/headshot asset. */
 export interface PresetHeadshotMetadata {
   status?: string;
   prompt?: string;
@@ -73,7 +77,6 @@ export interface PresetMetadata {
   headshot?: PresetHeadshotMetadata;
 }
 
-/** A user-saved voice preset created from an AI recommendation. */
 /** A tag attached to a custom preset for categorization. */
 export interface PresetTag {
   id?: number;
@@ -82,6 +85,7 @@ export interface PresetTag {
   color: string;
 }
 
+/** A user-saved voice preset, optionally with cached audio, tags, and metadata. */
 export interface CustomPreset {
   id: number;
   name: string;
@@ -110,6 +114,7 @@ export type ScriptSectionKind = 'chapter' | 'scene' | 'folder';
 export type SegmentStatus = 'draft' | 'changed' | 'queued' | 'rendering' | 'failed' | 'rendered' | 'approved' | 'flagged' | 'locked';
 export type CastRole = 'narrator' | 'protagonist' | 'antagonist' | 'supporting' | 'extra' | 'brand_voice' | 'archived';
 
+/** Durable project-level container for long-form narration and voiceover work. */
 export interface ScriptProject {
   id: number;
   title: string;
@@ -131,6 +136,7 @@ export interface ScriptProject {
   updated_at: string;
 }
 
+/** Ordered project section such as a chapter, scene, or folder. */
 export interface ScriptSection {
   id: number;
   project_id: number;
@@ -143,6 +149,7 @@ export interface ScriptSection {
   updated_at: string;
 }
 
+/** Renderable script unit with voice, cast, provider, and status metadata. */
 export interface ScriptSegment {
   id: number;
   project_id: number;

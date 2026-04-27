@@ -3,6 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * QcIssueList.tsx - Inline QC issue list for review workflows.
+ *
+ * Displays issue severity, status, notes, and quick actions for the selected
+ * segment, including resolve, edit, and delete operations.
+ */
+
 import React, { useState } from 'react';
 import { AlertTriangle, CheckCircle, Edit2, Trash2, XCircle } from 'lucide-react';
 import { deleteQcIssue, resolveQcIssue } from '../api';
@@ -29,6 +36,7 @@ const STATUS_ICON: Record<QcIssueStatus, React.ReactNode> = {
   wont_fix: <XCircle size={13} className="text-zinc-400" />,
 };
 
+/** Render and edit the QC issues associated with one project segment. */
 export default function QcIssueList({
   issues,
   projectId,

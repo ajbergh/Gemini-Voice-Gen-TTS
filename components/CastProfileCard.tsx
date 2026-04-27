@@ -42,14 +42,17 @@ const ROLE_LABELS: Record<string, string> = {
   archived:    'Archived',
 };
 
+/** Return the badge color class for a cast profile role. */
 function roleBadgeClass(role: string): string {
   return ROLE_BADGE[role] ?? ROLE_BADGE.extra;
 }
 
+/** Convert a role identifier into display text. */
 function formatRole(role: string): string {
   return ROLE_LABELS[role] ?? role.replace(/_/g, ' ');
 }
 
+/** Render one cast profile card with continuity and management actions. */
 const CastProfileCard: React.FC<CastProfileCardProps> = ({
   profile,
   onEdit,
