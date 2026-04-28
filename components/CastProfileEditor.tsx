@@ -19,6 +19,7 @@ import {
   CastProfileVersion,
   CastRole,
   CreateCastProfileInput,
+  CustomPreset,
   Voice,
 } from '../types';
 import { useToast } from './ToastProvider';
@@ -28,6 +29,7 @@ interface CastProfileEditorProps {
   /** Pass an existing profile to edit it; omit to create a new one. */
   profile?: CastProfile;
   voices: Voice[];
+  customPresets?: CustomPreset[];
   /** Pre-select a role when creating a profile from a specific group. */
   initialRole?: CastRole;
   onSave: (saved: CastProfile) => void;
@@ -49,6 +51,7 @@ const CastProfileEditor: React.FC<CastProfileEditorProps> = ({
   projectId,
   profile,
   voices,
+  customPresets = [],
   initialRole,
   onSave,
   onClose,
@@ -60,7 +63,12 @@ const CastProfileEditor: React.FC<CastProfileEditorProps> = ({
   const [name, setName]                       = useState(profile?.name ?? '');
   const [role, setRole]                       = useState<string>(profile?.role ?? initialRole ?? 'narrator');
   const [description, setDescription]         = useState(profile?.description ?? '');
-  const [voiceName, setVoiceName]             = useState(profile?.voice_name ?? '');
+  // voiceSelection encodes either "stock:<name>", "preset:<id>", or ""
+  const [voiceSelection, setVoiceSelection]   = useState<string>(() => {
+    if (profile?.preset_id) return `preset:${profile.preset_id}`;
+    if (profile?.voice_name) return `stock:${profile.voice_name}`;
+    return '';
+  });
   const [languageCode, setLanguageCode]       = useState(profile?.language_code ?? '');
   const [ageImpression, setAgeImpression]     = useState(profile?.age_impression ?? '');
   const [emotionalRange, setEmotionalRange]   = useState(profile?.emotional_range ?? '');
@@ -129,11 +137,23 @@ const CastProfileEditor: React.FC<CastProfileEditorProps> = ({
     setSaving(true);
     try {
       const lines = sampleLines.split('\n').map(l => l.trim()).filter(Boolean);
+      // Decode voice selection
+      let resolvedVoiceName: string | undefined;
+      let resolvedPresetId: number | undefined;
+      if (voiceSelection.startsWith('preset:')) {
+        const pid = parseInt(voiceSelection.slice(7), 10);
+        const preset = customPresets.find(p => p.id === pid);
+        resolvedPresetId = pid;
+        resolvedVoiceName = preset?.voice_name;
+      } else if (voiceSelection.startsWith('stock:')) {
+        resolvedVoiceName = voiceSelection.slice(6) || undefined;
+      }
       const data: CreateCastProfileInput = {
         name:                name.trim(),
         role,
         description,
-        voice_name:          voiceName || undefined,
+        voice_name:          resolvedVoiceName,
+        preset_id:           resolvedPresetId,
         language_code:       languageCode || undefined,
         age_impression:      ageImpression || undefined,
         emotional_range:     emotionalRange || undefined,
@@ -226,14 +246,25 @@ const CastProfileEditor: React.FC<CastProfileEditorProps> = ({
           <div className="space-y-1">
             <label className={labelCls}>Voice</label>
             <select
-              value={voiceName}
-              onChange={e => setVoiceName(e.target.value)}
+              value={voiceSelection}
+              onChange={e => setVoiceSelection(e.target.value)}
               className="h-9 w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-2.5 text-sm text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
             >
               <option value="">— None (use project default) —</option>
-              {voices.map(v => (
-                <option key={v.name} value={v.name}>{v.name}</option>
-              ))}
+              {customPresets.length > 0 && (
+                <optgroup label="My Presets">
+                  {customPresets.map(p => (
+                    <option key={`preset:${p.id}`} value={`preset:${p.id}`}>
+                      {p.name} ({p.voice_name})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="Stock Voices">
+                {voices.map(v => (
+                  <option key={`stock:${v.name}`} value={`stock:${v.name}`}>{v.name}</option>
+                ))}
+              </optgroup>
             </select>
           </div>
 

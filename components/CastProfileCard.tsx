@@ -13,10 +13,11 @@
 
 import React from 'react';
 import { Mic, Pencil, Trash2 } from 'lucide-react';
-import { CastProfile } from '../types';
+import { CastProfile, CustomPreset } from '../types';
 
 interface CastProfileCardProps {
   profile: CastProfile;
+  customPresets?: CustomPreset[];
   onEdit: (profile: CastProfile) => void;
   onAudition: (profile: CastProfile) => void;
   onDelete: (profile: CastProfile) => void;
@@ -55,6 +56,7 @@ function formatRole(role: string): string {
 /** Render one cast profile card with continuity and management actions. */
 const CastProfileCard: React.FC<CastProfileCardProps> = ({
   profile,
+  customPresets = [],
   onEdit,
   onAudition,
   onDelete,
@@ -62,6 +64,10 @@ const CastProfileCard: React.FC<CastProfileCardProps> = ({
   const sampleLines: string[] = (() => {
     try { return JSON.parse(profile.sample_lines_json ?? '[]'); } catch { return []; }
   })();
+
+  const assignedPreset = profile.preset_id
+    ? customPresets.find(p => p.id === profile.preset_id)
+    : undefined;
 
   return (
     <div className="group relative rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4 flex flex-col gap-3 hover:shadow-md dark:hover:shadow-zinc-900/50 transition-shadow">
@@ -75,9 +81,11 @@ const CastProfileCard: React.FC<CastProfileCardProps> = ({
             >
               {formatRole(profile.role)}
             </span>
-            {profile.voice_name && (
-              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
-                {profile.voice_name}
+            {(profile.voice_name || assignedPreset) && (
+              <span className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-semibold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                {assignedPreset
+                  ? <>★ {assignedPreset.name}</>  
+                  : profile.voice_name}
               </span>
             )}
           </div>

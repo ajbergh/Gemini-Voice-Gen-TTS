@@ -12,6 +12,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Play,
   Archive,
+  ArchiveRestore,
   BookOpen,
   Check,
   ChevronDown,
@@ -21,6 +22,7 @@ import {
   FileText,
   Layers,
   Loader2,
+  MoreHorizontal,
   Package,
   Pencil,
   Plus,
@@ -103,6 +105,7 @@ const PROJECT_KINDS: { value: ProjectKind; label: string }[] = [
 ];
 
 type WorkspaceMobileTab = 'script' | 'cast' | 'takes' | 'jobs' | 'review';
+type WorkspaceTab = 'script' | 'cast' | 'review' | 'timeline' | 'export';
 
 const MOBILE_TABS: { id: WorkspaceMobileTab; label: string; icon: React.ReactNode }[] = [
   { id: 'script', label: 'Script', icon: <FileText size={15} /> },
@@ -233,17 +236,16 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   // ---- pronunciation editor panel ----
   const [showPronunciation, setShowPronunciation] = useState(false);
 
-  // ---- cast board panel ----
-  const [showCastBoard, setShowCastBoard] = useState(false);
+  // ---- workspace content tab (Script / Cast / Review / Timeline / Export) ----
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTab>('script');
+  const [showOverflowMenu, setShowOverflowMenu] = useState(false);
 
-  // ---- review / QC panel ----
-  const [showReview, setShowReview] = useState(false);
-
-  // ---- timeline review panel ----
-  const [showTimeline, setShowTimeline] = useState(false);
-
-  // ---- export dialog ----
-  const [showExport, setShowExport] = useState(false);
+  // ---- sidebar: archived visibility + per-project context menu ----
+  const [showArchived, setShowArchived] = useState(false);
+  const [contextMenuProjectId, setContextMenuProjectId] = useState<number | null>(null);
+  const [renamingProjectId, setRenamingProjectId] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [savingRename, setSavingRename] = useState(false);
 
   // ---- project settings panel ----
   const [showProjectSettings, setShowProjectSettings] = useState(false);
@@ -267,6 +269,16 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
   const draftCount = useMemo(
     () => segments.filter(s => s.status === 'draft').length,
+    [segments],
+  );
+
+  const renderedCount = useMemo(
+    () => segments.filter(s => s.status === 'rendered' || s.status === 'approved').length,
+    [segments],
+  );
+
+  const approvedCount = useMemo(
+    () => segments.filter(s => s.status === 'approved').length,
     [segments],
   );
 
@@ -382,6 +394,19 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     });
   }, [selectedProjectId, subscribeToProgress, loadProjectContents]);
 
+  // Dismiss project context menu on outside click.
+  useEffect(() => {
+    if (contextMenuProjectId === null) return;
+    const handler = (e: MouseEvent) => {
+      // Don't dismiss if the click was on the ⋯ button or inside the menu.
+      const target = e.target as HTMLElement;
+      if (target.closest('[role="menu"]') || target.closest('[aria-label="Project options"]')) return;
+      setContextMenuProjectId(null);
+    };
+    window.addEventListener('click', handler);
+    return () => window.removeEventListener('click', handler);
+  }, [contextMenuProjectId]);
+
   // ---------------------------------------------------------------------------
   // Project selection with config persistence
   // ---------------------------------------------------------------------------
@@ -396,6 +421,10 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     setEditingSegmentId(null);
     setEditingSectionId(null);
     setMobileTab('script');
+    setActiveWorkspaceTab('script');
+    setShowOverflowMenu(false);
+    setContextMenuProjectId(null);
+    setRenamingProjectId(null);
     updateConfig({ [CONFIG_KEYS.LAST_OPEN_PROJECT_ID]: String(id) }).catch(() => {});
   }, []);
 
@@ -448,6 +477,47 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     }
   };
 
+  const handleUnarchiveProject = async (project: ScriptProject) => {
+    try {
+      await updateProject(project.id, { ...project, status: 'active' });
+      await refreshProjects();
+      showToast('Project unarchived', 'success');
+    } catch (err: any) {
+      showToast(err?.message ?? 'Failed to unarchive project.', 'error');
+    }
+  };
+
+  const handleSaveRename = async (project: ScriptProject) => {
+    const title = renameValue.trim();
+    if (!title) return;
+    setSavingRename(true);
+    try {
+      await updateProject(project.id, { ...project, title });
+      setProjects(prev => prev.map(p => p.id === project.id ? { ...p, title } : p));
+      setRenamingProjectId(null);
+      showToast('Project renamed', 'success');
+    } catch (err: any) {
+      showToast(err?.message ?? 'Failed to rename project.', 'error');
+    } finally {
+      setSavingRename(false);
+    }
+  };
+
+  const handleArchiveFromMenu = async (project: ScriptProject) => {
+    setContextMenuProjectId(null);
+    setArchiving(true);
+    try {
+      await archiveProject(project.id);
+      await refreshProjects();
+      if (selectedProjectId === project.id) setSelectedProjectId(null);
+      showToast('Project archived', 'success');
+    } catch (err: any) {
+      showToast(err?.message ?? 'Failed to archive project.', 'error');
+    } finally {
+      setArchiving(false);
+    }
+  };
+
   const handleSaveProjectSettings = async () => {
     if (!selectedProject) return;
     setSavingSettings(true);
@@ -484,15 +554,29 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     if (!title || !selectedProjectId) return;
     setSavingSection(true);
     try {
-      await createProjectSection(selectedProjectId, {
+      const { id } = await createProjectSection(selectedProjectId, {
         title,
         kind: 'chapter',
         sort_order: sections.length,
       });
-      await loadProjectContents(selectedProjectId);
+      // Optimistic update: immediately add to local state so stats + list update instantly
+      const now = new Date().toISOString();
+      const newSection: ScriptSection = {
+        id,
+        project_id: selectedProjectId,
+        title,
+        kind: 'chapter',
+        sort_order: sections.length,
+        created_at: now,
+        updated_at: now,
+      };
+      setSections(prev => [...prev, newSection]);
+      setExpandedSections(prev => { const n = new Set(prev); n.add(id); return n; });
       setNewSectionTitle('');
       setShowAddSection(false);
       showToast('Section added', 'success');
+      // Background sync to pick up any server-side defaults
+      loadProjectContents(selectedProjectId).catch(() => {});
     } catch (err: any) {
       showToast(err?.message ?? 'Failed to add section.', 'error');
     } finally {
@@ -538,16 +622,32 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     setSavingSegment(true);
     try {
       const sectionSegments = segmentsBySection.get(sectionId) ?? [];
-      await createProjectSegment(selectedProjectId, {
+      const { id } = await createProjectSegment(selectedProjectId, {
         script_text: text,
         section_id: sectionId ?? undefined,
         status: 'draft' as SegmentStatus,
         sort_order: sectionSegments.length,
       });
-      await loadProjectContents(selectedProjectId);
+      // Optimistic update: immediately add to local state so stats update instantly
+      const now = new Date().toISOString();
+      const newSegment: ScriptSegment = {
+        id,
+        project_id: selectedProjectId,
+        section_id: sectionId ?? undefined,
+        title: '',
+        script_text: text,
+        status: 'draft' as SegmentStatus,
+        content_hash: '',
+        sort_order: sectionSegments.length,
+        created_at: now,
+        updated_at: now,
+      };
+      setSegments(prev => [...prev, newSegment]);
       setNewSegmentText('');
       setAddingToSectionId(null);
       showToast('Segment added', 'success');
+      // Background sync to pick up server-side fields (content_hash, etc.)
+      loadProjectContents(selectedProjectId).catch(() => {});
     } catch (err: any) {
       showToast(err?.message ?? 'Failed to add segment.', 'error');
     } finally {
@@ -673,14 +773,11 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               onClick={() => {
                 setMobileTab(tab.id);
                 if (tab.id === 'cast') {
-                  setShowCastBoard(true);
-                  setShowReview(false);
+                  setActiveWorkspaceTab('cast');
                 } else if (tab.id === 'review') {
-                  setShowReview(true);
-                  setShowCastBoard(false);
+                  setActiveWorkspaceTab('review');
                 } else {
-                  setShowCastBoard(false);
-                  setShowReview(false);
+                  setActiveWorkspaceTab('script');
                 }
               }}
               className={`flex h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors ${
@@ -754,7 +851,7 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               className="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
             >
               <Wrench size={14} />
-              <span className="hidden sm:inline">Script Reader</span>
+              <span className="hidden sm:inline">Quick Script</span>
             </button>
             <button
               type="button"
@@ -799,38 +896,179 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             </div>
           </form>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-2">
+          <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-1">
             {loadingProjects ? (
               <div className="flex items-center justify-center py-10 text-zinc-400">
                 <Loader2 size={22} className="animate-spin" />
               </div>
-            ) : projects.length === 0 ? (
+            ) : projects.filter(p => p.status !== 'archived').length === 0 && projects.filter(p => p.status === 'archived').length === 0 ? (
               <p className="py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">No projects yet.</p>
             ) : (
-              projects.map(project => {
-                const active = project.id === selectedProjectId;
-                return (
-                  <button
-                    key={project.id}
-                    onClick={() => selectProject(project.id)}
-                    className={`w-full rounded-lg border p-3 text-left transition-colors ${
-                      active
-                        ? 'border-[var(--accent-400)] bg-[var(--accent-50)] dark:border-[var(--accent-600)] dark:bg-zinc-900'
-                        : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{project.title}</p>
-                        <p className="mt-1 text-xs capitalize text-zinc-500 dark:text-zinc-400">{formatKind(project.kind)}</p>
+              <>
+                {projects.filter(p => p.status !== 'archived').map(project => {
+                  const active = project.id === selectedProjectId;
+                  const isRenaming = renamingProjectId === project.id;
+                  const hasMenu = contextMenuProjectId === project.id;
+                  const segCount = active ? segments.length : null;
+                  return (
+                    <div key={project.id} className="relative group">
+                      <div
+                        className={`rounded-lg border transition-colors ${
+                          active
+                            ? 'border-[var(--accent-400)] bg-[var(--accent-50)] dark:border-[var(--accent-600)] dark:bg-zinc-900'
+                            : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900'
+                        }`}
+                      >
+                        {isRenaming ? (
+                          <form
+                            onSubmit={e => { e.preventDefault(); handleSaveRename(project); }}
+                            className="p-3"
+                          >
+                            <input
+                              autoFocus
+                              value={renameValue}
+                              onChange={e => setRenameValue(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Escape') setRenamingProjectId(null); }}
+                              className="w-full rounded border border-[var(--accent-400)] bg-white dark:bg-zinc-900 px-2 py-0.5 text-sm font-semibold text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-[var(--accent-400)]"
+                              disabled={savingRename}
+                            />
+                            <p className="mt-1 text-[10px] text-zinc-400">Enter to save · Esc to cancel</p>
+                          </form>
+                        ) : (
+                          <div className="flex items-start gap-1">
+                            <button
+                              onClick={() => { setContextMenuProjectId(null); selectProject(project.id); }}
+                              className="min-w-0 flex-1 p-3 text-left"
+                              aria-current={active ? 'page' : undefined}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{project.title}</p>
+                                  <div className="mt-1 flex items-center gap-2">
+                                    <span className="text-xs capitalize text-zinc-500 dark:text-zinc-400">{formatKind(project.kind)}</span>
+                                    {segCount !== null && segCount > 0 && (
+                                      <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
+                                        {segCount} seg
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                            <button
+                              aria-label="Project options"
+                              onClick={e => { e.stopPropagation(); setContextMenuProjectId(hasMenu ? null : project.id); }}
+                              className={`mt-2 mr-1.5 shrink-0 rounded p-1 transition-colors ${
+                                hasMenu
+                                  ? 'text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800'
+                                  : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 opacity-0 group-hover:opacity-100 focus:opacity-100'
+                              }`}
+                            >
+                              <MoreHorizontal size={14} />
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      <span className="shrink-0 rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">
-                        {project.status}
-                      </span>
+                      {hasMenu && (
+                        <div
+                          className="absolute right-0 top-full z-40 mt-1 min-w-[160px] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xl py-1"
+                          role="menu"
+                        >
+                          <button
+                            role="menuitem"
+                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                            onClick={() => { setContextMenuProjectId(null); setRenamingProjectId(project.id); setRenameValue(project.title); }}
+                          >
+                            <Pencil size={14} />
+                            Rename
+                          </button>
+                          <button
+                            role="menuitem"
+                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-amber-600 dark:text-amber-400 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                            onClick={() => handleArchiveFromMenu(project)}
+                          >
+                            <Archive size={14} />
+                            Archive
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  </button>
-                );
-              })
+                  );
+                })}
+
+                {/* Archived projects toggle */}
+                {(() => {
+                  const archived = projects.filter(p => p.status === 'archived');
+                  if (archived.length === 0) return null;
+                  return (
+                    <div className="pt-2">
+                      <button
+                        onClick={() => setShowArchived(prev => !prev)}
+                        className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                      >
+                        <ChevronRight size={12} className={`transition-transform ${showArchived ? 'rotate-90' : ''}`} />
+                        {showArchived ? 'Hide archived' : `Show archived (${archived.length})`}
+                      </button>
+                      {showArchived && archived.map(project => {
+                        const active = project.id === selectedProjectId;
+                        const hasMenu = contextMenuProjectId === project.id;
+                        return (
+                          <div key={project.id} className="relative group mt-1">
+                            <div
+                              className={`flex items-start gap-1 w-full rounded-lg border transition-colors opacity-60 hover:opacity-100 ${
+                                active
+                                  ? 'border-[var(--accent-400)] bg-[var(--accent-50)] dark:border-[var(--accent-600)] dark:bg-zinc-900'
+                                  : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900'
+                              }`}
+                            >
+                              <button
+                                onClick={() => { setContextMenuProjectId(null); selectProject(project.id); }}
+                                className="min-w-0 flex-1 p-3 text-left"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{project.title}</p>
+                                    <p className="mt-1 text-xs capitalize text-zinc-500 dark:text-zinc-400">{formatKind(project.kind)}</p>
+                                  </div>
+                                  <span className="shrink-0 rounded-full bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
+                                    archived
+                                  </span>
+                                </div>
+                              </button>
+                              <button
+                                aria-label="Project options"
+                                onClick={e => { e.stopPropagation(); setContextMenuProjectId(hasMenu ? null : project.id); }}
+                                className={`mt-2 mr-1.5 shrink-0 rounded p-1 transition-colors ${
+                                  hasMenu
+                                    ? 'text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800'
+                                    : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 opacity-0 group-hover:opacity-100 focus:opacity-100'
+                                }`}
+                              >
+                                <MoreHorizontal size={14} />
+                              </button>
+                            </div>
+                            {hasMenu && (
+                              <div
+                                className="absolute right-0 top-full z-40 mt-1 min-w-[160px] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xl py-1"
+                                role="menu"
+                              >
+                                <button
+                                  role="menuitem"
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                                  onClick={() => { setContextMenuProjectId(null); handleUnarchiveProject(project); }}
+                                >
+                                  <ArchiveRestore size={14} />
+                                  Unarchive
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </>
             )}
           </div>
         </aside>
@@ -857,200 +1095,510 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             </div>
           ) : selectedProject ? (
             <div className="p-4 sm:p-6 space-y-6">
-              {/* Project header */}
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-zinc-100 dark:bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-600 dark:text-zinc-300">
-                      {formatKind(selectedProject.kind)}
-                    </span>
-                    <span className="rounded-full bg-zinc-100 dark:bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-600 dark:text-zinc-300">
-                      {selectedProject.status}
-                    </span>
-                  </div>
-                  <h3 className="text-2xl font-serif font-medium text-zinc-900 dark:text-white">{selectedProject.title}</h3>
-                  {selectedProject.default_voice_name && (
-                    <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                      Default voice: {selectedProject.default_voice_name}
-                    </p>
-                  )}
+              {/* Project title */}
+              <div className="min-w-0">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-zinc-100 dark:bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+                    {formatKind(selectedProject.kind)}
+                  </span>
+                  <span className="rounded-full bg-zinc-100 dark:bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+                    {selectedProject.status}
+                  </span>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSettingsVoice(selectedProject.default_voice_name ?? '');
-                      setSettingsLang(selectedProject.default_language_code ?? '');
-                      setSettingsProvider(selectedProject.default_provider ?? '');
-                      setSettingsModel(selectedProject.default_model ?? '');
-                      setSettingsFallbackProvider(selectedProject.fallback_provider ?? '');
-                      setSettingsFallbackModel(selectedProject.fallback_model ?? '');
-                      setSettingsStyleId(selectedProject.default_style_id ?? null);
-                      setShowProjectSettings(prev => !prev);
-                      if (showPronunciation) setShowPronunciation(false);
-                      if (showTimeline) setShowTimeline(false);
-                      if (showCastBoard) setShowCastBoard(false);
-                    }}
-                    className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors ${
-                      showProjectSettings
-                        ? 'border-[var(--accent-400)] bg-[var(--accent-50)] dark:border-[var(--accent-600)] dark:bg-zinc-900 text-[var(--accent-700)] dark:text-[var(--accent-200)]'
-                        : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                    }`}
-                  >
-                    <Settings size={14} />
-                    Settings
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowPronunciation(prev => !prev); if (showProjectSettings) setShowProjectSettings(false); if (showTimeline) setShowTimeline(false); if (showCastBoard) setShowCastBoard(false); }}
-                    className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors ${
-                      showPronunciation
-                        ? 'border-[var(--accent-400)] bg-[var(--accent-50)] dark:border-[var(--accent-600)] dark:bg-zinc-900 text-[var(--accent-700)] dark:text-[var(--accent-200)]'
-                        : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                    }`}
-                    title="Pronunciation dictionaries"
-                  >
-                    <BookOpen size={14} />
-                    Dicts
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowTimeline(prev => !prev); if (showProjectSettings) setShowProjectSettings(false); if (showPronunciation) setShowPronunciation(false); if (showCastBoard) setShowCastBoard(false); if (showReview) setShowReview(false); }}
-                    className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors ${
-                      showTimeline
-                        ? 'border-[var(--accent-400)] bg-[var(--accent-50)] dark:border-[var(--accent-600)] dark:bg-zinc-900 text-[var(--accent-700)] dark:text-[var(--accent-200)]'
-                        : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                    }`}
-                    title="Timeline review and export"
-                  >
-                    <Film size={14} />
-                    Timeline
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowCastBoard(prev => !prev); if (showProjectSettings) setShowProjectSettings(false); if (showPronunciation) setShowPronunciation(false); if (showTimeline) setShowTimeline(false); if (showReview) setShowReview(false); }}
-                    className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors ${
-                      showCastBoard
-                        ? 'border-[var(--accent-400)] bg-[var(--accent-50)] dark:border-[var(--accent-600)] dark:bg-zinc-900 text-[var(--accent-700)] dark:text-[var(--accent-200)]'
-                        : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                    }`}
-                    title="Cast bible"
-                  >
-                    <Users size={14} />
-                    Cast
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowReview(prev => !prev); if (showProjectSettings) setShowProjectSettings(false); if (showPronunciation) setShowPronunciation(false); if (showTimeline) setShowTimeline(false); if (showCastBoard) setShowCastBoard(false); }}
-                    className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors ${
-                      showReview
-                        ? 'border-[var(--accent-400)] bg-[var(--accent-50)] dark:border-[var(--accent-600)] dark:bg-zinc-900 text-[var(--accent-700)] dark:text-[var(--accent-200)]'
-                        : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                    }`}
-                    title="Review & QC"
-                  >
-                    <ClipboardCheck size={14} />
-                    Review
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowExport(true)}
-                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
-                    title="Export deliverable ZIP"
-                  >
-                    <Package size={14} />
-                    Export
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowScriptPrep(true)}
-                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
-                    title="AI script prep"
-                  >
-                    <Sparkles size={14} />
-                    Prep
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowImport(prev => !prev); setImportText(''); }}
-                    className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors ${
-                      showImport
-                        ? 'border-[var(--accent-400)] bg-[var(--accent-50)] dark:border-[var(--accent-600)] dark:bg-zinc-900 text-[var(--accent-700)] dark:text-[var(--accent-200)]'
-                        : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                    }`}
-                  >
-                    <Upload size={14} />
-                    Import text
-                  </button>
-                  <button
-                    type="button"
-                    disabled={batchRendering}
-                    onClick={async () => {
-                      if (!selectedProject) return;
-                      setBatchRendering(true);
-                      try {
-                        const res = await batchRenderProject(selectedProject.id);
-                        showToast(`Rendering ${res.segment_count} segment${res.segment_count === 1 ? '' : 's'} (job ${res.job_id})`, 'success');
-                      } catch (err: any) {
-                        showToast(err?.message ?? 'Batch render failed.', 'error');
-                      } finally {
-                        setBatchRendering(false);
-                      }
-                    }}
-                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors disabled:opacity-50"
-                  >
-                    {batchRendering ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-                    Render all
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleArchiveProject}
-                    disabled={archiving || selectedProject.status === 'archived'}
-                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors disabled:opacity-50"
-                  >
-                    {archiving ? <Loader2 size={14} className="animate-spin" /> : <Archive size={14} />}
-                    Archive
-                  </button>
+                <h3 className="text-2xl font-serif font-medium text-zinc-900 dark:text-white">{selectedProject.title}</h3>
+                {selectedProject.default_voice_name && (
+                  <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                    Default voice: {selectedProject.default_voice_name}
+                  </p>
+                )}
+
+                {/* Production stage indicator */}
+                {segments.length > 0 && (
+                  <div className="mt-3 flex items-center gap-1 overflow-x-auto pb-0.5">
+                    {[
+                      {
+                        label: 'Scripted',
+                        detail: `${segments.length} seg${segments.length !== 1 ? 's' : ''}`,
+                        done: true,
+                        active: false,
+                      },
+                      {
+                        label: 'Cast',
+                        detail: castProfiles.length > 0 ? `${castProfiles.length}` : null,
+                        done: castProfiles.length > 0,
+                        active: false,
+                      },
+                      {
+                        label: 'Rendered',
+                        detail: `${renderedCount}/${segments.length}`,
+                        done: renderedCount === segments.length,
+                        active: renderedCount > 0 && renderedCount < segments.length,
+                      },
+                      {
+                        label: 'Reviewed',
+                        detail: approvedCount > 0 ? `${approvedCount}/${renderedCount}` : null,
+                        done: approvedCount > 0 && approvedCount === renderedCount,
+                        active: approvedCount > 0 && approvedCount < renderedCount,
+                      },
+                      {
+                        label: 'Export ready',
+                        detail: null,
+                        done: draftCount === 0 && segments.length > 0,
+                        active: false,
+                      },
+                    ].map((stage, i, arr) => (
+                      <React.Fragment key={stage.label}>
+                        {i > 0 && (
+                          <ChevronRight size={10} className="shrink-0 text-zinc-300 dark:text-zinc-600" aria-hidden="true" />
+                        )}
+                        <span
+                          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+                            stage.done
+                              ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                              : stage.active
+                              ? 'bg-[var(--accent-100)] dark:bg-[var(--accent-900)]/40 text-[var(--accent-700)] dark:text-[var(--accent-300)]'
+                              : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500'
+                          }`}
+                        >
+                          {stage.done && <Check size={8} aria-hidden="true" />}
+                          {stage.label}
+                          {stage.detail && (
+                            <span className="opacity-60">{stage.detail}</span>
+                          )}
+                        </span>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Content tab bar */}
+              <div className="-mx-4 sm:-mx-6 px-4 sm:px-6 border-b border-zinc-200 dark:border-zinc-800">
+                <div className="flex items-center justify-between gap-2">
+                  <nav className="flex -mb-px" role="tablist" aria-label="Project workspace">
+                    {(
+                      [
+                        { id: 'script' as WorkspaceTab, label: 'Script', icon: <FileText size={13} /> },
+                        { id: 'cast' as WorkspaceTab, label: 'Cast', icon: <Users size={13} /> },
+                        { id: 'review' as WorkspaceTab, label: 'Review', icon: <ClipboardCheck size={13} /> },
+                        { id: 'timeline' as WorkspaceTab, label: 'Timeline', icon: <Film size={13} /> },
+                        { id: 'export' as WorkspaceTab, label: 'Export', icon: <Package size={13} /> },
+                      ]
+                    ).map(tab => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={activeWorkspaceTab === tab.id}
+                        onClick={() => setActiveWorkspaceTab(tab.id)}
+                        className={`inline-flex h-9 items-center gap-1.5 border-b-2 px-3 text-xs font-semibold transition-colors ${
+                          activeWorkspaceTab === tab.id
+                            ? 'border-[var(--accent-500)] text-[var(--accent-700)] dark:text-[var(--accent-300)]'
+                            : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-600'
+                        }`}
+                      >
+                        {tab.icon}
+                        <span className="hidden sm:inline">{tab.label}</span>
+                      </button>
+                    ))}
+                  </nav>
+                  <div className="flex items-center gap-1.5 pb-1">
+                    {activeWorkspaceTab === 'script' && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setShowScriptPrep(true)}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 px-2.5 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+                          title="AI script prep"
+                        >
+                          <Sparkles size={13} />
+                          <span className="hidden sm:inline">Prep</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowImport(prev => !prev); setImportText(''); }}
+                          className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors ${
+                            showImport
+                              ? 'border-[var(--accent-400)] bg-[var(--accent-50)] dark:border-[var(--accent-600)] dark:bg-zinc-900 text-[var(--accent-700)] dark:text-[var(--accent-200)]'
+                              : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'
+                          }`}
+                        >
+                          <Upload size={13} />
+                          <span className="hidden sm:inline">Import</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={batchRendering}
+                          onClick={async () => {
+                            if (!selectedProject) return;
+                            setBatchRendering(true);
+                            try {
+                              const res = await batchRenderProject(selectedProject.id);
+                              showToast(`Rendering ${res.segment_count} segment${res.segment_count === 1 ? '' : 's'} (job ${res.job_id})`, 'success');
+                            } catch (err: any) {
+                              showToast(err?.message ?? 'Batch render failed.', 'error');
+                            } finally {
+                              setBatchRendering(false);
+                            }
+                          }}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-[var(--accent-600)] px-2.5 text-xs font-semibold text-white hover:bg-zinc-800 dark:hover:bg-[var(--accent-500)] transition-colors disabled:opacity-50"
+                        >
+                          {batchRendering ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+                          <span className="hidden sm:inline">Render all</span>
+                        </button>
+                      </>
+                    )}
+                    {/* Overflow menu */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowOverflowMenu(prev => !prev)}
+                        aria-label="More actions"
+                        aria-haspopup="true"
+                        aria-expanded={showOverflowMenu}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+                      >
+                        <MoreHorizontal size={15} />
+                      </button>
+                      {showOverflowMenu && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setShowOverflowMenu(false)} />
+                          <div className="absolute right-0 top-full mt-1 z-20 w-48 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-lg py-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSettingsVoice(selectedProject.default_voice_name ?? '');
+                                setSettingsLang(selectedProject.default_language_code ?? '');
+                                setSettingsProvider(selectedProject.default_provider ?? '');
+                                setSettingsModel(selectedProject.default_model ?? '');
+                                setSettingsFallbackProvider(selectedProject.fallback_provider ?? '');
+                                setSettingsFallbackModel(selectedProject.fallback_model ?? '');
+                                setSettingsStyleId(selectedProject.default_style_id ?? null);
+                                setShowProjectSettings(prev => !prev);
+                                setShowPronunciation(false);
+                                setActiveWorkspaceTab('script');
+                                setShowOverflowMenu(false);
+                              }}
+                              className={`flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold transition-colors ${
+                                showProjectSettings
+                                  ? 'text-[var(--accent-700)] dark:text-[var(--accent-300)] bg-[var(--accent-50)] dark:bg-zinc-900'
+                                  : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'
+                              }`}
+                            >
+                              <Settings size={13} /> Project Settings
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowPronunciation(prev => !prev);
+                                setShowProjectSettings(false);
+                                setActiveWorkspaceTab('script');
+                                setShowOverflowMenu(false);
+                              }}
+                              className={`flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold transition-colors ${
+                                showPronunciation
+                                  ? 'text-[var(--accent-700)] dark:text-[var(--accent-300)] bg-[var(--accent-50)] dark:bg-zinc-900'
+                                  : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'
+                              }`}
+                            >
+                              <BookOpen size={13} /> Dictionaries
+                            </button>
+                            <div className="my-1 border-t border-zinc-100 dark:border-zinc-800" />
+                            <button
+                              type="button"
+                              onClick={() => { setShowOverflowMenu(false); handleArchiveProject(); }}
+                              disabled={archiving || selectedProject.status === 'archived'}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-40"
+                            >
+                              {archiving ? <Loader2 size={13} className="animate-spin" /> : <Archive size={13} />}
+                              Archive Project
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Project settings panel */}
-              {showProjectSettings && selectedProject && (
-                <ProjectSettingsPanel
-                  selectedProject={selectedProject}
-                  voices={voices}
-                  styles={styles}
-                  settingsVoice={settingsVoice}
-                  settingsLang={settingsLang}
-                  settingsProvider={settingsProvider}
-                  settingsModel={settingsModel}
-                  settingsFallbackProvider={settingsFallbackProvider}
-                  settingsFallbackModel={settingsFallbackModel}
-                  settingsStyleId={settingsStyleId}
-                  savingSettings={savingSettings}
-                  onChangeVoice={setSettingsVoice}
-                  onChangeLang={setSettingsLang}
-                  onChangeProvider={setSettingsProvider}
-                  onChangeModel={setSettingsModel}
-                  onChangeFallbackProvider={setSettingsFallbackProvider}
-                  onChangeFallbackModel={setSettingsFallbackModel}
-                  onChangeStyleId={setSettingsStyleId}
-                  onStyleCreated={s => setStyles(prev => [...prev, s])}
-                  onSave={handleSaveProjectSettings}
-                  onClose={() => setShowProjectSettings(false)}
-                />
+              {/* ── Script tab ─────────────────────────────────────── */}
+              {activeWorkspaceTab === 'script' && (
+                <>
+                  {/* Project settings panel */}
+                  {showProjectSettings && selectedProject && (
+                    <ProjectSettingsPanel
+                      selectedProject={selectedProject}
+                      voices={voices}
+                      styles={styles}
+                      settingsVoice={settingsVoice}
+                      settingsLang={settingsLang}
+                      settingsProvider={settingsProvider}
+                      settingsModel={settingsModel}
+                      settingsFallbackProvider={settingsFallbackProvider}
+                      settingsFallbackModel={settingsFallbackModel}
+                      settingsStyleId={settingsStyleId}
+                      savingSettings={savingSettings}
+                      onChangeVoice={setSettingsVoice}
+                      onChangeLang={setSettingsLang}
+                      onChangeProvider={setSettingsProvider}
+                      onChangeModel={setSettingsModel}
+                      onChangeFallbackProvider={setSettingsFallbackProvider}
+                      onChangeFallbackModel={setSettingsFallbackModel}
+                      onChangeStyleId={setSettingsStyleId}
+                      onStyleCreated={s => setStyles(prev => [...prev, s])}
+                      onSave={handleSaveProjectSettings}
+                      onClose={() => setShowProjectSettings(false)}
+                    />
+                  )}
+
+                  {/* Pronunciation editor panel */}
+                  {showPronunciation && selectedProject && (
+                    <PronunciationEditor
+                      projectId={selectedProject.id}
+                      onClose={() => setShowPronunciation(false)}
+                    />
+                  )}
+
+                  {showScriptPrep && selectedProject && (
+                    <ScriptPrepDialog
+                      projectId={selectedProject.id}
+                      projectKind={selectedProject.kind}
+                      onClose={() => setShowScriptPrep(false)}
+                      onApplied={async summary => {
+                        await loadProjectContents(selectedProject.id);
+                        showToast(
+                          `Applied ${summary.sections_created} section${summary.sections_created === 1 ? '' : 's'} and ${summary.segments_created} segment${summary.segments_created === 1 ? '' : 's'}.`,
+                          'success',
+                        );
+                      }}
+                    />
+                  )}
+
+                  {/* Import panel */}
+                  {showImport && (
+                    <ProjectImportPanel
+                      importText={importText}
+                      importing={importing}
+                      onChangeText={setImportText}
+                      onSubmit={handleImport}
+                      onFileImport={handleFileImport}
+                      onClose={() => { setShowImport(false); setImportText(''); }}
+                    />
+                  )}
+
+                  {/* Stats */}
+                  <ProjectStatsBar
+                    sectionCount={sections.length}
+                    segmentCount={segments.length}
+                    draftCount={draftCount}
+                  />
+
+                  {/* Sections and segments */}
+                  <section className="space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="text-sm font-bold text-zinc-900 dark:text-white">Sections &amp; Segments</h4>
+                      {loadingProjectData && <Loader2 size={16} className="animate-spin text-zinc-400" />}
+                    </div>
+
+                    <div className="space-y-2">
+                      {sections.map(section => (
+                        <SectionBlock
+                          key={section.id}
+                          section={section}
+                          sectionSegments={segmentsBySection.get(section.id) ?? []}
+                          projectId={selectedProjectId!}
+                          isExpanded={expandedSections.has(section.id)}
+                          editingSectionId={editingSectionId}
+                          editingSectionTitle={editingSectionTitle}
+                          editingSectionKind={editingSectionKind}
+                          savingSectionEdit={savingSectionEdit}
+                          addingToSectionId={addingToSectionId}
+                          newSegmentText={newSegmentText}
+                          savingSegment={savingSegment}
+                          editingSegmentId={editingSegmentId}
+                          editState={segmentEditState}
+                          savingSegmentEdit={savingSegmentEdit}
+                          renderingSegmentId={renderingSegmentId}
+                          castProfiles={castProfiles}
+                          voices={voices}
+                          styles={styles}
+                          statusBadge={statusBadge}
+                          defaultVoiceName={selectedProject?.default_voice_name}
+                          onToggle={id => setExpandedSections(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; })}
+                          onEditSection={s => { setEditingSectionId(s.id); setEditingSectionTitle(s.title); setEditingSectionKind(s.kind ?? 'chapter'); }}
+                          onCancelSectionEdit={() => setEditingSectionId(null)}
+                          onSaveSectionEdit={handleSaveSectionEdit}
+                          onDeleteSection={handleDeleteSection}
+                          onSectionTitleChange={setEditingSectionTitle}
+                          onSectionKindChange={setEditingSectionKind}
+                          onSetAddingToSection={setAddingToSectionId}
+                          onNewSegmentTextChange={setNewSegmentText}
+                          onAddSegment={handleAddSegment}
+                          onEditSegment={handleEditSegmentStart}
+                          onCancelSegmentEdit={() => setEditingSegmentId(null)}
+                          onSaveSegmentEdit={handleSaveSegmentEdit}
+                          onDeleteSegment={handleDeleteSegment}
+                          onReRenderSegment={async (seg) => {
+                            if (!selectedProjectId) return;
+                            setRenderingSegmentId(seg.id);
+                            try {
+                              await reRenderSegment(selectedProjectId, seg.id);
+                              showToast('Segment rendered', 'success');
+                              loadProjectContents(selectedProjectId);
+                            } catch (err: any) {
+                              showToast(err?.message ?? 'Render failed.', 'error');
+                            } finally {
+                              if (isMounted.current) setRenderingSegmentId(null);
+                            }
+                          }}
+                          onTakesChanged={() => loadProjectContents(selectedProjectId!)}
+                          onSegmentEditStateChange={patchSegmentEditState}
+                          onStyleCreated={s => setStyles(prev => [...prev, s])}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Unsectioned segments */}
+                    {(unsectionedSegments.length > 0 || addingToSectionId === 'unsectioned') && (
+                      <div className="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 p-3 space-y-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Unsectioned</p>
+                        {unsectionedSegments.map(seg => (
+                          <SegmentRow
+                            key={seg.id}
+                            segment={seg}
+                            projectId={selectedProjectId!}
+                            isEditing={editingSegmentId === seg.id}
+                            editState={segmentEditState}
+                            savingEdit={savingSegmentEdit}
+                            renderingId={renderingSegmentId}
+                            castProfiles={castProfiles}
+                            voices={voices}
+                            styles={styles}
+                            statusBadge={statusBadge}
+                            defaultVoiceName={selectedProject?.default_voice_name}
+                            onEdit={handleEditSegmentStart}
+                            onCancelEdit={() => setEditingSegmentId(null)}
+                            onSaveEdit={handleSaveSegmentEdit}
+                            onDelete={handleDeleteSegment}
+                            onReRender={async (s) => {
+                              if (!selectedProjectId) return;
+                              setRenderingSegmentId(s.id);
+                              try {
+                                await reRenderSegment(selectedProjectId, s.id);
+                                showToast('Segment rendered', 'success');
+                                loadProjectContents(selectedProjectId);
+                              } catch (err: any) {
+                                showToast(err?.message ?? 'Render failed.', 'error');
+                              } finally {
+                                if (isMounted.current) setRenderingSegmentId(null);
+                              }
+                            }}
+                            onTakesChanged={() => loadProjectContents(selectedProjectId!)}
+                            onEditStateChange={patchSegmentEditState}
+                            onStyleCreated={s => setStyles(prev => [...prev, s])}
+                          />
+                        ))}
+                        {/* Add unsectioned segment */}
+                        {addingToSectionId === 'unsectioned' ? (
+                          <form onSubmit={e => handleAddSegment(e, null)} className="mt-2 space-y-2">
+                            <textarea
+                              autoFocus rows={3} value={newSegmentText}
+                              onChange={e => setNewSegmentText(e.target.value)}
+                              placeholder="Enter segment text..."
+                              className="w-full resize-y rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
+                            />
+                            <div className="flex justify-end gap-2">
+                              <button type="button" onClick={() => setAddingToSectionId(null)}
+                                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors">
+                                Cancel
+                              </button>
+                              <button type="submit" disabled={savingSegment || !newSegmentText.trim()}
+                                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-[var(--accent-600)] px-3 text-xs font-semibold text-white hover:bg-zinc-700 dark:hover:bg-[var(--accent-500)] transition-colors disabled:opacity-50">
+                                {savingSegment ? <Loader2 size={12} className="animate-spin" /> : null} Add
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <button type="button"
+                            onClick={() => { setAddingToSectionId('unsectioned'); setNewSegmentText(''); }}
+                            className="w-full flex items-center gap-2 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 px-3 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors">
+                            <Plus size={12} /> Add segment
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Add section / add unsectioned segment buttons */}
+                    <div className="flex flex-wrap gap-2">
+                      {showAddSection ? (
+                        <form onSubmit={handleAddSection} className="flex w-full gap-2">
+                          <input
+                            autoFocus
+                            value={newSectionTitle}
+                            onChange={e => setNewSectionTitle(e.target.value)}
+                            placeholder="Section title"
+                            className="h-9 min-w-0 flex-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowAddSection(false)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-100 transition-colors"
+                          >
+                            <X size={14} />
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={savingSection || !newSectionTitle.trim()}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-900 dark:bg-[var(--accent-600)] text-white hover:bg-zinc-700 dark:hover:bg-[var(--accent-500)] transition-colors disabled:opacity-50"
+                          >
+                            {savingSection ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                          </button>
+                        </form>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => { setShowAddSection(true); setNewSectionTitle(''); }}
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 px-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
+                        >
+                          <Plus size={12} /> Add section
+                        </button>
+                      )}
+                      {!showAddSection && unsectionedSegments.length === 0 && addingToSectionId !== 'unsectioned' && (
+                        <button
+                          type="button"
+                          onClick={() => { setAddingToSectionId('unsectioned'); setNewSegmentText(''); }}
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 px-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
+                        >
+                          <Plus size={12} /> Add segment
+                        </button>
+                      )}
+                    </div>
+                  </section>
+                </>
               )}
 
-              {/* Pronunciation editor panel */}
-              {showPronunciation && selectedProject && (
-                <PronunciationEditor
+              {/* ── Cast tab ─────────────────────────────────────── */}
+              {activeWorkspaceTab === 'cast' && selectedProject && (
+                <CastBoard
                   projectId={selectedProject.id}
-                  onClose={() => setShowPronunciation(false)}
+                  voices={voices}
+                  customPresets={customPresets}
+                  onClose={() => setActiveWorkspaceTab('script')}
                 />
               )}
 
-              {/* Timeline review panel */}
-              {showTimeline && selectedProject && (
+              {/* ── Review tab ───────────────────────────────────── */}
+              {activeWorkspaceTab === 'review' && selectedProject && (
+                <ReviewMode
+                  project={selectedProject}
+                  onClose={() => setActiveWorkspaceTab('script')}
+                  isDarkMode={document.documentElement.classList.contains('dark')}
+                  inline
+                />
+              )}
+
+              {/* ── Timeline tab ─────────────────────────────────── */}
+              {activeWorkspaceTab === 'timeline' && selectedProject && (
                 <TimelineReview
                   projectId={selectedProject.id}
                   sections={sections}
@@ -1058,247 +1606,16 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                 />
               )}
 
-              {/* Cast bible panel */}
-              {showCastBoard && selectedProject && (
-                <CastBoard
-                  projectId={selectedProject.id}
-                  voices={voices}
-                  onClose={() => setShowCastBoard(false)}
-                />
-              )}
-
-              {/* Review / QC panel */}
-              {showReview && selectedProject && (
-                <ReviewMode
-                  project={selectedProject}
-                  onClose={() => setShowReview(false)}
-                  isDarkMode={document.documentElement.classList.contains('dark')}
-                />
-              )}
-
-              {/* Export dialog */}
-              {showExport && selectedProject && (
+              {/* ── Export tab ───────────────────────────────────── */}
+              {activeWorkspaceTab === 'export' && selectedProject && (
                 <ExportDialog
                   projectId={selectedProject.id}
-                  onClose={() => setShowExport(false)}
+                  onClose={() => setActiveWorkspaceTab('script')}
+                  totalSegments={segments.length}
+                  renderedSegments={renderedCount}
+                  inline
                 />
               )}
-
-              {showScriptPrep && selectedProject && (
-                <ScriptPrepDialog
-                  projectId={selectedProject.id}
-                  projectKind={selectedProject.kind}
-                  onClose={() => setShowScriptPrep(false)}
-                  onApplied={async summary => {
-                    await loadProjectContents(selectedProject.id);
-                    showToast(
-                      `Applied ${summary.sections_created} section${summary.sections_created === 1 ? '' : 's'} and ${summary.segments_created} segment${summary.segments_created === 1 ? '' : 's'}.`,
-                      'success',
-                    );
-                  }}
-                />
-              )}
-
-              {/* Import panel */}
-              {showImport && (
-                <ProjectImportPanel
-                  importText={importText}
-                  importing={importing}
-                  onChangeText={setImportText}
-                  onSubmit={handleImport}
-                  onFileImport={handleFileImport}
-                  onClose={() => { setShowImport(false); setImportText(''); }}
-                />
-              )}
-
-              {/* Stats */}
-              <ProjectStatsBar
-                sectionCount={sections.length}
-                segmentCount={segments.length}
-                draftCount={draftCount}
-              />
-
-              {/* Sections and segments */}
-              <section className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-sm font-bold text-zinc-900 dark:text-white">Sections &amp; Segments</h4>
-                  {loadingProjectData && <Loader2 size={16} className="animate-spin text-zinc-400" />}
-                </div>
-
-                <div className="space-y-2">
-                  {sections.map(section => (
-                    <SectionBlock
-                      key={section.id}
-                      section={section}
-                      sectionSegments={segmentsBySection.get(section.id) ?? []}
-                      projectId={selectedProjectId!}
-                      isExpanded={expandedSections.has(section.id)}
-                      editingSectionId={editingSectionId}
-                      editingSectionTitle={editingSectionTitle}
-                      editingSectionKind={editingSectionKind}
-                      savingSectionEdit={savingSectionEdit}
-                      addingToSectionId={addingToSectionId}
-                      newSegmentText={newSegmentText}
-                      savingSegment={savingSegment}
-                      editingSegmentId={editingSegmentId}
-                      editState={segmentEditState}
-                      savingSegmentEdit={savingSegmentEdit}
-                      renderingSegmentId={renderingSegmentId}
-                      castProfiles={castProfiles}
-                      voices={voices}
-                      styles={styles}
-                      statusBadge={statusBadge}
-                      defaultVoiceName={selectedProject?.default_voice_name}
-                      onToggle={id => setExpandedSections(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; })}
-                      onEditSection={s => { setEditingSectionId(s.id); setEditingSectionTitle(s.title); setEditingSectionKind(s.kind ?? 'chapter'); }}
-                      onCancelSectionEdit={() => setEditingSectionId(null)}
-                      onSaveSectionEdit={handleSaveSectionEdit}
-                      onDeleteSection={handleDeleteSection}
-                      onSectionTitleChange={setEditingSectionTitle}
-                      onSectionKindChange={setEditingSectionKind}
-                      onSetAddingToSection={setAddingToSectionId}
-                      onNewSegmentTextChange={setNewSegmentText}
-                      onAddSegment={handleAddSegment}
-                      onEditSegment={handleEditSegmentStart}
-                      onCancelSegmentEdit={() => setEditingSegmentId(null)}
-                      onSaveSegmentEdit={handleSaveSegmentEdit}
-                      onDeleteSegment={handleDeleteSegment}
-                      onReRenderSegment={async (seg) => {
-                        if (!selectedProjectId) return;
-                        setRenderingSegmentId(seg.id);
-                        try {
-                          await reRenderSegment(selectedProjectId, seg.id);
-                          showToast('Segment rendered', 'success');
-                          loadProjectContents(selectedProjectId);
-                        } catch (err: any) {
-                          showToast(err?.message ?? 'Render failed.', 'error');
-                        } finally {
-                          if (isMounted.current) setRenderingSegmentId(null);
-                        }
-                      }}
-                      onTakesChanged={() => loadProjectContents(selectedProjectId!)}
-                      onSegmentEditStateChange={patchSegmentEditState}
-                      onStyleCreated={s => setStyles(prev => [...prev, s])}
-                    />
-                  ))}
-                </div>
-
-                {/* Unsectioned segments */}
-                {(unsectionedSegments.length > 0 || addingToSectionId === 'unsectioned') && (
-                  <div className="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 p-3 space-y-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Unsectioned</p>
-                    {unsectionedSegments.map(seg => (
-                      <SegmentRow
-                        key={seg.id}
-                        segment={seg}
-                        projectId={selectedProjectId!}
-                        isEditing={editingSegmentId === seg.id}
-                        editState={segmentEditState}
-                        savingEdit={savingSegmentEdit}
-                        renderingId={renderingSegmentId}
-                        castProfiles={castProfiles}
-                        voices={voices}
-                        styles={styles}
-                        statusBadge={statusBadge}
-                        defaultVoiceName={selectedProject?.default_voice_name}
-                        onEdit={handleEditSegmentStart}
-                        onCancelEdit={() => setEditingSegmentId(null)}
-                        onSaveEdit={handleSaveSegmentEdit}
-                        onDelete={handleDeleteSegment}
-                        onReRender={async (s) => {
-                          if (!selectedProjectId) return;
-                          setRenderingSegmentId(s.id);
-                          try {
-                            await reRenderSegment(selectedProjectId, s.id);
-                            showToast('Segment rendered', 'success');
-                            loadProjectContents(selectedProjectId);
-                          } catch (err: any) {
-                            showToast(err?.message ?? 'Render failed.', 'error');
-                          } finally {
-                            if (isMounted.current) setRenderingSegmentId(null);
-                          }
-                        }}
-                        onTakesChanged={() => loadProjectContents(selectedProjectId!)}
-                        onEditStateChange={patchSegmentEditState}
-                        onStyleCreated={s => setStyles(prev => [...prev, s])}
-                      />
-                    ))}
-                    {/* Add unsectioned segment */}
-                    {addingToSectionId === 'unsectioned' ? (
-                      <form onSubmit={e => handleAddSegment(e, null)} className="mt-2 space-y-2">
-                        <textarea
-                          autoFocus rows={3} value={newSegmentText}
-                          onChange={e => setNewSegmentText(e.target.value)}
-                          placeholder="Enter segment text..."
-                          className="w-full resize-y rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-                        />
-                        <div className="flex justify-end gap-2">
-                          <button type="button" onClick={() => setAddingToSectionId(null)}
-                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors">
-                            Cancel
-                          </button>
-                          <button type="submit" disabled={savingSegment || !newSegmentText.trim()}
-                            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-[var(--accent-600)] px-3 text-xs font-semibold text-white hover:bg-zinc-700 dark:hover:bg-[var(--accent-500)] transition-colors disabled:opacity-50">
-                            {savingSegment ? <Loader2 size={12} className="animate-spin" /> : null} Add
-                          </button>
-                        </div>
-                      </form>
-                    ) : (
-                      <button type="button"
-                        onClick={() => { setAddingToSectionId('unsectioned'); setNewSegmentText(''); }}
-                        className="w-full flex items-center gap-2 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 px-3 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors">
-                        <Plus size={12} /> Add segment
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Add section / add unsectioned segment buttons */}
-                <div className="flex flex-wrap gap-2">
-                  {showAddSection ? (
-                    <form onSubmit={handleAddSection} className="flex w-full gap-2">
-                      <input
-                        autoFocus
-                        value={newSectionTitle}
-                        onChange={e => setNewSectionTitle(e.target.value)}
-                        placeholder="Section title"
-                        className="h-9 min-w-0 flex-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowAddSection(false)}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-100 transition-colors"
-                      >
-                        <X size={14} />
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={savingSection || !newSectionTitle.trim()}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-900 dark:bg-[var(--accent-600)] text-white hover:bg-zinc-700 dark:hover:bg-[var(--accent-500)] transition-colors disabled:opacity-50"
-                      >
-                        {savingSection ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                      </button>
-                    </form>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => { setShowAddSection(true); setNewSectionTitle(''); }}
-                      className="inline-flex h-9 items-center gap-2 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 px-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
-                    >
-                      <Plus size={12} /> Add section
-                    </button>
-                  )}
-                  {!showAddSection && unsectionedSegments.length === 0 && addingToSectionId !== 'unsectioned' && (
-                    <button
-                      type="button"
-                      onClick={() => { setAddingToSectionId('unsectioned'); setNewSegmentText(''); }}
-                      className="inline-flex h-9 items-center gap-2 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 px-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
-                    >
-                      <Plus size={12} /> Add segment
-                    </button>
-                  )}
-                </div>
-              </section>
             </div>
           ) : (
             <div className="flex min-h-full items-center justify-center p-6 text-center">

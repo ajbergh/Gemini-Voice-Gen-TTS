@@ -12,9 +12,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Mic, User, FileText, Clock, Settings, Sparkles, Sun, Moon, PanelLeftClose, PanelLeft, Palette, Contrast } from 'lucide-react';
+import { Mic, User, FolderOpen, FileText, Clock, Settings, Sparkles, Sun, Moon, PanelLeftClose, PanelLeft, Palette, Contrast, Activity, Loader2 } from 'lucide-react';
 
-export type AppSection = 'voices' | 'presets' | 'script' | 'history';
+export type AppSection = 'voices' | 'presets' | 'script' | 'scriptreader' | 'history';
 
 interface NavigationSidebarProps {
   activeSection: AppSection;
@@ -28,6 +28,10 @@ interface NavigationSidebarProps {
   onAccentChange?: (color: string) => void;
   highContrast?: boolean;
   onHighContrastChange?: (on: boolean) => void;
+  onOpenJobCenter?: () => void;
+  jobBadgeCount?: number;
+  hasActiveJob?: boolean;
+  activeJobPercent?: number;
 }
 
 interface NavItem {
@@ -60,6 +64,10 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   onAccentChange,
   highContrast = false,
   onHighContrastChange,
+  onOpenJobCenter,
+  jobBadgeCount = 0,
+  hasActiveJob = false,
+  activeJobPercent = 0,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -74,7 +82,8 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   const navItems: NavItem[] = [
     { id: 'voices', label: 'Voices', shortLabel: 'Voices', icon: <Mic size={20} /> },
     { id: 'presets', label: 'My Presets', shortLabel: 'Presets', icon: <User size={20} />, badge: customPresetCount > 0 ? customPresetCount : undefined },
-    { id: 'script', label: 'Script Reader', shortLabel: 'Script', icon: <FileText size={20} /> },
+    { id: 'script', label: 'Projects', shortLabel: 'Projects', icon: <FolderOpen size={20} /> },
+    { id: 'scriptreader', label: 'Script Reader', shortLabel: 'Script', icon: <FileText size={20} /> },
     { id: 'history', label: 'History', shortLabel: 'History', icon: <Clock size={20} /> },
   ];
 
@@ -260,6 +269,36 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
           >
             <Contrast size={18} />
             {!collapsed && <span>{highContrast ? 'High Contrast' : 'High Contrast'}</span>}
+          </button>
+        )}
+        {onOpenJobCenter && (
+          <button
+            onClick={onOpenJobCenter}
+            className={`w-full flex items-center gap-3 py-2 rounded-xl text-sm text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors ${
+              collapsed ? 'justify-center px-2' : 'px-3'
+            }`}
+            title="Job Center"
+          >
+            <span className="relative shrink-0 flex h-5 w-5 items-center justify-center">
+              {hasActiveJob
+                ? <Loader2 size={18} className="animate-spin text-[var(--accent-500)]" />
+                : <Activity size={18} />}
+              {jobBadgeCount > 0 && (
+                <span className="absolute -top-1 -right-2 min-w-[14px] h-3.5 px-0.5 flex items-center justify-center text-[9px] font-bold bg-red-500 text-white rounded-full">
+                  {jobBadgeCount}
+                </span>
+              )}
+            </span>
+            {!collapsed && (
+              <div className="flex flex-1 items-center gap-2 overflow-hidden">
+                <span className="truncate">Jobs</span>
+                {hasActiveJob && (
+                  <span className="ml-auto w-12 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700 shrink-0">
+                    <span className="block h-1 accent-bg" style={{ width: `${activeJobPercent}%` }} />
+                  </span>
+                )}
+              </div>
+            )}
           </button>
         )}
         <button

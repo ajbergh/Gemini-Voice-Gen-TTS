@@ -30,13 +30,14 @@ import NavigationSidebar, { AppSection } from './components/NavigationSidebar';
 import VoiceFinder from './components/VoiceFinder';
 import AiResultCard from './components/AiResultCard';
 import ProjectWorkspace from './components/ProjectWorkspace';
+import ScriptReaderModal from './components/ScriptReaderModal';
 import SettingsModal from './components/SettingsModal';
 import HistoryPanel from './components/HistoryPanel';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import MiniPlayer from './components/MiniPlayer';
 import CommandPalette from './components/CommandPalette';
 import OnboardingTour from './components/OnboardingTour';
-import JobCenter from './components/JobCenter';
+import JobCenter, { useJobBadge } from './components/JobCenter';
 import { FilterState, AiRecommendation, CustomPreset } from './types';
 import { Info, Sparkles, X } from 'lucide-react';
 import { getConfig, updateConfig, listPresets, deletePreset as apiDeletePreset, createPreset as apiCreatePreset, updatePreset as apiUpdatePreset, listFavorites, toggleFavorite as apiToggleFavorite, exportPresets as apiExportPresets, importPresets as apiImportPresets, reorderPresets as apiReorderPresets, regeneratePresetImage as apiRegeneratePresetImage } from './api';
@@ -101,6 +102,10 @@ const App: React.FC = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [showJobCenter, setShowJobCenter] = useState(false);
+
+  // Job badge data for sidebar
+  const { badgeCount: jobBadgeCount, hasActive: hasActiveJob, latestPercent: activeJobPercent } = useJobBadge();
 
   // --- View and theme state ---
   const [viewMode, setViewMode] = useState<'carousel' | 'grid'>('carousel');
@@ -757,6 +762,10 @@ const App: React.FC = () => {
         onAccentChange={setAccentColor}
         highContrast={highContrast}
         onHighContrastChange={setHighContrast}
+        onOpenJobCenter={() => setShowJobCenter(true)}
+        jobBadgeCount={jobBadgeCount}
+        hasActiveJob={hasActiveJob}
+        activeJobPercent={activeJobPercent}
       />
 
       {/* Main Content Area */}
@@ -772,6 +781,17 @@ const App: React.FC = () => {
         {activeSection === 'script' && (
           <div className="flex-1 overflow-hidden flex flex-col">
             <ProjectWorkspace
+              voices={VOICE_DATA}
+              customPresets={customPresets}
+              initialVoiceName={scriptVoiceName}
+              onClose={() => setActiveSection('voices')}
+              inline
+            />
+          </div>
+        )}
+        {activeSection === 'scriptreader' && (
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <ScriptReaderModal
               voices={VOICE_DATA}
               customPresets={customPresets}
               initialVoiceName={scriptVoiceName}
@@ -870,7 +890,7 @@ const App: React.FC = () => {
       )}
 
       {/* Floating mini-player */}
-      {!isModalOpen && <JobCenter />}
+      {!isModalOpen && <JobCenter open={showJobCenter} onClose={() => setShowJobCenter(false)} />}
       <MiniPlayer />
 
       {/* Command palette */}

@@ -14,13 +14,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Mic, X } from 'lucide-react';
 import { auditionCastProfile } from '../api';
-import { CastAuditionInput, CastProfile, Voice } from '../types';
+import { CastAuditionInput, CastProfile, CustomPreset, Voice } from '../types';
 import { useAudio } from './AudioProvider';
 import { useToast } from './ToastProvider';
 
 interface CastAuditionPanelProps {
   profile: CastProfile;
   voices: Voice[];
+  customPresets?: CustomPreset[];
   onClose: () => void;
 }
 
@@ -28,6 +29,7 @@ interface CastAuditionPanelProps {
 const CastAuditionPanel: React.FC<CastAuditionPanelProps> = ({
   profile,
   voices,
+  customPresets = [],
   onClose,
 }) => {
   const { showToast } = useToast();
@@ -44,7 +46,12 @@ const CastAuditionPanel: React.FC<CastAuditionPanelProps> = ({
   })();
 
   const [sampleText, setSampleText]       = useState(defaultSampleText || `Hello, my name is ${profile.name}.`);
-  const [voiceOverride, setVoiceOverride] = useState(profile.voice_name ?? '');
+  // voiceOverride encodes "stock:<name>", "preset:<id>" or ""
+  const [voiceOverride, setVoiceOverride] = useState<string>(() => {
+    if (profile.preset_id) return `preset:${profile.preset_id}`;
+    if (profile.voice_name) return `stock:${profile.voice_name}`;
+    return '';
+  });
   const [auditioning, setAuditioning]     = useState(false);
 
   // Escape key to close
@@ -66,9 +73,18 @@ const CastAuditionPanel: React.FC<CastAuditionPanelProps> = ({
     }
     setAuditioning(true);
     try {
+      // Decode voice selection
+      let resolvedVoiceName: string | undefined;
+      if (voiceOverride.startsWith('preset:')) {
+        const pid = parseInt(voiceOverride.slice(7), 10);
+        const preset = customPresets.find(p => p.id === pid);
+        resolvedVoiceName = preset?.voice_name;
+      } else if (voiceOverride.startsWith('stock:')) {
+        resolvedVoiceName = voiceOverride.slice(6) || undefined;
+      }
       const input: CastAuditionInput = {
         sample_text: sampleText.trim(),
-        voice_name:  voiceOverride || undefined,
+        voice_name:  resolvedVoiceName,
       };
       const res = await auditionCastProfile(profile.id, input);
       if (!isMounted.current) return;
@@ -138,9 +154,20 @@ const CastAuditionPanel: React.FC<CastAuditionPanelProps> = ({
               <option value="">
                 — Profile default ({profile.voice_name ?? 'project default'}) —
               </option>
-              {voices.map(v => (
-                <option key={v.name} value={v.name}>{v.name}</option>
-              ))}
+              {customPresets.length > 0 && (
+                <optgroup label="My Presets">
+                  {customPresets.map(p => (
+                    <option key={`preset:${p.id}`} value={`preset:${p.id}`}>
+                      {p.name} ({p.voice_name})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="Stock Voices">
+                {voices.map(v => (
+                  <option key={`stock:${v.name}`} value={`stock:${v.name}`}>{v.name}</option>
+                ))}
+              </optgroup>
             </select>
           </div>
 

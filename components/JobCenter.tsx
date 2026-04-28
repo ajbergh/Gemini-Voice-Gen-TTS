@@ -133,46 +133,36 @@ function JobRow({ job, onDismiss }: { job: JobRecord; onDismiss: (id: string) =>
   );
 }
 
-/** Render the floating job/progress center backed by persisted job state. */
-const JobCenter: React.FC = () => {
-  const { jobs, activeJobs, failedJobs, finishedJobs, clearFinished, dismissJob } = useJobs();
-  const [open, setOpen] = useState(false);
-
-  const recentJobs = useMemo(() => jobs.slice(0, 8), [jobs]);
+/** Hook for components that need to show a Jobs badge/indicator without rendering the full drawer. */
+export function useJobBadge() {
+  const { activeJobs, failedJobs } = useJobs();
   const badgeCount = failedJobs.length > 0 ? failedJobs.length : activeJobs.length;
   const latestActive = activeJobs[0];
-  const buttonPercent = latestActive ? clampPercent(latestActive.percent) : 0;
+  const latestPercent = latestActive ? clampPercent(latestActive.percent) : 0;
+  return {
+    badgeCount,
+    hasActive: activeJobs.length > 0,
+    hasFailed: failedJobs.length > 0,
+    latestPercent,
+  };
+}
+
+interface JobCenterProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+/** Render the job/progress drawer. Trigger button lives in the sidebar. */
+const JobCenter: React.FC<JobCenterProps> = ({ open, onClose }) => {
+  const { jobs, activeJobs, failedJobs, finishedJobs, clearFinished, dismissJob } = useJobs();
+
+  const recentJobs = useMemo(() => jobs.slice(0, 8), [jobs]);
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed right-4 top-4 z-[55] flex h-10 items-center gap-2 rounded-full border border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-900/90 px-3 text-sm font-semibold text-zinc-700 dark:text-zinc-200 shadow-lg backdrop-blur-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
-        aria-label="Open job center"
-      >
-        <span className="relative flex h-5 w-5 items-center justify-center">
-          {activeJobs.length > 0 ? (
-            <Loader2 size={18} className="animate-spin text-[var(--accent-500)]" />
-          ) : (
-            <Activity size={18} className={failedJobs.length > 0 ? 'text-red-500' : 'text-zinc-500 dark:text-zinc-300'} />
-          )}
-        </span>
-        <span className="hidden sm:inline">Jobs</span>
-        {badgeCount > 0 && (
-          <span className={`flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white ${failedJobs.length > 0 ? 'bg-red-500' : 'accent-bg'}`}>
-            {badgeCount}
-          </span>
-        )}
-        {activeJobs.length > 0 && (
-          <span className="hidden w-12 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800 sm:block">
-            <span className="block h-1 accent-bg" style={{ width: `${buttonPercent}%` }} />
-          </span>
-        )}
-      </button>
-
       {open && (
         <div className="fixed inset-0 z-[65]">
-          <div className="absolute inset-0 bg-zinc-950/30 backdrop-blur-sm xl:bg-transparent xl:backdrop-blur-0" onClick={() => setOpen(false)} />
+          <div className="absolute inset-0 bg-zinc-950/30 backdrop-blur-sm xl:bg-transparent xl:backdrop-blur-0" onClick={onClose} />
           <section
             className="absolute inset-x-3 top-3 bottom-16 xl:left-auto xl:right-4 xl:top-16 xl:bottom-4 xl:w-[390px] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-2xl overflow-hidden flex flex-col animate-slide-up"
             role="dialog"
@@ -200,7 +190,7 @@ const JobCenter: React.FC = () => {
                   </button>
                 )}
                 <button
-                  onClick={() => setOpen(false)}
+                  onClick={onClose}
                   className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors"
                   aria-label="Close job center"
                 >

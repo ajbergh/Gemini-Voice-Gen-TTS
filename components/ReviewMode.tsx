@@ -37,10 +37,12 @@ interface ReviewModeProps {
   project: ScriptProject;
   onClose: () => void;
   isDarkMode?: boolean;
+  /** When true, renders as an inline panel instead of a full-screen fixed overlay. */
+  inline?: boolean;
 }
 
 /** Render the modal review workflow for approving, flagging, and annotating takes. */
-export default function ReviewMode({ project, onClose, isDarkMode = false }: ReviewModeProps) {
+export default function ReviewMode({ project, onClose, isDarkMode = false, inline = false }: ReviewModeProps) {
   const { playUrl, stop, isPlaying } = useAudio();
 
   // ── Data ────────────────────────────────────────────────────────────────────
@@ -208,7 +210,12 @@ export default function ReviewMode({ project, onClose, isDarkMode = false }: Rev
   const panelBg = isDarkMode ? 'bg-zinc-950 text-zinc-100' : 'bg-zinc-50 text-zinc-900';
 
   return (
-    <div className={`fixed inset-0 z-40 flex flex-col ${panelBg}`} role="dialog" aria-modal="true" aria-label="Review Mode">
+    <div
+      className={inline ? `flex flex-col min-h-0 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden ${panelBg}` : `fixed inset-0 z-40 flex flex-col ${panelBg}`}
+      role={inline ? 'region' : 'dialog'}
+      aria-modal={inline ? undefined : true}
+      aria-label="Review Mode"
+    >
       {/* Header */}
       <div className={`flex items-center justify-between px-6 py-3 border-b ${isDarkMode ? 'border-zinc-800 bg-zinc-900' : 'border-zinc-200 bg-white'}`}>
         <h2 className="font-semibold text-base">Review — {project.title}</h2>

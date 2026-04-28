@@ -66,7 +66,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 {/* Left: Section title + AI Casting Button */}
                 <div className="flex items-center gap-2 sm:gap-4 shrink-0">
                     <h2 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-white capitalize whitespace-nowrap">
-                        {activeSection === 'voices' ? 'Voice Library' : 'My Presets'}
+                        {activeSection === 'voices' ? 'Voice Library' : activeSection === 'presets' ? 'My Presets' : 'Library'}
                     </h2>
 
                     <button 

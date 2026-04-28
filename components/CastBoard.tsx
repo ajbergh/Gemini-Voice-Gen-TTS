@@ -18,7 +18,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Plus, Users, X } from 'lucide-react';
 import { deleteCastProfile, listProjectCast } from '../api';
-import { CastProfile, CastRole, Voice } from '../types';
+import { CastProfile, CastRole, CustomPreset, Voice } from '../types';
 import { useToast } from './ToastProvider';
 import CastProfileCard from './CastProfileCard';
 import CastProfileEditor from './CastProfileEditor';
@@ -28,6 +28,7 @@ import CastContinuityWarnings from './CastContinuityWarnings';
 interface CastBoardProps {
   projectId: number;
   voices: Voice[];
+  customPresets?: CustomPreset[];
   onClose: () => void;
 }
 
@@ -62,7 +63,7 @@ const ROLE_LABELS: Record<CastRole, string> = {
 const ALWAYS_VISIBLE: Set<CastRole> = new Set(['narrator', 'protagonist']);
 
 /** Render the project cast board for managing character and narrator profiles. */
-const CastBoard: React.FC<CastBoardProps> = ({ projectId, voices, onClose }) => {
+const CastBoard: React.FC<CastBoardProps> = ({ projectId, voices, customPresets = [], onClose }) => {
   const { showToast } = useToast();
   const isMounted = useRef(true);
   useEffect(() => () => { isMounted.current = false; }, []);
@@ -228,6 +229,7 @@ const CastBoard: React.FC<CastBoardProps> = ({ projectId, voices, onClose }) => 
                     <CastProfileCard
                       key={profile.id}
                       profile={profile}
+                      customPresets={customPresets}
                       onEdit={p => { setEditorInitialRole(undefined); setEditingProfile(p); }}
                       onAudition={p => setAuditioningProfile(p)}
                       onDelete={handleDelete}
@@ -246,6 +248,7 @@ const CastBoard: React.FC<CastBoardProps> = ({ projectId, voices, onClose }) => 
           projectId={projectId}
           profile={editingProfile === 'new' ? undefined : editingProfile}
           voices={voices}
+          customPresets={customPresets}
           initialRole={editorInitialRole}
           onSave={handleEditorSave}
           onClose={() => setEditingProfile(null)}
@@ -257,6 +260,7 @@ const CastBoard: React.FC<CastBoardProps> = ({ projectId, voices, onClose }) => 
         <CastAuditionPanel
           profile={auditioningProfile}
           voices={voices}
+          customPresets={customPresets}
           onClose={() => setAuditioningProfile(null)}
         />
       )}

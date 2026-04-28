@@ -13,23 +13,30 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Download, Loader2, Package, X } from 'lucide-react';
-import { CONFIG_KEYS, downloadExport, getConfig, getExport, startExport } from '../api';
+import { Clock, Download, Loader2, Package, X } from 'lucide-react';
+import { CONFIG_KEYS, downloadExport, getConfig, getExport, listExports, startExport } from '../api';
 import { ExportJob } from '../types';
 import ExportProfilePicker from './ExportProfilePicker';
 
 interface ExportDialogProps {
   projectId: number;
   onClose: () => void;
+  /** When true, renders as an inline card without the backdrop overlay. */
+  inline?: boolean;
+  /** Total segments in the project. */
+  totalSegments?: number;
+  /** Segments with audio ready (rendered or approved status). */
+  renderedSegments?: number;
 }
 
 /** Render the deliverable export modal and job polling workflow. */
-export default function ExportDialog({ projectId, onClose }: ExportDialogProps) {
+export default function ExportDialog({ projectId, onClose, inline = false, totalSegments, renderedSegments }: ExportDialogProps) {
   const [profileId, setProfileId] = useState<number | null>(null);
   const [job, setJob] = useState<ExportJob | null>(null);
   const [starting, setStarting] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [priorExports, setPriorExports] = useState<ExportJob[]>([]);
 
   const isMounted = useRef(true);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -57,6 +64,17 @@ export default function ExportDialog({ projectId, onClose }: ExportDialogProps) 
     }).catch(() => {});
     return () => { mounted = false; };
   }, []);
+
+  // Load prior exports for this project.
+  useEffect(() => {
+    let mounted = true;
+    listExports(projectId).then(jobs => {
+      if (!mounted) return;
+      // Show most recent 3 completed jobs that aren't the current job.
+      setPriorExports(jobs.filter(j => j.status === 'complete').slice(0, 3));
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, [projectId]);
 
   // Focus trap
   useEffect(() => {
@@ -132,9 +150,9 @@ export default function ExportDialog({ projectId, onClose }: ExportDialogProps) 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
+      className={inline ? '' : 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm'}
+      role={inline ? undefined : 'dialog'}
+      aria-modal={inline ? undefined : true}
       aria-labelledby="export-dialog-title"
     >
       <div
@@ -175,6 +193,31 @@ export default function ExportDialog({ projectId, onClose }: ExportDialogProps) 
           </p>
         </div>
 
+        {/* Segment scope summary */}
+        {totalSegments !== undefined && renderedSegments !== undefined && (
+          <div className={`rounded-xl px-4 py-3 text-sm flex items-start gap-3 ${
+            renderedSegments === 0
+              ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300'
+              : renderedSegments === totalSegments
+              ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300'
+              : 'bg-zinc-50 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-300'
+          }`}>
+            <Package className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+            <div>
+              <p className="font-medium">
+                {renderedSegments} of {totalSegments} segment{totalSegments !== 1 ? 's' : ''} have audio
+              </p>
+              <p className="text-xs opacity-75 mt-0.5">
+                {renderedSegments === 0
+                  ? 'Render segments first before exporting.'
+                  : renderedSegments < totalSegments
+                  ? `${totalSegments - renderedSegments} segment${totalSegments - renderedSegments !== 1 ? 's' : ''} still need rendering — export will include only segments with audio.`
+                  : 'All segments are ready to export.'}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Status display */}
         {job && (
           <div
@@ -202,6 +245,43 @@ export default function ExportDialog({ projectId, onClose }: ExportDialogProps) 
           <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 rounded-xl px-4 py-3" role="alert">
             {error}
           </p>
+        )}
+
+        {/* Prior exports */}
+        {priorExports.length > 0 && !job && (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide flex items-center gap-1.5">
+              <Clock className="w-3 h-3" aria-hidden="true" />
+              Recent exports
+            </p>
+            <div className="flex flex-col gap-1">
+              {priorExports.map(prev => (
+                <div key={prev.id} className="flex items-center justify-between rounded-lg bg-zinc-50 dark:bg-zinc-800/50 px-3 py-2 gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">
+                      Export #{prev.id}
+                    </p>
+                    <p className="text-[10px] text-zinc-400">
+                      {new Date(prev.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      setDownloading(true);
+                      try { await downloadExport(prev.id); }
+                      catch (err) { if (isMounted.current) setError(err instanceof Error ? err.message : 'Download failed.'); }
+                      finally { if (isMounted.current) setDownloading(false); }
+                    }}
+                    disabled={downloading}
+                    className="shrink-0 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors disabled:opacity-50"
+                  >
+                    <Download className="w-3 h-3" aria-hidden="true" />
+                    Download
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Actions */}
