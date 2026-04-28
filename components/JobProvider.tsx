@@ -11,7 +11,7 @@
  */
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { ApiJob, connectProgress, getJobs, ProgressEvent } from '../api';
+import { ApiJob, connectProgress, getJobs, ProgressConnectionStatus, ProgressEvent } from '../api';
 import { useToast } from './ToastProvider';
 
 export interface JobRecord {
@@ -38,6 +38,7 @@ interface JobContextValue {
   failedJobs: JobRecord[];
   finishedJobs: JobRecord[];
   isConnected: boolean;
+  connectionStatus: ProgressConnectionStatus;
   dismissJob: (id: string) => void;
   clearFinished: () => void;
   /** Subscribe to raw progress events. Returns an unsubscribe function. */
@@ -138,7 +139,7 @@ function fromApiJob(job: ApiJob): JobRecord {
 export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { showToast } = useToast();
   const [jobsById, setJobsById] = useState<Record<string, JobRecord>>({});
-  const [isConnected, setIsConnected] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ProgressConnectionStatus>('connecting');
   const notifiedRef = useRef<Set<string>>(new Set());
   const progressSubscribersRef = useRef<Set<(event: ProgressEvent) => void>>(new Set());
 
@@ -168,7 +169,7 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const handleProgress = useCallback((event: ProgressEvent) => {
     const status = normalizeStatus(event.status);
     if (event.type === 'system') {
-      setIsConnected(status === 'connected');
+      setConnectionStatus(status === 'connected' ? 'connected' : 'disconnected');
       return;
     }
     // Forward raw event to any interested subscribers (e.g. ProjectWorkspace).
@@ -214,20 +215,25 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     let mounted = true;
-    getJobs(50).then(persisted => {
+    const refreshPersistedJobs = () => getJobs(50).then(persisted => {
       if (!mounted) return;
       setJobsById(prev => {
         const next = { ...prev };
         for (const job of persisted) {
-          next[job.id] = { ...fromApiJob(job), ...next[job.id] };
+          next[job.id] = { ...next[job.id], ...fromApiJob(job) };
         }
         return next;
       });
     }).catch(() => {});
 
-    const disconnect = connectProgress(handleProgress);
+    refreshPersistedJobs();
+    const pollTimer = window.setInterval(refreshPersistedJobs, 10000);
+    const disconnect = connectProgress(handleProgress, status => {
+      if (mounted) setConnectionStatus(status);
+    });
     return () => {
       mounted = false;
+      window.clearInterval(pollTimer);
       disconnect();
     };
   }, [handleProgress]);
@@ -240,17 +246,19 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const activeJobs = jobs.filter(isJobActive);
     const failedJobs = jobs.filter(isJobFailed);
     const finishedJobs = jobs.filter(isJobFinished);
+    const isConnected = connectionStatus === 'connected';
     return {
       jobs,
       activeJobs,
       failedJobs,
       finishedJobs,
       isConnected,
+      connectionStatus,
       dismissJob,
       clearFinished,
       subscribeToProgress,
     };
-  }, [jobs, isConnected, dismissJob, clearFinished, subscribeToProgress]);
+  }, [jobs, connectionStatus, dismissJob, clearFinished, subscribeToProgress]);
 
   return (
     <JobContext.Provider value={value}>

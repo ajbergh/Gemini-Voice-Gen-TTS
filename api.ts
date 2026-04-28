@@ -715,6 +715,8 @@ export interface ProgressEvent {
   error_code?: string;
 }
 
+export type ProgressConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
+
 /** Persisted job state returned by /api/jobs. */
 export interface ApiJob {
   id: string;
@@ -743,14 +745,25 @@ export async function getJobs(limit: number = 50): Promise<ApiJob[]> {
 }
 
 /** Connect to the WebSocket progress endpoint. Returns a cleanup function. */
-export function connectProgress(onEvent: (event: ProgressEvent) => void): () => void {
+export function connectProgress(
+  onEvent: (event: ProgressEvent) => void,
+  onStatusChange?: (status: ProgressConnectionStatus) => void,
+): () => void {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const url = `${protocol}//${window.location.host}/api/ws/progress`;
-  let ws: WebSocket | null = new WebSocket(url);
+  let ws: WebSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let stopped = false;
+  let hasConnected = false;
 
   const connect = () => {
+    if (stopped) return;
+    onStatusChange?.(hasConnected ? 'reconnecting' : 'connecting');
     ws = new WebSocket(url);
+    ws.onopen = () => {
+      hasConnected = true;
+      onStatusChange?.('connected');
+    };
     ws.onmessage = (e) => {
       try {
         const event = JSON.parse(e.data) as ProgressEvent;
@@ -758,22 +771,17 @@ export function connectProgress(onEvent: (event: ProgressEvent) => void): () => 
       } catch { /* ignore malformed */ }
     };
     ws.onclose = () => {
-      // Auto-reconnect after 3s
+      ws = null;
+      if (stopped) return;
+      onStatusChange?.('disconnected');
       reconnectTimer = setTimeout(connect, 3000);
     };
   };
 
-  ws.onmessage = (e) => {
-    try {
-      const event = JSON.parse(e.data) as ProgressEvent;
-      onEvent(event);
-    } catch { /* ignore */ }
-  };
-  ws.onclose = () => {
-    reconnectTimer = setTimeout(connect, 3000);
-  };
+  connect();
 
   return () => {
+    stopped = true;
     if (reconnectTimer) clearTimeout(reconnectTimer);
     if (ws) {
       ws.onclose = null;

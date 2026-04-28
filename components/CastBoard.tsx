@@ -29,7 +29,7 @@ interface CastBoardProps {
   projectId: number;
   voices: Voice[];
   customPresets?: CustomPreset[];
-  onClose: () => void;
+  onClose?: () => void;
 }
 
 type RoleGroup = {
@@ -159,14 +159,16 @@ const CastBoard: React.FC<CastBoardProps> = ({ projectId, voices, customPresets 
             <Plus size={13} />
             Add character
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-100 transition-colors"
-            aria-label="Close cast board"
-          >
-            <X size={14} />
-          </button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-100 transition-colors"
+              aria-label="Close cast board"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
       </div>
 

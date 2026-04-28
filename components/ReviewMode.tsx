@@ -35,7 +35,7 @@ import QcIssueDialog from './QcIssueDialog';
 
 interface ReviewModeProps {
   project: ScriptProject;
-  onClose: () => void;
+  onClose?: () => void;
   isDarkMode?: boolean;
   /** When true, renders as an inline panel instead of a full-screen fixed overlay. */
   inline?: boolean;
@@ -199,15 +199,18 @@ export default function ReviewMode({ project, onClose, isDarkMode = false, inlin
         case 'n': case 'N': e.preventDefault(); handleNext(); break;
         case 'p': case 'P': e.preventDefault(); handlePrev(); break;
         case 'm': case 'M': e.preventDefault(); setShowAddIssue(true); break;
-        case 'Escape': onClose(); break;
+        case 'Escape':
+          if (!inline && onClose) onClose();
+          break;
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isPlaying, handlePause, playCurrentTake, handleApprove, handleFlag, handleReplay, handleNext, handlePrev, onClose]);
+  }, [isPlaying, handlePause, playCurrentTake, handleApprove, handleFlag, handleReplay, handleNext, handlePrev, inline, onClose]);
 
   // ── Layout ───────────────────────────────────────────────────────────────────
   const panelBg = isDarkMode ? 'bg-zinc-950 text-zinc-100' : 'bg-zinc-50 text-zinc-900';
+  const ReviewContent: React.ElementType = inline ? 'div' : 'main';
 
   return (
     <div
@@ -219,9 +222,11 @@ export default function ReviewMode({ project, onClose, isDarkMode = false, inlin
       {/* Header */}
       <div className={`flex items-center justify-between px-6 py-3 border-b ${isDarkMode ? 'border-zinc-800 bg-zinc-900' : 'border-zinc-200 bg-white'}`}>
         <h2 className="font-semibold text-base">Review — {project.title}</h2>
-        <button onClick={onClose} aria-label="Close review mode" className={`p-1.5 rounded-lg ${isDarkMode ? 'hover:bg-zinc-800' : 'hover:bg-zinc-100'}`}>
-          <X size={18} />
-        </button>
+        {!inline && onClose && (
+          <button onClick={onClose} aria-label="Close review mode" className={`p-1.5 rounded-lg ${isDarkMode ? 'hover:bg-zinc-800' : 'hover:bg-zinc-100'}`}>
+            <X size={18} />
+          </button>
+        )}
       </div>
 
       {loadingData ? (
@@ -243,7 +248,7 @@ export default function ReviewMode({ project, onClose, isDarkMode = false, inlin
           </aside>
 
           {/* Center — main review area */}
-          <main className="flex-1 min-w-0 flex flex-col gap-4 p-3 sm:p-4 pb-28 sm:pb-4 overflow-y-auto">
+          <ReviewContent className="flex-1 min-w-0 flex flex-col gap-4 p-3 sm:p-4 pb-28 sm:pb-4 overflow-y-auto">
             {selectedSegment ? (
               <>
                 {/* Script text */}
@@ -291,7 +296,7 @@ export default function ReviewMode({ project, onClose, isDarkMode = false, inlin
                 Select a segment from the list.
               </div>
             )}
-          </main>
+          </ReviewContent>
         </div>
       )}
 

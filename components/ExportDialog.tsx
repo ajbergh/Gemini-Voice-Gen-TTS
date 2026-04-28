@@ -20,7 +20,7 @@ import ExportProfilePicker from './ExportProfilePicker';
 
 interface ExportDialogProps {
   projectId: number;
-  onClose: () => void;
+  onClose?: () => void;
   /** When true, renders as an inline card without the backdrop overlay. */
   inline?: boolean;
   /** Total segments in the project. */
@@ -45,12 +45,12 @@ export default function ExportDialog({ projectId, onClose, inline = false, total
 
   useEffect(() => {
     isMounted.current = true;
-    firstBtnRef.current?.focus();
+    if (!inline) firstBtnRef.current?.focus();
     return () => {
       isMounted.current = false;
       if (pollRef.current) clearTimeout(pollRef.current);
     };
-  }, []);
+  }, [inline]);
 
   useEffect(() => {
     let mounted = true;
@@ -78,6 +78,7 @@ export default function ExportDialog({ projectId, onClose, inline = false, total
 
   // Focus trap
   useEffect(() => {
+    if (inline || !onClose) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { onClose(); return; }
       if (e.key !== 'Tab' || !dialogRef.current) return;
@@ -97,7 +98,7 @@ export default function ExportDialog({ projectId, onClose, inline = false, total
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  }, [inline, onClose]);
 
   const pollJob = useCallback((jobId: number) => {
     const tick = async () => {
@@ -147,6 +148,17 @@ export default function ExportDialog({ projectId, onClose, inline = false, total
   const isRunning = job?.status === 'pending' || job?.status === 'running';
   const isComplete = job?.status === 'complete';
   const isFailed = job?.status === 'failed';
+  const hasSegmentCounts = typeof totalSegments === 'number' && typeof renderedSegments === 'number';
+  const safeTotalSegments = Math.max(0, totalSegments ?? 0);
+  const safeRenderedSegments = Math.max(0, Math.min(renderedSegments ?? 0, safeTotalSegments));
+  const hasNoProjectContent = hasSegmentCounts && safeTotalSegments === 0;
+  const hasNoRenderedAudio = hasSegmentCounts && safeTotalSegments > 0 && safeRenderedSegments === 0;
+  const hasPartialAudio = hasSegmentCounts && safeRenderedSegments > 0 && safeRenderedSegments < safeTotalSegments;
+  const startDisabledReason = hasNoProjectContent
+    ? 'Add at least one segment before exporting.'
+    : hasNoRenderedAudio
+    ? 'Render at least one segment before exporting.'
+    : null;
 
   return (
     <div
@@ -167,14 +179,16 @@ export default function ExportDialog({ projectId, onClose, inline = false, total
               Export Project
             </h2>
           </div>
-          <button
-            ref={firstBtnRef}
-            onClick={onClose}
-            aria-label="Close export dialog"
-            className="p-1.5 rounded-full text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          {!inline && onClose && (
+            <button
+              ref={firstBtnRef}
+              onClick={onClose}
+              aria-label="Close export dialog"
+              className="p-1.5 rounded-full text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Profile picker */}
@@ -194,24 +208,26 @@ export default function ExportDialog({ projectId, onClose, inline = false, total
         </div>
 
         {/* Segment scope summary */}
-        {totalSegments !== undefined && renderedSegments !== undefined && (
+        {hasSegmentCounts && (
           <div className={`rounded-xl px-4 py-3 text-sm flex items-start gap-3 ${
-            renderedSegments === 0
+            safeRenderedSegments === 0
               ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300'
-              : renderedSegments === totalSegments
+              : safeRenderedSegments === safeTotalSegments
               ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300'
               : 'bg-zinc-50 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-300'
           }`}>
             <Package className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
             <div>
               <p className="font-medium">
-                {renderedSegments} of {totalSegments} segment{totalSegments !== 1 ? 's' : ''} have audio
+                {safeRenderedSegments} of {safeTotalSegments} segment{safeTotalSegments !== 1 ? 's' : ''} have audio
               </p>
               <p className="text-xs opacity-75 mt-0.5">
-                {renderedSegments === 0
-                  ? 'Render segments first before exporting.'
-                  : renderedSegments < totalSegments
-                  ? `${totalSegments - renderedSegments} segment${totalSegments - renderedSegments !== 1 ? 's' : ''} still need rendering — export will include only segments with audio.`
+                {hasNoProjectContent
+                  ? 'Add script segments before exporting.'
+                  : hasNoRenderedAudio
+                  ? 'Render at least one segment before exporting.'
+                  : hasPartialAudio
+                  ? `${safeTotalSegments - safeRenderedSegments} segment${safeTotalSegments - safeRenderedSegments !== 1 ? 's' : ''} still need rendering. Export will include only segments with audio.`
                   : 'All segments are ready to export.'}
               </p>
             </div>
@@ -285,37 +301,47 @@ export default function ExportDialog({ projectId, onClose, inline = false, total
         )}
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-3 pt-1">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-full text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-          >
-            {isComplete ? 'Close' : 'Cancel'}
-          </button>
-
-          {!job && (
-            <button
-              onClick={handleStart}
-              disabled={starting}
-              className="flex items-center gap-2 px-5 py-2 rounded-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
-            >
-              {starting && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
-              {starting ? 'Starting\u2026' : 'Start Export'}
-            </button>
+        <div className="flex flex-col items-end gap-2 pt-1">
+          {startDisabledReason && !job && (
+            <p id="export-start-disabled-reason" className="text-xs font-medium text-amber-700 dark:text-amber-300">
+              {startDisabledReason}
+            </p>
           )}
+          <div className="flex items-center justify-end gap-3">
+            {!inline && onClose && (
+              <button
+                onClick={onClose}
+                className="px-4 py-2 rounded-full text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                {isComplete ? 'Close' : 'Cancel'}
+              </button>
+            )}
 
-          {isComplete && (
-            <button
-              onClick={handleDownload}
-              disabled={downloading}
-              className="flex items-center gap-2 px-5 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
-            >
-              {downloading
-                ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-                : <Download className="w-4 h-4" aria-hidden="true" />}
-              {downloading ? 'Downloading\u2026' : 'Download ZIP'}
-            </button>
-          )}
+            {!job && (
+              <button
+                onClick={handleStart}
+                disabled={starting || !!startDisabledReason}
+                aria-describedby={startDisabledReason ? 'export-start-disabled-reason' : undefined}
+                className="flex items-center gap-2 px-5 py-2 rounded-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
+              >
+                {starting && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+                {starting ? 'Starting\u2026' : 'Start Export'}
+              </button>
+            )}
+
+            {isComplete && (
+              <button
+                onClick={handleDownload}
+                disabled={downloading}
+                className="flex items-center gap-2 px-5 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
+              >
+                {downloading
+                  ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                  : <Download className="w-4 h-4" aria-hidden="true" />}
+                {downloading ? 'Downloading\u2026' : 'Download ZIP'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -115,6 +115,14 @@ const MOBILE_TABS: { id: WorkspaceMobileTab; label: string; icon: React.ReactNod
   { id: 'review', label: 'Review', icon: <ClipboardCheck size={15} /> },
 ];
 
+const WORKSPACE_TABS: { id: WorkspaceTab; label: string; icon: React.ReactNode }[] = [
+  { id: 'script', label: 'Script', icon: <FileText size={13} /> },
+  { id: 'cast', label: 'Cast', icon: <Users size={13} /> },
+  { id: 'review', label: 'Review', icon: <ClipboardCheck size={13} /> },
+  { id: 'timeline', label: 'Timeline', icon: <Film size={13} /> },
+  { id: 'export', label: 'Export', icon: <Package size={13} /> },
+];
+
 const STATUS_BADGE: Record<string, string> = {
   draft:     'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400',
   changed:   'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
@@ -135,6 +143,14 @@ function formatKind(kind: string): string {
 /** Return badge color classes for segment/project status values. */
 function statusBadge(status: string): string {
   return STATUS_BADGE[status] ?? STATUS_BADGE.draft;
+}
+
+function workspaceTabId(tab: WorkspaceTab): string {
+  return `project-tab-${tab}`;
+}
+
+function workspacePanelId(tab: WorkspaceTab): string {
+  return `project-panel-${tab}`;
 }
 
 /** Groups segments by section_id (null -> unsectioned). */
@@ -827,9 +843,13 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   // ---------------------------------------------------------------------------
 
   const unsectionedSegments = segmentsBySection.get(null) ?? [];
+  const showProjectSidebar = !isPhone || (mobileTab === 'script' && activeWorkspaceTab === 'script');
 
   return (
-    <div className={`flex-1 overflow-hidden bg-white dark:bg-zinc-950 flex flex-col ${isPhone ? 'pb-28' : ''}`}>
+    <div
+      className="flex-1 overflow-hidden bg-white dark:bg-zinc-950 flex flex-col"
+      style={isPhone ? { paddingBottom: 'calc(7rem + env(safe-area-inset-bottom))' } : undefined}
+    >
       {/* Header */}
       <header className="shrink-0 border-b border-zinc-200 dark:border-zinc-800 px-4 sm:px-6 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -869,7 +889,7 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       {/* Main layout: sidebar + content */}
       <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)]">
         {/* Sidebar */}
-        <aside className={`min-h-0 border-b xl:border-b-0 xl:border-r border-zinc-200 dark:border-zinc-800 flex-col ${isPhone && mobileTab !== 'script' ? 'hidden' : 'flex'}`}>
+        <aside className={`min-h-0 border-b xl:border-b-0 xl:border-r border-zinc-200 dark:border-zinc-800 flex-col ${showProjectSidebar ? 'flex' : 'hidden'}`}>
           <form onSubmit={handleCreateProject} className="shrink-0 border-b border-zinc-200 dark:border-zinc-800 p-4 space-y-3">
             <input
               value={newTitle}
@@ -1074,7 +1094,10 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
         </aside>
 
         {/* Content pane */}
-        <main className={`min-h-0 overflow-y-auto ${isPhone && mobileTab === 'script' ? 'border-t border-zinc-200 dark:border-zinc-800' : ''}`}>
+        <main
+          className={`min-h-0 overflow-y-auto ${isPhone ? 'pb-32' : ''} ${isPhone && mobileTab === 'script' ? 'border-t border-zinc-200 dark:border-zinc-800' : ''}`}
+          style={isPhone ? { scrollPaddingBottom: 'calc(7rem + env(safe-area-inset-bottom))' } : undefined}
+        >
           {error && (
             <div className="m-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-sm text-red-700 dark:text-red-300">
               {error}
@@ -1176,20 +1199,15 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               <div className="-mx-4 sm:-mx-6 px-4 sm:px-6 border-b border-zinc-200 dark:border-zinc-800">
                 <div className="flex items-center justify-between gap-2">
                   <nav className="flex -mb-px" role="tablist" aria-label="Project workspace">
-                    {(
-                      [
-                        { id: 'script' as WorkspaceTab, label: 'Script', icon: <FileText size={13} /> },
-                        { id: 'cast' as WorkspaceTab, label: 'Cast', icon: <Users size={13} /> },
-                        { id: 'review' as WorkspaceTab, label: 'Review', icon: <ClipboardCheck size={13} /> },
-                        { id: 'timeline' as WorkspaceTab, label: 'Timeline', icon: <Film size={13} /> },
-                        { id: 'export' as WorkspaceTab, label: 'Export', icon: <Package size={13} /> },
-                      ]
-                    ).map(tab => (
+                    {WORKSPACE_TABS.map(tab => (
                       <button
                         key={tab.id}
+                        id={workspaceTabId(tab.id)}
                         type="button"
                         role="tab"
                         aria-selected={activeWorkspaceTab === tab.id}
+                        aria-controls={workspacePanelId(tab.id)}
+                        tabIndex={activeWorkspaceTab === tab.id ? 0 : -1}
                         onClick={() => setActiveWorkspaceTab(tab.id)}
                         className={`inline-flex h-9 items-center gap-1.5 border-b-2 px-3 text-xs font-semibold transition-colors ${
                           activeWorkspaceTab === tab.id
@@ -1321,9 +1339,15 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                 </div>
               </div>
 
-              {/* ── Script tab ─────────────────────────────────────── */}
-              {activeWorkspaceTab === 'script' && (
-                <>
+              <section
+                id={workspacePanelId(activeWorkspaceTab)}
+                role="tabpanel"
+                aria-labelledby={workspaceTabId(activeWorkspaceTab)}
+                className="focus:outline-none"
+              >
+                {/* ── Script tab ─────────────────────────────────────── */}
+                {activeWorkspaceTab === 'script' && (
+                  <>
                   {/* Project settings panel */}
                   {showProjectSettings && selectedProject && (
                     <ProjectSettingsPanel
@@ -1574,48 +1598,46 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                       )}
                     </div>
                   </section>
-                </>
-              )}
+                  </>
+                )}
 
-              {/* ── Cast tab ─────────────────────────────────────── */}
-              {activeWorkspaceTab === 'cast' && selectedProject && (
-                <CastBoard
-                  projectId={selectedProject.id}
-                  voices={voices}
-                  customPresets={customPresets}
-                  onClose={() => setActiveWorkspaceTab('script')}
-                />
-              )}
+                {/* ── Cast tab ─────────────────────────────────────── */}
+                {activeWorkspaceTab === 'cast' && selectedProject && (
+                  <CastBoard
+                    projectId={selectedProject.id}
+                    voices={voices}
+                    customPresets={customPresets}
+                  />
+                )}
 
-              {/* ── Review tab ───────────────────────────────────── */}
-              {activeWorkspaceTab === 'review' && selectedProject && (
-                <ReviewMode
-                  project={selectedProject}
-                  onClose={() => setActiveWorkspaceTab('script')}
-                  isDarkMode={document.documentElement.classList.contains('dark')}
-                  inline
-                />
-              )}
+                {/* ── Review tab ───────────────────────────────────── */}
+                {activeWorkspaceTab === 'review' && selectedProject && (
+                  <ReviewMode
+                    project={selectedProject}
+                    isDarkMode={document.documentElement.classList.contains('dark')}
+                    inline
+                  />
+                )}
 
-              {/* ── Timeline tab ─────────────────────────────────── */}
-              {activeWorkspaceTab === 'timeline' && selectedProject && (
-                <TimelineReview
-                  projectId={selectedProject.id}
-                  sections={sections}
-                  segments={segments}
-                />
-              )}
+                {/* ── Timeline tab ─────────────────────────────────── */}
+                {activeWorkspaceTab === 'timeline' && selectedProject && (
+                  <TimelineReview
+                    projectId={selectedProject.id}
+                    sections={sections}
+                    segments={segments}
+                  />
+                )}
 
-              {/* ── Export tab ───────────────────────────────────── */}
-              {activeWorkspaceTab === 'export' && selectedProject && (
-                <ExportDialog
-                  projectId={selectedProject.id}
-                  onClose={() => setActiveWorkspaceTab('script')}
-                  totalSegments={segments.length}
-                  renderedSegments={renderedCount}
-                  inline
-                />
-              )}
+                {/* ── Export tab ───────────────────────────────────── */}
+                {activeWorkspaceTab === 'export' && selectedProject && (
+                  <ExportDialog
+                    projectId={selectedProject.id}
+                    totalSegments={segments.length}
+                    renderedSegments={renderedCount}
+                    inline
+                  />
+                )}
+              </section>
             </div>
           ) : (
             <div className="flex min-h-full items-center justify-center p-6 text-center">

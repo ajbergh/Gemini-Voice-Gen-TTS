@@ -154,9 +154,10 @@ interface JobCenterProps {
 
 /** Render the job/progress drawer. Trigger button lives in the sidebar. */
 const JobCenter: React.FC<JobCenterProps> = ({ open, onClose }) => {
-  const { jobs, activeJobs, failedJobs, finishedJobs, clearFinished, dismissJob } = useJobs();
+  const { jobs, activeJobs, failedJobs, finishedJobs, connectionStatus, clearFinished, dismissJob } = useJobs();
 
   const recentJobs = useMemo(() => jobs.slice(0, 8), [jobs]);
+  const showConnectionFallback = connectionStatus === 'disconnected' || connectionStatus === 'reconnecting';
 
   return (
     <>
@@ -198,6 +199,15 @@ const JobCenter: React.FC<JobCenterProps> = ({ open, onClose }) => {
                 </button>
               </div>
             </header>
+
+            {showConnectionFallback && (
+              <div className="border-b border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/25 px-4 py-2 text-xs font-medium text-amber-800 dark:text-amber-200">
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                  <span>Live progress disconnected. Job history will refresh periodically.</span>
+                </div>
+              </div>
+            )}
 
             <div className="flex-1 overflow-y-auto p-4">
               {recentJobs.length === 0 ? (

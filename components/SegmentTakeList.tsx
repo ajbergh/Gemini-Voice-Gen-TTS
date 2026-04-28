@@ -14,7 +14,7 @@
  * - Delete take button (confirm on second click).
  * - Reviewer notes: expand notes per take, add/delete notes inline.
  * - "Add take" entry: pre-fills from the parent segment's voice + speaker
- *   metadata so users can quickly re-render with a manual record path.
+ *   metadata for manually creating take records.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -195,9 +195,9 @@ const SegmentTakeList: React.FC<SegmentTakeListProps> = ({
       setAddTakeDuration('');
       setAddTakeStatus('rendered');
       onTakesChanged?.();
-      showToast('Take recorded', 'success');
+      showToast('Take added', 'success');
     } catch (err: any) {
-      showToast(err?.message ?? 'Failed to record take.', 'error');
+      showToast(err?.message ?? 'Failed to add take.', 'error');
     } finally {
       if (isMounted.current) setSavingTake(false);
     }
@@ -446,7 +446,7 @@ const SegmentTakeList: React.FC<SegmentTakeListProps> = ({
           {showAddTake ? (
             <form onSubmit={handleAddTake} className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-3 space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                Record take
+                Add take
               </p>
               <div className="flex flex-wrap gap-2">
                 <input
@@ -499,7 +499,7 @@ const SegmentTakeList: React.FC<SegmentTakeListProps> = ({
               onClick={() => setShowAddTake(true)}
               className="flex w-full items-center gap-1.5 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
             >
-              <Plus size={11} /> Record take
+              <Plus size={11} /> Add take
             </button>
           )}
         </div>
