@@ -24,6 +24,7 @@ interface SplitPaneProps {
   className?: string;
 }
 
+/** Render a resizable two-pane layout with persisted split width. */
 const SplitPane: React.FC<SplitPaneProps> = ({
   left,
   right,

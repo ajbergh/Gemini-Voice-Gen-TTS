@@ -28,6 +28,7 @@ interface Carousel3DProps {
   disabled?: boolean;
 }
 
+/** Render the interactive 3D-style stock voice carousel. */
 const Carousel3D: React.FC<Carousel3DProps> = ({ 
   voices, 
   activeIndex, 

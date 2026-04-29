@@ -51,6 +51,7 @@ function highlightScript(text: string): string {
     );
 }
 
+/** Render script text with matching pronunciation entries highlighted. */
 const ScriptHighlighter: React.FC<ScriptHighlighterProps> = ({ text, scrollTop = 0 }) => {
   return (
     <div

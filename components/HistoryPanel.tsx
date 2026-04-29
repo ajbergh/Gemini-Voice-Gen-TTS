@@ -15,7 +15,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Clock, Sparkles, Volume2, Trash2, Loader2, ChevronDown, Play, Square, Search, Calendar, Download } from 'lucide-react';
+import { X, Clock, Sparkles, Volume2, Trash2, Loader2, ChevronDown, Play, Square, Search, Calendar, Download, MessagesSquare } from 'lucide-react';
 import { getHistory, deleteHistoryEntry, clearHistory, getHistoryAudio, getHistoryExportUrl, HistoryEntry } from '../api';
 import BottomSheet from './BottomSheet';
 
@@ -25,10 +25,11 @@ interface HistoryPanelProps {
   inline?: boolean;
 }
 
+/** Render generation history with filters, playback, export, and deletion actions. */
 const HistoryPanel: React.FC<HistoryPanelProps> = ({ onClose, inline = false }) => {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'tts' | 'recommendation'>('all');
+  const [filter, setFilter] = useState<'all' | 'tts' | 'tts_multi' | 'recommendation'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [voiceFilter, setVoiceFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -253,13 +254,13 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ onClose, inline = false }) 
           {/* Filter tabs + Date toggle + Clear */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1">
-              {(['all', 'recommendation', 'tts'] as const).map(t => (
+              {(['all', 'recommendation', 'tts', 'tts_multi'] as const).map(t => (
                 <button
                   key={t}
                   onClick={() => setFilter(t)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filter === t ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
                 >
-                  {t === 'all' ? 'All' : t === 'recommendation' ? 'Recommendations' : 'TTS'}
+                  {t === 'all' ? 'All' : t === 'recommendation' ? 'Recommendations' : t === 'tts_multi' ? 'Dialogue' : 'TTS'}
                 </button>
               ))}
             </div>
@@ -374,12 +375,14 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ onClose, inline = false }) 
                 <Clock size={24} className="text-zinc-400" />
               </div>
               <p className="text-zinc-500 dark:text-zinc-400 text-sm">No history entries yet.</p>
-              <p className="text-zinc-400 dark:text-zinc-500 text-xs mt-1">Recommendations and TTS generations will appear here.</p>
+              <p className="text-zinc-400 dark:text-zinc-500 text-xs mt-1">Recommendations and audio generations will appear here.</p>
             </div>
           ) : (
             <div className="space-y-2">
               {entries.map(entry => {
                 const isExpanded = expandedId === entry.id;
+                const isAudioEntry = entry.type === 'tts' || entry.type === 'tts_multi';
+                const isDialogueEntry = entry.type === 'tts_multi';
 
                 return (
                   <div
@@ -391,8 +394,10 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ onClose, inline = false }) 
                       className="w-full flex items-center gap-3 p-4 text-left"
                       aria-expanded={isExpanded}
                     >
-                      <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${entry.type === 'tts' ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-violet-100 dark:bg-violet-900/30'}`}>
-                        {entry.type === 'tts' ? (
+                      <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${isAudioEntry ? isDialogueEntry ? 'bg-cyan-100 dark:bg-cyan-900/30' : 'bg-blue-100 dark:bg-blue-900/30' : 'bg-violet-100 dark:bg-violet-900/30'}`}>
+                        {isDialogueEntry ? (
+                          <MessagesSquare size={14} className="text-cyan-600 dark:text-cyan-400" />
+                        ) : entry.type === 'tts' ? (
                           <Volume2 size={14} className="text-blue-600 dark:text-blue-400" />
                         ) : (
                           <Sparkles size={14} className="text-violet-600 dark:text-violet-400" />
@@ -401,7 +406,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ onClose, inline = false }) 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-zinc-900 dark:text-white truncate">
-                            {entry.input_text?.substring(0, 60) || (entry.type === 'tts' ? 'TTS Generation' : 'Recommendation')}
+                            {entry.input_text?.substring(0, 60) || (isAudioEntry ? isDialogueEntry ? 'Dialogue Generation' : 'TTS Generation' : 'Recommendation')}
                             {entry.input_text && entry.input_text.length > 60 && '...'}
                           </span>
                           {entry.voice_name && (
@@ -420,12 +425,12 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ onClose, inline = false }) 
                         <div className="pt-3 space-y-2">
                           {entry.input_text && (
                             <div>
-                              <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{entry.type === 'tts' ? 'Script' : 'Query'}</p>
+                              <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{isAudioEntry ? 'Script' : 'Query'}</p>
                               <p className="text-sm text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 p-3 rounded-xl">{entry.input_text}</p>
                             </div>
                           )}
                           <div className="flex justify-between items-center pt-2">
-                            {entry.type === 'tts' && entry.audio_path && (
+                            {isAudioEntry && entry.audio_path && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); handlePlayAudio(entry.id); }}
                                 disabled={loadingAudioId === entry.id}
@@ -441,7 +446,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ onClose, inline = false }) 
                                 {playingId === entry.id ? 'Stop' : 'Play'}
                               </button>
                             )}
-                            {!(entry.type === 'tts' && entry.audio_path) && <div />}
+                            {!(isAudioEntry && entry.audio_path) && <div />}
                             <button
                               onClick={(e) => { e.stopPropagation(); handleDelete(entry.id); }}
                               disabled={deletingId === entry.id}

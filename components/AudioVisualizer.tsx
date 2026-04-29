@@ -26,6 +26,7 @@ const GOOGLE_COLORS = [
   '#0EBC5F', // Green
 ];
 
+/** Convert a hex color to RGB components for visualizer interpolation. */
 function hexToRgb(hex: string) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result ? {
@@ -35,10 +36,12 @@ function hexToRgb(hex: string) {
   } : { r: 0, g: 0, b: 0 };
 }
 
+/** Convert RGB components back to a hex color string. */
 function rgbToHex(r: number, g: number, b: number) {
   return "#" + ((1 << 24) + (Math.round(r) << 16) + (Math.round(g) << 8) + Math.round(b)).toString(16).slice(1);
 }
 
+/** Blend two hex colors by the supplied interpolation factor. */
 function interpolateColor(color1: string, color2: string, factor: number) {
   const rgb1 = hexToRgb(color1);
   const rgb2 = hexToRgb(color2);
@@ -50,6 +53,7 @@ function interpolateColor(color1: string, color2: string, factor: number) {
   return rgbToHex(r, g, b);
 }
 
+/** Render animated bars that indicate active audio playback. */
 const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ isPlaying, color = '#18181b' }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);

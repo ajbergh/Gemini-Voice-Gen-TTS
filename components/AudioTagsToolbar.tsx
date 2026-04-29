@@ -43,6 +43,7 @@ const CATEGORY_META: Record<AudioTagCategory, { label: string; pillBg: string; p
 
 const CATEGORIES: AudioTagCategory[] = ['style', 'emotion', 'action'];
 
+/** Render quick-insert controls for supported Gemini audio style tags. */
 const AudioTagsToolbar: React.FC<AudioTagsToolbarProps> = ({ onInsertTag }) => {
   const [expanded, setExpanded] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);

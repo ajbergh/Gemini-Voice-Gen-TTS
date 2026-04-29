@@ -29,6 +29,7 @@ import (
 	"github.com/ajbergh/gemini-voice-gen-tts/backend/internal/store"
 )
 
+// main wires CLI configuration, persistent storage, frontend assets, and HTTP lifecycle.
 func main() {
 	// Parse flags
 	port := flag.Int("port", 0, "HTTP server port (default: 8080)")

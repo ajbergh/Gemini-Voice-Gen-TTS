@@ -32,6 +32,7 @@ interface PresetCardProps {
   onInlineEdit?: (id: number, data: { name?: string; system_instruction?: string }) => Promise<void>;
 }
 
+/** Decode cached preset audio from base64 PCM into bytes. */
 function decodeBase64(base64: string): Uint8Array {
   const binaryString = atob(base64);
   const len = binaryString.length;
@@ -42,6 +43,7 @@ function decodeBase64(base64: string): Uint8Array {
   return bytes;
 }
 
+/** Render one saved preset card with artwork, tags, playback, and edit actions. */
 const PresetCard: React.FC<PresetCardProps> = ({ preset, isPlaying, onPlayToggle, onEdit, onDelete, onDuplicate, onInlineEdit }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);

@@ -3,10 +3,9 @@
 
 // Package gemini implements a raw HTTP client for the Google Gemini API.
 //
-// It supports two operations: voice recommendation (using gemini-3-flash-preview
-// with structured JSON output) and text-to-speech generation (using
-// gemini-3.1-flash-tts-preview with AUDIO response modality). API key
-// validation is provided via a lightweight models.list call.
+// It supports voice recommendation, script formatting/prep, text-to-speech
+// generation, streaming TTS, multi-speaker TTS, and image generation for preset
+// headshots. API key validation is provided via a lightweight models.list call.
 package gemini
 
 import (
@@ -73,6 +72,7 @@ type ttsResponseEnvelope struct {
 	} `json:"promptFeedback"`
 }
 
+// summarizeTTSResponseText compacts non-audio Gemini responses for diagnostics.
 func summarizeTTSResponseText(text string) string {
 	text = strings.Join(strings.Fields(text), " ")
 	if len(text) > 160 {
@@ -81,6 +81,7 @@ func summarizeTTSResponseText(text string) string {
 	return text
 }
 
+// parseTTSAudioResponse extracts the first inline audio part or returns diagnostics.
 func parseTTSAudioResponse(body []byte) (string, string, error) {
 	var envelope ttsResponseEnvelope
 	if err := json.Unmarshal(body, &envelope); err != nil {
@@ -125,6 +126,7 @@ func parseTTSAudioResponse(body []byte) (string, string, error) {
 	return "", strings.Join(diagnostics, "; "), nil
 }
 
+// parseImageResponse extracts a generated image and preserves text-only diagnostics.
 func parseImageResponse(body []byte) ([]byte, string, string, error) {
 	var envelope ttsResponseEnvelope
 	if err := json.Unmarshal(body, &envelope); err != nil {
@@ -188,6 +190,7 @@ func parseImageResponse(body []byte) ([]byte, string, string, error) {
 }
 
 // resolveTTSModel returns a validated TTS model name or the default.
+// resolveTTSModel accepts allowed frontend overrides and falls back to the default.
 func resolveTTSModel(model string) string {
 	if model != "" && allowedTTSModels[model] {
 		return model
@@ -196,6 +199,7 @@ func resolveTTSModel(model string) string {
 }
 
 // resolveImageModel returns a validated image model name or the default.
+// resolveImageModel accepts allowed image-model overrides and falls back to the default.
 func resolveImageModel(model string) string {
 	if model != "" && allowedImageModels[model] {
 		return model
@@ -796,4 +800,170 @@ Rules:
 	}
 
 	return geminiResp.Candidates[0].Content.Parts[0].Text, nil
+}
+
+// PrepareScriptForNarration analyses a raw script and returns a structured
+// draft: proposed sections/segments, detected speakers, pronunciation
+// candidates, style suggestions, and warnings. The caller stores the raw
+// result_json for creator review before any content is applied to the project.
+func (c *Client) PrepareScriptForNarration(rawScript string, opts ScriptPrepOptions) (*ScriptPrepResult, error) {
+	projectKind := opts.ProjectKind
+	if projectKind == "" {
+		projectKind = "audiobook"
+	}
+
+	var optionsBullets strings.Builder
+	if opts.DetectSpeakers {
+		optionsBullets.WriteString("- Detect distinct speakers and assign consistent labels (e.g. \"NARRATOR\", \"ALICE\", \"BOB\").\n")
+	}
+	if opts.SuggestPronunciations {
+		optionsBullets.WriteString("- Identify unusual words, proper nouns, and technical terms that may need pronunciation guidance.\n")
+	}
+	if opts.SuggestStyles {
+		optionsBullets.WriteString("- Suggest narration styles for sections (e.g. \"Calm Narration\", \"Suspense\", \"Energetic\").\n")
+	}
+	maxLen := opts.MaxSegmentLength
+	if maxLen <= 0 {
+		maxLen = 500
+	}
+
+	prompt := fmt.Sprintf(`You are an expert audiobook and voiceover script structuring assistant.
+
+Project type: %s
+
+Your task is to analyse the following raw script and return a structured production plan.
+
+Rules:
+1. NEVER alter the original text — only split and label it.
+2. Break the text into logical sections (chapters, scenes) and segments (paragraphs, dialogue lines).
+3. Keep each segment under %d characters where natural paragraph breaks allow.
+4. For each segment, preserve the original text exactly.
+%s
+5. Return your response as a strict JSON object matching the schema provided.
+
+Raw Script:
+---
+%s
+---`, projectKind, maxLen, optionsBullets.String(), rawScript)
+
+	responseSchema := map[string]any{
+		"type": "OBJECT",
+		"properties": map[string]any{
+			"sections": map[string]any{
+				"type": "ARRAY",
+				"items": map[string]any{
+					"type": "OBJECT",
+					"properties": map[string]any{
+						"title": map[string]any{"type": "STRING"},
+						"kind":  map[string]any{"type": "STRING"},
+						"segments": map[string]any{
+							"type": "ARRAY",
+							"items": map[string]any{
+								"type": "OBJECT",
+								"properties": map[string]any{
+									"script_text":   map[string]any{"type": "STRING"},
+									"speaker_label": map[string]any{"type": "STRING"},
+									"confidence":    map[string]any{"type": "NUMBER"},
+								},
+							},
+						},
+					},
+				},
+			},
+			"speaker_candidates": map[string]any{
+				"type": "ARRAY",
+				"items": map[string]any{
+					"type": "OBJECT",
+					"properties": map[string]any{
+						"label":       map[string]any{"type": "STRING"},
+						"occurrences": map[string]any{"type": "INTEGER"},
+						"sample_lines": map[string]any{
+							"type":  "ARRAY",
+							"items": map[string]any{"type": "STRING"},
+						},
+					},
+				},
+			},
+			"pronunciation_candidates": map[string]any{
+				"type": "ARRAY",
+				"items": map[string]any{
+					"type": "OBJECT",
+					"properties": map[string]any{
+						"word":     map[string]any{"type": "STRING"},
+						"phonetic": map[string]any{"type": "STRING"},
+						"notes":    map[string]any{"type": "STRING"},
+					},
+				},
+			},
+			"style_suggestions": map[string]any{
+				"type":  "ARRAY",
+				"items": map[string]any{"type": "STRING"},
+			},
+			"warnings": map[string]any{
+				"type":  "ARRAY",
+				"items": map[string]any{"type": "STRING"},
+			},
+		},
+	}
+
+	reqBody := map[string]any{
+		"contents": []map[string]any{
+			{
+				"parts": []map[string]any{
+					{"text": prompt},
+				},
+			},
+		},
+		"generationConfig": map[string]any{
+			"responseMimeType": "application/json",
+			"responseSchema":   responseSchema,
+			"temperature":      0.2,
+			"maxOutputTokens":  8192,
+		},
+	}
+
+	data, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/models/gemini-3-flash-preview:generateContent?key=%s", baseURL, c.apiKey)
+	resp, err := c.httpClient.Post(url, "application/json", bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		slog.Error("PrepareScriptForNarration API error", "status", resp.StatusCode, "body", string(body))
+		return nil, fmt.Errorf("Gemini API error (status %d)", resp.StatusCode)
+	}
+
+	var envelope struct {
+		Candidates []struct {
+			Content struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"content"`
+		} `json:"candidates"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, fmt.Errorf("parse response envelope: %w", err)
+	}
+	if len(envelope.Candidates) == 0 || len(envelope.Candidates[0].Content.Parts) == 0 {
+		return nil, fmt.Errorf("empty response from Gemini")
+	}
+
+	var result ScriptPrepResult
+	if err := json.Unmarshal([]byte(envelope.Candidates[0].Content.Parts[0].Text), &result); err != nil {
+		return nil, fmt.Errorf("parse script prep result: %w", err)
+	}
+
+	return &result, nil
 }

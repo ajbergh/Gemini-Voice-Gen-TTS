@@ -1,6 +1,8 @@
 // Copyright 2026 ajbergh
 // SPDX-License-Identifier: Apache-2.0
 
+// Package handler - preset_headshots.go manages preset metadata and generated
+// portrait/headshot cache files.
 package handler
 
 import (
@@ -45,6 +47,7 @@ type presetHeadshotMetadata struct {
 	Model       string `json:"model,omitempty"`
 }
 
+// parsePresetMetadata reads the optional metadata_json payload stored on presets.
 func parsePresetMetadata(raw *string) (presetMetadata, error) {
 	if raw == nil || strings.TrimSpace(*raw) == "" {
 		return presetMetadata{}, nil
@@ -57,6 +60,7 @@ func parsePresetMetadata(raw *string) (presetMetadata, error) {
 	return metadata, nil
 }
 
+// marshalPresetMetadata serializes metadata or returns nil when it has no content.
 func marshalPresetMetadata(metadata presetMetadata) (*string, error) {
 	if metadata.CastingDirector == nil && metadata.Headshot == nil {
 		return nil, nil
@@ -70,6 +74,7 @@ func marshalPresetMetadata(metadata presetMetadata) (*string, error) {
 	return &value, nil
 }
 
+// buildHeadshotPrompt converts casting metadata into the Gemini image prompt.
 func buildHeadshotPrompt(personDescription string) string {
 	description := strings.TrimSpace(personDescription)
 	description = strings.TrimRight(description, ".!?,;: ")
@@ -79,6 +84,7 @@ func buildHeadshotPrompt(personDescription string) string {
 	return "1:1 size. " + description + ". " + headshotPromptModifier
 }
 
+// safeHeadshotErrorMessage trims provider errors before persisting metadata.
 func safeHeadshotErrorMessage(err error) string {
 	if err == nil {
 		return ""
@@ -90,6 +96,7 @@ func safeHeadshotErrorMessage(err error) string {
 	return message
 }
 
+// applyHeadshotFailure records a failed image-generation attempt in metadata.
 func applyHeadshotFailure(metadata *presetMetadata, prompt string, err error) {
 	metadata.Headshot = &presetHeadshotMetadata{
 		Status: headshotStatusFailed,
@@ -98,6 +105,7 @@ func applyHeadshotFailure(metadata *presetMetadata, prompt string, err error) {
 	}
 }
 
+// applyHeadshotSuccess records the generated image details in preset metadata.
 func applyHeadshotSuccess(metadata *presetMetadata, prompt, mimeType, path string) {
 	metadata.Headshot = &presetHeadshotMetadata{
 		Status:      headshotStatusReady,
@@ -111,6 +119,7 @@ func applyHeadshotSuccess(metadata *presetMetadata, prompt, mimeType, path strin
 	}
 }
 
+// mergePresetMetadata preserves existing headshot data while updating casting context.
 func mergePresetMetadata(existing *string, sourceQuery, personDescription string) (presetMetadata, error) {
 	metadata, err := parsePresetMetadata(existing)
 	if err != nil {
@@ -134,6 +143,7 @@ func mergePresetMetadata(existing *string, sourceQuery, personDescription string
 	return metadata, nil
 }
 
+// imageExtensionForMimeType maps supported generated image MIME types to file extensions.
 func imageExtensionForMimeType(mimeType string) (string, error) {
 	baseType := strings.ToLower(strings.TrimSpace(strings.Split(mimeType, ";")[0]))
 	switch baseType {
@@ -148,6 +158,7 @@ func imageExtensionForMimeType(mimeType string) (string, error) {
 	}
 }
 
+// normalizeHeadshotMimeType trusts the provider MIME type when supported, then sniffs bytes.
 func normalizeHeadshotMimeType(mimeType string, imageBytes []byte) (string, string, error) {
 	baseType := strings.ToLower(strings.TrimSpace(strings.Split(mimeType, ";")[0]))
 	extension, err := imageExtensionForMimeType(baseType)
@@ -163,6 +174,7 @@ func normalizeHeadshotMimeType(mimeType string, imageBytes []byte) (string, stri
 	return detected, extension, nil
 }
 
+// cachePresetHeadshot validates and writes a generated preset image into the media cache.
 func cachePresetHeadshot(cacheDir, presetName, voiceName, mimeType string, imageBytes []byte) (string, string, error) {
 	if strings.TrimSpace(cacheDir) == "" {
 		return "", "", fmt.Errorf("cache directory is not configured")
@@ -190,6 +202,7 @@ func cachePresetHeadshot(cacheDir, presetName, voiceName, mimeType string, image
 	return filename, normalizedMimeType, nil
 }
 
+// headshotMetadataFromRaw extracts usable headshot metadata from metadata_json.
 func headshotMetadataFromRaw(raw *string) (*presetHeadshotMetadata, error) {
 	metadata, err := parsePresetMetadata(raw)
 	if err != nil {
@@ -201,6 +214,7 @@ func headshotMetadataFromRaw(raw *string) (*presetHeadshotMetadata, error) {
 	return metadata.Headshot, nil
 }
 
+// removePresetHeadshot deletes a cached headshot referenced by preset metadata.
 func removePresetHeadshot(cacheDir string, raw *string) error {
 	headshot, err := headshotMetadataFromRaw(raw)
 	if err != nil {
@@ -228,6 +242,7 @@ func portablePresetMetadata(raw *string) *string {
 	return portable
 }
 
+// buildPresetMetadata merges casting metadata and optionally generates a cached headshot.
 func (h *PresetsHandler) buildPresetMetadata(existing *string, sourceQuery, personDescription string, generateHeadshot bool, presetName, voiceName string) (*string, string, error) {
 	metadata, err := mergePresetMetadata(existing, sourceQuery, personDescription)
 	if err != nil {

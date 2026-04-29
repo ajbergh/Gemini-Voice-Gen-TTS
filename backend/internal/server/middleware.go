@@ -78,6 +78,7 @@ func originProtectionMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// requiresTrustedOrigin returns true for methods that can mutate local state.
 func requiresTrustedOrigin(method string) bool {
 	switch method {
 	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
@@ -87,6 +88,7 @@ func requiresTrustedOrigin(method string) bool {
 	}
 }
 
+// requestHasTrustedOrigin validates Origin or Referer when the browser sends one.
 func requestHasTrustedOrigin(r *http.Request) bool {
 	if origin := r.Header.Get("Origin"); origin != "" {
 		return isLocalhostOrigin(origin)
@@ -135,6 +137,7 @@ type statusWriter struct {
 	status int
 }
 
+// WriteHeader captures the status code before delegating to the wrapped writer.
 func (sw *statusWriter) WriteHeader(code int) {
 	sw.status = code
 	sw.ResponseWriter.WriteHeader(code)

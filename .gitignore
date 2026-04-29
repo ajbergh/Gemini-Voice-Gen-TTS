@@ -25,3 +25,6 @@ dist-ssr
 .github/*
 bin/*
 *.exe
+.playwright-mcp/*
+docs_internal/*
+/output/*

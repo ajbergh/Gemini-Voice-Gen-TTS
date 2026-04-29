@@ -39,6 +39,7 @@ interface CommandPaletteProps {
   onToggleView: () => void;
 }
 
+/** Render the keyboard-driven command palette for navigation and app actions. */
 const CommandPalette: React.FC<CommandPaletteProps> = ({
   isOpen,
   onClose,

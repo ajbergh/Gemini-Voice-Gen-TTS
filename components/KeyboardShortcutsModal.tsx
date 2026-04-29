@@ -36,6 +36,7 @@ const SHORTCUTS: { section: string; items: { keys: string[]; description: string
   },
 ];
 
+/** Render the keyboard shortcuts reference modal. */
 const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({ onClose }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 

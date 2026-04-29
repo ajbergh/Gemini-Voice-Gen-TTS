@@ -35,6 +35,7 @@ const badgeColors: Record<string, string> = {
 };
 const defaultBadgeColor = 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800';
 
+/** Render one stock voice card with playback, favorite, and discovery actions. */
 const VoiceCard: React.FC<VoiceCardProps> = ({ voice, isPlaying, onPlayToggle, isFavorite, onFavoriteToggle, onFindSimilar, badges, hoverPreview = false }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const hoverAudioRef = useRef<HTMLAudioElement | null>(null);

@@ -1,4 +1,9 @@
 /**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
  * SavePresetDialog.tsx — Custom Preset Save Confirmation
  *
  * Collects or confirms the preset name before saving an AI casting result as a
@@ -25,6 +30,7 @@ interface SavePresetDialogProps {
   onSave: () => void;
 }
 
+/** Render the confirmation modal that saves an AI casting result as a preset. */
 const SavePresetDialog: React.FC<SavePresetDialogProps> = ({
   voiceName,
   presetName,

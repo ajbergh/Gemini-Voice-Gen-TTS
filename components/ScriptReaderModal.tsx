@@ -101,6 +101,7 @@ interface ScriptReaderModalProps {
   inline?: boolean;
 }
 
+/** Render a script-input modal for single- or multi-speaker TTS generation. */
 const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPresets = [], initialVoiceName, onClose, inline = false }) => {
   const [script, setScript] = useState('Hello! I am ready to read your script. Type something here and click Listen.');
   const [showTemplates, setShowTemplates] = useState(false);
@@ -661,7 +662,7 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
   if (inline) {
     return (
       <div ref={modalRef} tabIndex={-1} className="flex-1 flex flex-col bg-white dark:bg-zinc-900 overflow-hidden outline-none">
-        <div className="flex items-center justify-between p-4 border-b border-zinc-100 dark:border-zinc-800">
+        <div className="flex items-center justify-between p-4 pr-28 border-b border-zinc-100 dark:border-zinc-800">
           <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
             <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400">
               <FileText size={18} />
