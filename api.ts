@@ -39,12 +39,14 @@ import {
   CreateTakeInput,
   CustomPreset,
   ExportProfile,
+  ImportPreview,
   PerformanceStyle,
   PerformanceStyleVersion,
   PresetTag,
   PronunciationDictionary,
   PronunciationEntry,
   PreviewResult,
+  ProjectSummary,
   QcIssue,
   QcRollup,
   ScriptProject,
@@ -264,6 +266,10 @@ export async function listProjects(): Promise<ScriptProject[]> {
   return request<ScriptProject[]>('/projects');
 }
 
+export async function listProjectSummaries(): Promise<ProjectSummary[]> {
+  return request<ProjectSummary[]>('/projects/summary');
+}
+
 export async function createProject(data: CreateScriptProjectInput): Promise<ScriptProject> {
   return request<ScriptProject>('/projects', {
     method: 'POST',
@@ -337,6 +343,17 @@ export async function importProjectText(
 ): Promise<{ sections_created: number; segments_created: number }> {
   return request<{ sections_created: number; segments_created: number }>(
     `/projects/${projectId}/import`,
+    { method: 'POST', body: JSON.stringify({ text, filename: filename ?? '' }) },
+  );
+}
+
+export async function previewProjectImport(
+  projectId: number,
+  text: string,
+  filename?: string,
+): Promise<ImportPreview> {
+  return request<ImportPreview>(
+    `/projects/${projectId}/import/preview`,
     { method: 'POST', body: JSON.stringify({ text, filename: filename ?? '' }) },
   );
 }

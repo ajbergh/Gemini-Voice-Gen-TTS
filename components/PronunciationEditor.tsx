@@ -46,8 +46,11 @@ interface PronunciationEditorProps {
 /** Render project-scoped pronunciation dictionary and entry management. */
 const PronunciationEditor: React.FC<PronunciationEditorProps> = ({ projectId, onClose }) => {
   const { showToast } = useToast();
-  const isMounted = useRef(true);
-  useEffect(() => () => { isMounted.current = false; }, []);
+  const isMounted = useRef(false);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
 
   // ---- dictionaries ----
   const [dicts, setDicts] = useState<PronunciationDictionary[]>([]);

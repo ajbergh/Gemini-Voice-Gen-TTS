@@ -44,6 +44,7 @@ func RegisterRoutes(mux *http.ServeMux, configH *handler.ConfigHandler, keysH *h
 	mux.HandleFunc("PATCH /api/jobs/{id}/cancel", batchH.CancelJob)
 
 	// Script projects
+	mux.HandleFunc("GET /api/projects/summary", projectsH.ListProjectSummaries)
 	mux.HandleFunc("GET /api/projects", projectsH.ListProjects)
 	mux.HandleFunc("POST /api/projects", projectsH.CreateProject)
 	mux.HandleFunc("GET /api/projects/{id}", projectsH.GetProject)
@@ -57,6 +58,7 @@ func RegisterRoutes(mux *http.ServeMux, configH *handler.ConfigHandler, keysH *h
 	mux.HandleFunc("POST /api/projects/{id}/segments", projectsH.CreateSegment)
 	mux.HandleFunc("PUT /api/projects/{id}/segments/{segmentId}", projectsH.UpdateSegment)
 	mux.HandleFunc("DELETE /api/projects/{id}/segments/{segmentId}", projectsH.DeleteSegment)
+	mux.HandleFunc("POST /api/projects/{id}/import/preview", projectsH.PreviewProjectImport)
 	mux.HandleFunc("POST /api/projects/{id}/import", projectsH.ImportProject)
 	mux.HandleFunc("POST /api/projects/{id}/batch-render", batchH.BatchRenderProject)
 	mux.HandleFunc("POST /api/projects/{id}/segments/{segmentId}/render", batchH.RenderSegment)

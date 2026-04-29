@@ -242,3 +242,24 @@ Manual Playwright checks:
 ## Done Definition
 
 Phase 4 is done when Projects on a phone has one navigation layer, visible primary actions, readable stage state, and no content hidden under fixed bars.
+
+### Current Phase 4 Completion Assessment
+
+**Complete** - Phone Projects now uses the global app bottom navigation only. The project-specific bottom tab bar was removed, workspace views are selected through an in-content labeled tab control, and the selected project is shown as a compact switcher row that opens a full-height project picker sheet.
+
+Implemented code:
+- `components/ProjectWorkspace.tsx` hides the full project list on phones after a project is selected, renders the mobile project switcher row/sheet, uses labeled in-content workspace tabs, and reserves scroll space for the sticky action bar above global navigation.
+- `components/projects/MobileProjectSwitcher.tsx` provides the selected-project row and project picker sheet with search, new-project creation, active projects, and archived-project access through the existing `ProjectListPanel`.
+- `components/projects/ProjectHeader.tsx` renders a compact mobile stage summary instead of the full stage trail.
+- `components/projects/ProjectActionBar.tsx` renders a phone sticky action row above global navigation and moves secondary actions into a bottom-sheet-style More menu.
+- `components/ProjectImportPanel.tsx` uses a focused full-screen mobile sheet with sticky Preview/Import actions.
+- `components/ProjectSettingsPanel.tsx` and `components/projects/ProjectSettingsDrawer.tsx` use mobile-safe full-width treatment and sticky save actions.
+- `tests/projects/projects.spec.ts` includes Phase 4 mobile coverage for the 390x844 viewport.
+
+Validation passed:
+- `npm run build`
+- `npx playwright test tests/projects/projects.spec.ts --project=chromium --workers=1 --headed`
+
+Remaining follow-up, not blocking Phase 4:
+- Add deeper touch/keyboard checks for long scripts and on-screen keyboard behavior on real mobile browsers.
+- Consider tab-specific mobile primary actions for Cast, Review, Timeline, and Export as those panels expose stable action callbacks.

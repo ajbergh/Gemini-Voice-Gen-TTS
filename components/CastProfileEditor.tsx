@@ -57,8 +57,11 @@ const CastProfileEditor: React.FC<CastProfileEditorProps> = ({
   onClose,
 }) => {
   const { showToast } = useToast();
-  const isMounted = useRef(true);
-  useEffect(() => () => { isMounted.current = false; }, []);
+  const isMounted = useRef(false);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
 
   const [name, setName]                       = useState(profile?.name ?? '');
   const [role, setRole]                       = useState<string>(profile?.role ?? initialRole ?? 'narrator');

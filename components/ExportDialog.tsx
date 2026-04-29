@@ -15,8 +15,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Clock, Download, Loader2, Package, X } from 'lucide-react';
 import { CONFIG_KEYS, downloadExport, getConfig, getExport, listExports, startExport } from '../api';
-import { ExportJob } from '../types';
+import { ExportJob, QcIssue, ScriptSegment } from '../types';
 import ExportProfilePicker from './ExportProfilePicker';
+import ExportReadinessChecklist from './projects/ExportReadinessChecklist';
+import { getExportReadiness } from './projects/exportReadiness';
 
 interface ExportDialogProps {
   projectId: number;
@@ -27,10 +29,26 @@ interface ExportDialogProps {
   totalSegments?: number;
   /** Segments with audio ready (rendered or approved status). */
   renderedSegments?: number;
+  segments?: ScriptSegment[];
+  qcIssues?: QcIssue[];
+  renderingMissingAudio?: boolean;
+  onRenderMissingAudio?: () => void;
+  onGoToReview?: () => void;
 }
 
 /** Render the deliverable export modal and job polling workflow. */
-export default function ExportDialog({ projectId, onClose, inline = false, totalSegments, renderedSegments }: ExportDialogProps) {
+export default function ExportDialog({
+  projectId,
+  onClose,
+  inline = false,
+  totalSegments,
+  renderedSegments,
+  segments,
+  qcIssues = [],
+  renderingMissingAudio = false,
+  onRenderMissingAudio,
+  onGoToReview,
+}: ExportDialogProps) {
   const [profileId, setProfileId] = useState<number | null>(null);
   const [job, setJob] = useState<ExportJob | null>(null);
   const [starting, setStarting] = useState(false);
@@ -154,7 +172,15 @@ export default function ExportDialog({ projectId, onClose, inline = false, total
   const hasNoProjectContent = hasSegmentCounts && safeTotalSegments === 0;
   const hasNoRenderedAudio = hasSegmentCounts && safeTotalSegments > 0 && safeRenderedSegments === 0;
   const hasPartialAudio = hasSegmentCounts && safeRenderedSegments > 0 && safeRenderedSegments < safeTotalSegments;
-  const startDisabledReason = hasNoProjectContent
+  const readiness = getExportReadiness({
+    segments: segments ?? [],
+    qcIssues,
+    exportProfileSelected: profileId != null,
+  });
+  const hasReadinessData = Array.isArray(segments);
+  const startDisabledReason = hasReadinessData && !readiness.canExport
+    ? readiness.blockers[0]?.label ?? 'Resolve export blockers before exporting.'
+    : hasNoProjectContent
     ? 'Add at least one segment before exporting.'
     : hasNoRenderedAudio
     ? 'Render at least one segment before exporting.'
@@ -208,7 +234,15 @@ export default function ExportDialog({ projectId, onClose, inline = false, total
         </div>
 
         {/* Segment scope summary */}
-        {hasSegmentCounts && (
+        {hasReadinessData ? (
+          <ExportReadinessChecklist
+            readiness={readiness}
+            renderingMissingAudio={renderingMissingAudio}
+            onRenderMissingAudio={onRenderMissingAudio}
+            onGoToReview={onGoToReview}
+            onOpenQcIssues={onGoToReview}
+          />
+        ) : hasSegmentCounts && (
           <div className={`rounded-xl px-4 py-3 text-sm flex items-start gap-3 ${
             safeRenderedSegments === 0
               ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300'

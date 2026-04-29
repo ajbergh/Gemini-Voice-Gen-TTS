@@ -128,3 +128,87 @@ func TestScriptProjectSectionSegmentPersistence(t *testing.T) {
 		t.Fatalf("expected archived status, got %q", project.Status)
 	}
 }
+
+func TestListProjectSummaries(t *testing.T) {
+	st, err := New(filepath.Join(t.TempDir(), "project-summaries.db"))
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	defer st.Close()
+
+	projectID, err := st.CreateProject(ScriptProject{
+		Title:  "Summary Work",
+		Kind:   "audiobook",
+		Status: "active",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	emptyID, err := st.CreateProject(ScriptProject{
+		Title:  "Empty Work",
+		Kind:   "podcast",
+		Status: "active",
+	})
+	if err != nil {
+		t.Fatalf("create empty project: %v", err)
+	}
+
+	sectionID, err := st.CreateSection(ScriptSection{
+		ProjectID: projectID,
+		Kind:      "chapter",
+		Title:     "Chapter 1",
+		SortOrder: 0,
+	})
+	if err != nil {
+		t.Fatalf("create section: %v", err)
+	}
+
+	segmentIDs := make([]int64, 0, 3)
+	for idx, status := range []string{"draft", "rendered", "approved"} {
+		id, err := st.CreateSegment(ScriptSegment{
+			ProjectID:  projectID,
+			SectionID:  &sectionID,
+			ScriptText: status + " segment",
+			Status:     status,
+			SortOrder:  idx,
+		})
+		if err != nil {
+			t.Fatalf("create %s segment: %v", status, err)
+		}
+		segmentIDs = append(segmentIDs, id)
+	}
+
+	if _, err := st.CreateQcIssue(QcIssue{
+		ProjectID: projectID,
+		SegmentID: segmentIDs[0],
+		Status:    "open",
+	}); err != nil {
+		t.Fatalf("create open qc issue: %v", err)
+	}
+	if _, err := st.CreateQcIssue(QcIssue{
+		ProjectID: projectID,
+		SegmentID: segmentIDs[1],
+		Status:    "resolved",
+	}); err != nil {
+		t.Fatalf("create resolved qc issue: %v", err)
+	}
+
+	summaries, err := st.ListProjectSummaries()
+	if err != nil {
+		t.Fatalf("list summaries: %v", err)
+	}
+	byProject := map[int64]ScriptProjectSummary{}
+	for _, summary := range summaries {
+		byProject[summary.ProjectID] = summary
+	}
+
+	got := byProject[projectID]
+	if got.SectionCount != 1 || got.SegmentCount != 3 || got.RenderedCount != 2 || got.ApprovedCount != 1 || got.OpenQcCount != 1 {
+		t.Fatalf("unexpected populated summary: %#v", got)
+	}
+
+	empty := byProject[emptyID]
+	if empty.SectionCount != 0 || empty.SegmentCount != 0 || empty.RenderedCount != 0 || empty.ApprovedCount != 0 || empty.OpenQcCount != 0 {
+		t.Fatalf("unexpected empty summary: %#v", empty)
+	}
+}

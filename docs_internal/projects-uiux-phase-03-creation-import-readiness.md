@@ -230,7 +230,7 @@ Acceptance criteria:
 ### 6. Data-Backed Stage Trail
 
 Files:
-- `components/projects/ProjectStageTrail.tsx`
+- `components/projects/ProjectHeader.tsx`
 - Optional: project summary endpoint from Phase 2.
 
 Stage definitions:
@@ -274,3 +274,24 @@ Manual checks:
 ## Done Definition
 
 Phase 3 is done when project setup feels intentional, import is previewable, and export readiness tells users exactly what is needed before delivery.
+
+### Current Phase 3 Completion Assessment
+
+**Complete** - Project creation now supports templates, optional descriptions, client assignment, and template metadata. Import preview is backed by the same backend parser used by committed imports. Export and Timeline share the same readiness helper and expose render-missing/review actions. Project summaries are loaded from `GET /api/projects/summary` so list metadata is not limited to the selected project.
+
+Implemented code:
+- `components/projects/projectTemplates.ts` and `NewProjectSheet.tsx` provide the template-first creation flow.
+- `components/ProjectImportPanel.tsx`, `api.ts`, `backend/internal/handler/api_projects.go`, and `backend/internal/server/routes.go` implement `POST /api/projects/{id}/import/preview`.
+- `components/projects/exportReadiness.ts` and `ExportReadinessChecklist.tsx` drive consistent Timeline and Export blockers/warnings.
+- `components/ProjectWorkspace.tsx` wires clients, summaries, import preview, render-missing audio, and readiness actions.
+- `components/projects/ProjectHeader.tsx` contains the data-backed stage trail. A separate `ProjectStageTrail.tsx` file was not created because the stage display remains header-local and presentational.
+- `backend/internal/store/projects.go` implements project summaries, and `backend/internal/handler/api_batch.go` allows failed segments to be re-rendered by missing-audio flows.
+
+Validation passed:
+- `npm run build`
+- `go test ./internal/store ./internal/handler ./internal/server`
+- `npx playwright test tests/projects/projects.spec.ts --project=chromium --workers=1 --headed`
+
+Remaining follow-up, not blocking Phase 4:
+- Extract the stage calculation from `ProjectHeader.tsx` only if another component needs to consume the same model.
+- Add dedicated frontend unit tests for readiness/stage helpers if a frontend unit test harness is introduced.

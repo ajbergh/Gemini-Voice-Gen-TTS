@@ -65,8 +65,11 @@ const ALWAYS_VISIBLE: Set<CastRole> = new Set(['narrator', 'protagonist']);
 /** Render the project cast board for managing character and narrator profiles. */
 const CastBoard: React.FC<CastBoardProps> = ({ projectId, voices, customPresets = [], onClose }) => {
   const { showToast } = useToast();
-  const isMounted = useRef(true);
-  useEffect(() => () => { isMounted.current = false; }, []);
+  const isMounted = useRef(false);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
 
   const [profiles, setProfiles]   = useState<CastProfile[]>([]);
   const [loading, setLoading]     = useState(true);

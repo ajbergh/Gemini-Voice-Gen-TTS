@@ -12,58 +12,56 @@
 
 import React from 'react';
 import { Check, Loader2, X } from 'lucide-react';
-import { PerformanceStyle, ScriptProject, Voice } from '../types';
+import { CustomPreset, PerformanceStyle, ScriptProject, Voice } from '../types';
 import StylePresetPicker from './StylePresetPicker';
+
+const TTS_MODELS: { value: string; label: string }[] = [
+  { value: 'gemini-3.1-flash-tts-preview', label: '3.1 Flash' },
+  { value: 'gemini-2.5-flash-preview-tts', label: '2.5 Flash' },
+  { value: 'gemini-2.5-pro-preview-tts',   label: '2.5 Pro'   },
+];
 
 interface ProjectSettingsPanelProps {
   selectedProject: ScriptProject;
   voices: Voice[];
+  customPresets?: CustomPreset[];
   styles: PerformanceStyle[];
   settingsVoice: string;
   settingsLang: string;
-  settingsProvider: string;
   settingsModel: string;
-  settingsFallbackProvider: string;
-  settingsFallbackModel: string;
   settingsStyleId: number | null;
   savingSettings: boolean;
   onChangeVoice: (v: string) => void;
   onChangeLang: (v: string) => void;
-  onChangeProvider: (v: string) => void;
   onChangeModel: (v: string) => void;
-  onChangeFallbackProvider: (v: string) => void;
-  onChangeFallbackModel: (v: string) => void;
   onChangeStyleId: (id: number | null) => void;
   onStyleCreated: (s: PerformanceStyle) => void;
   onSave: () => void;
   onClose: () => void;
+  mobile?: boolean;
 }
 
 /** Render editable defaults for the selected script project. */
 const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
   selectedProject,
   voices,
+  customPresets = [],
   styles,
   settingsVoice,
   settingsLang,
-  settingsProvider,
   settingsModel,
-  settingsFallbackProvider,
-  settingsFallbackModel,
   settingsStyleId,
   savingSettings,
   onChangeVoice,
   onChangeLang,
-  onChangeProvider,
   onChangeModel,
-  onChangeFallbackProvider,
-  onChangeFallbackModel,
   onChangeStyleId,
   onStyleCreated,
   onSave,
   onClose,
+  mobile = false,
 }) => (
-  <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4 space-y-4">
+  <div className={mobile ? 'space-y-4' : 'rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4 space-y-4'}>
     <div className="flex items-center justify-between gap-2">
       <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">Project defaults</p>
       <button
@@ -85,9 +83,20 @@ const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
           className="h-9 w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-2.5 text-sm text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
         >
           <option value="">— None —</option>
-          {voices.map(v => (
-            <option key={v.name} value={v.name}>{v.name}</option>
-          ))}
+          {voices.length > 0 && (
+            <optgroup label="Stock voices">
+              {voices.map(v => (
+                <option key={v.name} value={v.name}>{v.name}</option>
+              ))}
+            </optgroup>
+          )}
+          {customPresets.length > 0 && (
+            <optgroup label="My voices">
+              {customPresets.map(p => (
+                <option key={`preset:${p.id}`} value={`preset:${p.id}`}>{p.name}</option>
+              ))}
+            </optgroup>
+          )}
         </select>
       </div>
       <div className="space-y-1">
@@ -103,49 +112,19 @@ const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
       </div>
       <div className="space-y-1">
         <label className="block text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Provider
-        </label>
-        <input
-          value={settingsProvider}
-          onChange={e => onChangeProvider(e.target.value)}
-          placeholder="e.g. google"
-          className="h-9 w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-        />
-      </div>
-      <div className="space-y-1">
-        <label className="block text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           Model
         </label>
-        <input
+        <select
           value={settingsModel}
           onChange={e => onChangeModel(e.target.value)}
-          placeholder="e.g. gemini-2.5-pro-preview-tts"
-          className="h-9 w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-        />
+          className="h-9 w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-2.5 text-sm text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
+        >
+          {TTS_MODELS.map(m => (
+            <option key={m.value} value={m.value}>{m.label}</option>
+          ))}
+        </select>
       </div>
-      <div className="space-y-1">
-        <label className="block text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Fallback provider
-        </label>
-        <input
-          value={settingsFallbackProvider}
-          onChange={e => onChangeFallbackProvider(e.target.value)}
-          placeholder="e.g. gemini"
-          className="h-9 w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-        />
-      </div>
-      <div className="space-y-1">
-        <label className="block text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Fallback model
-        </label>
-        <input
-          value={settingsFallbackModel}
-          onChange={e => onChangeFallbackModel(e.target.value)}
-          placeholder="e.g. tts-1"
-          className="h-9 w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-        />
-      </div>
-      <div className="space-y-1 col-span-2">
+      <div className="space-y-1 sm:col-span-2">
         <label className="block text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           Default performance style
         </label>
@@ -158,7 +137,7 @@ const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
         />
       </div>
     </div>
-    <div className="flex justify-end gap-2 pt-1">
+    <div className={mobile ? 'sticky bottom-0 -mx-4 flex justify-end gap-2 border-t border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 px-4 py-3 backdrop-blur' : 'flex justify-end gap-2 pt-1'}>
       <button
         type="button"
         onClick={onClose}

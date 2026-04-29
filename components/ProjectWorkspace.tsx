@@ -10,28 +10,18 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Play,
-  Archive,
-  ArchiveRestore,
   BookOpen,
   Check,
   ChevronDown,
-  ChevronRight,
   ClipboardCheck,
   Film,
   FileText,
   Layers,
   Loader2,
-  MoreHorizontal,
   Package,
-  Pencil,
   Plus,
   RefreshCw,
-  Rows3,
-  Settings,
-  Sparkles,
   Trash2,
-  Upload,
   Users,
   X,
   Wrench,
@@ -47,11 +37,15 @@ import {
   deleteProjectSegment,
   getConfig,
   importProjectText,
+  listClients,
   listProjectCast,
+  listProjectQcIssues,
   listProjectSections,
   listProjectSegments,
+  listProjectSummaries,
   listProjects,
   listStyles,
+  previewProjectImport,
   reRenderSegment,
   updateConfig,
   updateProject,
@@ -62,13 +56,17 @@ import CastBoard from './CastBoard';
 import PronunciationEditor from './PronunciationEditor';
 import ReviewMode from './ReviewMode';
 import TimelineReview from './TimelineReview';
-import { formatJobType, useJobs } from './JobProvider';
+import { useJobs } from './JobProvider';
 import { ProgressEvent } from '../api';
 import {
   CastProfile,
+  Client,
   CustomPreset,
+  ImportPreview,
   PerformanceStyle,
   ProjectKind,
+  ProjectSummary,
+  QcIssue,
   ScriptProject,
   ScriptSection,
   ScriptSegment,
@@ -82,10 +80,16 @@ import StylePresetPicker from './StylePresetPicker';
 import ExportDialog from './ExportDialog';
 import { useResponsiveMode } from './useResponsiveMode';
 import ProjectStatsBar from './ProjectStatsBar';
-import ProjectSettingsPanel from './ProjectSettingsPanel';
 import ProjectImportPanel from './ProjectImportPanel';
 import SectionBlock from './SectionBlock';
 import SegmentRow from './SegmentRow';
+import ProjectListPanel from './projects/ProjectListPanel';
+import ProjectHeader from './projects/ProjectHeader';
+import ProjectActionBar from './projects/ProjectActionBar';
+import ProjectSettingsDrawer from './projects/ProjectSettingsDrawer';
+import MobileProjectSwitcher from './projects/MobileProjectSwitcher';
+import { DEFAULT_PROJECT_TEMPLATE_ID, getProjectTemplate } from './projects/projectTemplates';
+import { isSegmentAudioReady } from './projects/exportReadiness';
 
 interface ProjectWorkspaceProps {
   voices: Voice[];
@@ -104,16 +108,7 @@ const PROJECT_KINDS: { value: ProjectKind; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
-type WorkspaceMobileTab = 'script' | 'cast' | 'takes' | 'jobs' | 'review';
 type WorkspaceTab = 'script' | 'cast' | 'review' | 'timeline' | 'export';
-
-const MOBILE_TABS: { id: WorkspaceMobileTab; label: string; icon: React.ReactNode }[] = [
-  { id: 'script', label: 'Script', icon: <FileText size={15} /> },
-  { id: 'cast', label: 'Cast', icon: <Users size={15} /> },
-  { id: 'takes', label: 'Takes', icon: <Rows3 size={15} /> },
-  { id: 'jobs', label: 'Jobs', icon: <Loader2 size={15} /> },
-  { id: 'review', label: 'Review', icon: <ClipboardCheck size={15} /> },
-];
 
 const WORKSPACE_TABS: { id: WorkspaceTab; label: string; icon: React.ReactNode }[] = [
   { id: 'script', label: 'Script', icon: <FileText size={13} /> },
@@ -134,11 +129,6 @@ const STATUS_BADGE: Record<string, string> = {
   failed:    'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
   locked:    'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300',
 };
-
-/** Convert project kind identifiers into display text. */
-function formatKind(kind: string): string {
-  return PROJECT_KINDS.find(item => item.value === kind)?.label ?? kind.replace(/_/g, ' ');
-}
 
 /** Return badge color classes for segment/project status values. */
 function statusBadge(status: string): string {
@@ -164,6 +154,10 @@ function groupBySection(segments: ScriptSegment[]): Map<number | null, ScriptSeg
   return map;
 }
 
+function mapProjectSummaries(summaries: ProjectSummary[]): Record<number, ProjectSummary> {
+  return Object.fromEntries(summaries.map(summary => [summary.project_id, summary]));
+}
+
 // ---------------------------------------------------------------------------
 
 const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
@@ -173,31 +167,40 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   onClose,
 }) => {
   const { showToast } = useToast();
-  const { subscribeToProgress, jobs, activeJobs } = useJobs();
+  const { subscribeToProgress } = useJobs();
   const responsiveMode = useResponsiveMode();
   const isPhone = responsiveMode === 'phone';
   const isMounted = useRef(true);
-  useEffect(() => () => { isMounted.current = false; }, []);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
 
   // ---- project list ----
   const [projects, setProjects] = useState<ScriptProject[]>([]);
+  const [projectSummaries, setProjectSummaries] = useState<Record<number, ProjectSummary>>({});
+  const [clients, setClients] = useState<Client[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [creating, setCreating] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newKind, setNewKind] = useState<ProjectKind>('audiobook');
+  const [newDescription, setNewDescription] = useState(getProjectTemplate(DEFAULT_PROJECT_TEMPLATE_ID).description);
+  const [newClientId, setNewClientId] = useState<number | null>(null);
+  const [newTemplateId, setNewTemplateId] = useState(DEFAULT_PROJECT_TEMPLATE_ID);
 
   // ---- project contents ----
   const [sections, setSections] = useState<ScriptSection[]>([]);
   const [segments, setSegments] = useState<ScriptSegment[]>([]);
+  const [qcIssues, setQcIssues] = useState<QcIssue[]>([]);
   const [loadingProjectData, setLoadingProjectData] = useState(false);
 
   // ---- UI state ----
   const [error, setError] = useState<string | null>(null);
   const [showCompactTool, setShowCompactTool] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
-  const [mobileTab, setMobileTab] = useState<WorkspaceMobileTab>('script');
+  const [showMobileProjectSwitcher, setShowMobileProjectSwitcher] = useState(false);
 
   // ---- add section ----
   const [showAddSection, setShowAddSection] = useState(false);
@@ -243,6 +246,10 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   const [showImport, setShowImport] = useState(false);
   const [showScriptPrep, setShowScriptPrep] = useState(false);
   const [importText, setImportText] = useState('');
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
+  const [importPreviewSource, setImportPreviewSource] = useState('');
+  const [importPreviewError, setImportPreviewError] = useState<string | null>(null);
+  const [previewingImport, setPreviewingImport] = useState(false);
   const [importing, setImporting] = useState(false);
   const [batchRendering, setBatchRendering] = useState(false);
 
@@ -267,10 +274,7 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   const [showProjectSettings, setShowProjectSettings] = useState(false);
   const [settingsVoice, setSettingsVoice] = useState('');
   const [settingsLang, setSettingsLang] = useState('');
-  const [settingsProvider, setSettingsProvider] = useState('');
-  const [settingsModel, setSettingsModel] = useState('');
-  const [settingsFallbackProvider, setSettingsFallbackProvider] = useState('');
-  const [settingsFallbackModel, setSettingsFallbackModel] = useState('');
+  const [settingsModel, setSettingsModel] = useState('gemini-3.1-flash-tts-preview');
   const [settingsStyleId, setSettingsStyleId] = useState<number | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
 
@@ -279,6 +283,11 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   const selectedProject = useMemo(
     () => projects.find(p => p.id === selectedProjectId) ?? null,
     [projects, selectedProjectId],
+  );
+
+  const selectedClient = useMemo(
+    () => selectedProject?.client_id ? clients.find(c => c.id === selectedProject.client_id) ?? null : null,
+    [clients, selectedProject],
   );
 
   const segmentsBySection = useMemo(() => groupBySection(segments), [segments]);
@@ -306,17 +315,19 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     setLoadingProjectData(true);
     setError(null);
     try {
-      const [nextSections, nextSegments, nextCastProfiles, nextStyles] = await Promise.all([
+      const [nextSections, nextSegments, nextCastProfiles, nextStyles, nextQcIssues] = await Promise.all([
         listProjectSections(projectId),
         listProjectSegments(projectId),
         listProjectCast(projectId).catch(() => [] as CastProfile[]),
         listStyles(projectId).catch(() => [] as PerformanceStyle[]),
+        listProjectQcIssues(projectId).catch(() => [] as QcIssue[]),
       ]);
       if (!isMounted.current) return;
       setSections(nextSections);
       setSegments(nextSegments);
       setCastProfiles(nextCastProfiles);
       setStyles(nextStyles);
+      setQcIssues(nextQcIssues);
       setExpandedSections(new Set(nextSections.map(s => s.id)));
     } catch (err: any) {
       if (!isMounted.current) return;
@@ -326,13 +337,27 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     }
   }, []);
 
+  const refreshProjectSummaries = useCallback(async () => {
+    try {
+      const summaries = await listProjectSummaries();
+      if (!isMounted.current) return;
+      setProjectSummaries(mapProjectSummaries(summaries));
+    } catch {
+      // Summary metadata is additive; core project loading still works without it.
+    }
+  }, []);
+
   const refreshProjects = useCallback(async () => {
     setLoadingProjects(true);
     setError(null);
     try {
-      const data = await listProjects();
+      const [data, summaries] = await Promise.all([
+        listProjects(),
+        listProjectSummaries().catch(() => [] as ProjectSummary[]),
+      ]);
       if (!isMounted.current) return;
       setProjects(data);
+      setProjectSummaries(mapProjectSummaries(summaries));
       return data;
     } catch (err: any) {
       if (!isMounted.current) return;
@@ -361,9 +386,15 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
       setLoadingProjects(true);
       try {
-        const data = await listProjects();
+        const [data, summaries, nextClients] = await Promise.all([
+          listProjects(),
+          listProjectSummaries().catch(() => [] as ProjectSummary[]),
+          listClients().catch(() => [] as Client[]),
+        ]);
         if (!mounted) return;
         setProjects(data);
+        setProjectSummaries(mapProjectSummaries(summaries));
+        setClients(nextClients);
         const active = data.filter(p => p.status !== 'archived');
         const preferred = lastId ? data.find(p => p.id === lastId) : null;
         const chosen = preferred ?? active[0] ?? data[0] ?? null;
@@ -384,6 +415,7 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     if (!selectedProjectId) {
       setSections([]);
       setSegments([]);
+      setQcIssues([]);
       return;
     }
     loadProjectContents(selectedProjectId);
@@ -405,10 +437,13 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
         }
       } else if (FINISHED.has((event.status ?? '').toLowerCase())) {
         // Batch finished — reload to get accurate final statuses for every segment.
-        if (isMounted.current) loadProjectContents(selectedProjectId);
+        if (isMounted.current) {
+          loadProjectContents(selectedProjectId);
+          refreshProjectSummaries();
+        }
       }
     });
-  }, [selectedProjectId, subscribeToProgress, loadProjectContents]);
+  }, [selectedProjectId, subscribeToProgress, loadProjectContents, refreshProjectSummaries]);
 
   // Dismiss project context menu on outside click.
   useEffect(() => {
@@ -430,14 +465,17 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   const selectProject = useCallback((id: number) => {
     setSelectedProjectId(id);
     setShowImport(false);
+    setImportPreview(null);
+    setImportPreviewSource('');
+    setImportPreviewError(null);
     setShowProjectSettings(false);
     setShowScriptPrep(false);
     setShowAddSection(false);
     setAddingToSectionId(null);
     setEditingSegmentId(null);
     setEditingSectionId(null);
-    setMobileTab('script');
     setActiveWorkspaceTab('script');
+    setShowMobileProjectSwitcher(false);
     setShowOverflowMenu(false);
     setContextMenuProjectId(null);
     setRenamingProjectId(null);
@@ -455,17 +493,50 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     setCreating(true);
     setError(null);
     try {
+      const template = getProjectTemplate(newTemplateId);
+      const metadata = {
+        ...(template.recommendedDefaults?.metadata ?? {}),
+        template_id: template.id,
+      };
       const project = await createProject({
         title,
         kind: newKind,
         status: 'active',
-        description: '',
+        description: newDescription.trim(),
+        client_id: newClientId ?? undefined,
         default_voice_name: initialVoiceName || undefined,
+        default_language_code: template.recommendedDefaults?.language_code,
+        default_style_id: template.recommendedDefaults?.style_id,
+        metadata_json: JSON.stringify(metadata),
       });
+
+      let failedSections = 0;
+      for (let i = 0; i < template.defaultSections.length; i++) {
+        const section = template.defaultSections[i];
+        try {
+          await createProjectSection(project.id, {
+            title: section.title,
+            kind: section.kind,
+            sort_order: i,
+          });
+        } catch {
+          failedSections++;
+        }
+      }
+
       setProjects(prev => [project, ...prev]);
       selectProject(project.id);
       setNewTitle('');
-      showToast('Project created', 'success');
+      setNewDescription(getProjectTemplate(DEFAULT_PROJECT_TEMPLATE_ID).description);
+      setNewClientId(null);
+      setNewTemplateId(DEFAULT_PROJECT_TEMPLATE_ID);
+      setNewKind(getProjectTemplate(DEFAULT_PROJECT_TEMPLATE_ID).kind);
+      refreshProjectSummaries();
+      if (failedSections > 0) {
+        showToast('Project created, but some template sections could not be added.', 'warning');
+      } else {
+        showToast('Project created', 'success');
+      }
     } catch (err: any) {
       const msg = err?.message ?? 'Failed to create project.';
       setError(msg);
@@ -542,10 +613,7 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
         ...selectedProject,
         default_voice_name: settingsVoice.trim() || undefined,
         default_language_code: settingsLang.trim() || undefined,
-        default_provider: settingsProvider.trim() || undefined,
-        default_model: settingsModel.trim() || undefined,
-        fallback_provider: settingsFallbackProvider.trim() || undefined,
-        fallback_model: settingsFallbackModel.trim() || undefined,
+        default_model: settingsModel || undefined,
         default_style_id: settingsStyleId ?? undefined,
       });
       const updated = await listProjects();
@@ -713,15 +781,46 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   // Import
   // ---------------------------------------------------------------------------
 
+  const handleImportTextChange = (value: string) => {
+    setImportText(value);
+    setImportPreviewError(null);
+  };
+
+  const handlePreviewImport = async () => {
+    const text = importText.trim();
+    if (!text || !selectedProjectId) return;
+    setPreviewingImport(true);
+    setImportPreviewError(null);
+    try {
+      const preview = await previewProjectImport(selectedProjectId, text);
+      setImportPreview(preview);
+      setImportPreviewSource(text);
+    } catch (err: any) {
+      setImportPreview(null);
+      setImportPreviewSource('');
+      setImportPreviewError(err?.message ?? 'Preview failed.');
+    } finally {
+      setPreviewingImport(false);
+    }
+  };
+
   const handleImport = async (event: React.FormEvent) => {
     event.preventDefault();
     const text = importText.trim();
     if (!text || !selectedProjectId) return;
+    if (!importPreview || importPreviewSource !== text) {
+      showToast('Preview the current import text before importing.', 'warning');
+      return;
+    }
     setImporting(true);
     try {
       const result = await importProjectText(selectedProjectId, text);
       await loadProjectContents(selectedProjectId);
+      await refreshProjectSummaries();
       setImportText('');
+      setImportPreview(null);
+      setImportPreviewSource('');
+      setImportPreviewError(null);
       setShowImport(false);
       showToast(
         `Imported ${result.sections_created} section${result.sections_created !== 1 ? 's' : ''} and ${result.segments_created} segment${result.segments_created !== 1 ? 's' : ''}.`,
@@ -741,6 +840,9 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     reader.onload = e => {
       const text = e.target?.result as string;
       setImportText(text ?? '');
+      setImportPreview(null);
+      setImportPreviewSource('');
+      setImportPreviewError(null);
     };
     reader.readAsText(file);
     event.target.value = '';
@@ -777,78 +879,49 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     });
   };
 
-  const renderMobileTabs = () => {
-    if (!isPhone || !selectedProject) return null;
-    return (
-      <nav className="fixed inset-x-0 bottom-14 z-30 border-t border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 backdrop-blur" aria-label="Project workspace tabs">
-        <div className="grid grid-cols-5">
-          {MOBILE_TABS.map(tab => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                setMobileTab(tab.id);
-                if (tab.id === 'cast') {
-                  setActiveWorkspaceTab('cast');
-                } else if (tab.id === 'review') {
-                  setActiveWorkspaceTab('review');
-                } else {
-                  setActiveWorkspaceTab('script');
-                }
-              }}
-              className={`flex h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors ${
-                mobileTab === tab.id
-                  ? 'text-[var(--accent-600)] dark:text-[var(--accent-300)]'
-                  : 'text-zinc-500 dark:text-zinc-400'
-              }`}
-              aria-current={mobileTab === tab.id ? 'page' : undefined}
-            >
-              {tab.id === 'jobs' && activeJobs.length > 0 ? <Loader2 size={15} className="animate-spin" /> : tab.icon}
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
-      </nav>
-    );
-  };
+  const handleRenderMissingAudio = async () => {
+    if (!selectedProject) return;
+    const missingSegmentIds = segments
+      .filter(segment => segment.script_text.trim() && !isSegmentAudioReady(segment))
+      .map(segment => segment.id);
+    if (missingSegmentIds.length === 0) {
+      showToast('No missing audio to render.', 'info');
+      return;
+    }
 
-  const renderMobileJobsPanel = () => (
-    <div className="p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <h4 className="text-sm font-bold text-zinc-900 dark:text-white">Jobs</h4>
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">{activeJobs.length} active</span>
-      </div>
-      <div className="space-y-2">
-        {jobs.slice(0, 12).map(job => (
-          <div key={job.id} className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="min-w-0 truncate text-sm font-semibold text-zinc-900 dark:text-white">{formatJobType(job.type)}</p>
-              <span className="shrink-0 rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">{job.status}</span>
-            </div>
-            {job.message && <p className="mt-1 truncate text-xs text-zinc-500 dark:text-zinc-400">{job.message}</p>}
-            <div className="mt-2 h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-              <div className="h-full rounded-full bg-[var(--accent-500)]" style={{ width: `${Math.max(0, Math.min(100, job.percent || 0))}%` }} />
-            </div>
-          </div>
-        ))}
-        {jobs.length === 0 && (
-          <p className="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-center text-sm text-zinc-500 dark:text-zinc-400">No jobs yet.</p>
-        )}
-      </div>
-    </div>
-  );
+    setBatchRendering(true);
+    try {
+      const res = await batchRenderProject(selectedProject.id, { segmentIds: missingSegmentIds });
+      showToast(`Rendering ${res.segment_count} missing segment${res.segment_count === 1 ? '' : 's'} (job ${res.job_id})`, 'success');
+    } catch (err: any) {
+      showToast(err?.message ?? 'Render missing audio failed.', 'error');
+    } finally {
+      setBatchRendering(false);
+    }
+  };
 
   // ---------------------------------------------------------------------------
   // Main render
   // ---------------------------------------------------------------------------
 
   const unsectionedSegments = segmentsBySection.get(null) ?? [];
-  const showProjectSidebar = !isPhone || (mobileTab === 'script' && activeWorkspaceTab === 'script');
+  const showProjectSidebar = !isPhone || !selectedProject;
+  const sidebarSegmentCounts = selectedProjectId !== null ? { [selectedProjectId]: segments.length } : {};
+  const importPreviewStale = !!importPreview && importPreviewSource !== importText.trim();
+  const selectedProjectKindLabel = selectedProject
+    ? PROJECT_KINDS.find(kind => kind.value === selectedProject.kind)?.label ?? selectedProject.kind.replace(/_/g, ' ')
+    : '';
+  const mobileStageSummary = segments.length === 0
+    ? 'No script yet'
+    : renderedCount < segments.length
+    ? `Rendered ${renderedCount}/${segments.length}`
+    : approvedCount < renderedCount
+    ? `Reviewed ${approvedCount}/${renderedCount}`
+    : 'Export ready';
 
   return (
     <div
       className="flex-1 overflow-hidden bg-white dark:bg-zinc-950 flex flex-col"
-      style={isPhone ? { paddingBottom: 'calc(7rem + env(safe-area-inset-bottom))' } : undefined}
     >
       {/* Header */}
       <header className="shrink-0 border-b border-zinc-200 dark:border-zinc-800 px-4 sm:px-6 py-4">
@@ -890,212 +963,45 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)]">
         {/* Sidebar */}
         <aside className={`min-h-0 border-b xl:border-b-0 xl:border-r border-zinc-200 dark:border-zinc-800 flex-col ${showProjectSidebar ? 'flex' : 'hidden'}`}>
-          <form onSubmit={handleCreateProject} className="shrink-0 border-b border-zinc-200 dark:border-zinc-800 p-4 space-y-3">
-            <input
-              value={newTitle}
-              onChange={e => setNewTitle(e.target.value)}
-              placeholder="New project title"
-              className="h-10 w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-            />
-            <div className="flex gap-2">
-              <select
-                value={newKind}
-                onChange={e => setNewKind(e.target.value as ProjectKind)}
-                className="h-10 min-w-0 flex-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-2 text-sm text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-              >
-                {PROJECT_KINDS.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}
-              </select>
-              <button
-                type="submit"
-                disabled={creating || !newTitle.trim()}
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-900 dark:bg-[var(--accent-600)] text-white hover:bg-zinc-800 dark:hover:bg-[var(--accent-500)] transition-colors disabled:opacity-50"
-                aria-label="Create project"
-              >
-                {creating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-              </button>
-            </div>
-          </form>
-
-          <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-1">
-            {loadingProjects ? (
-              <div className="flex items-center justify-center py-10 text-zinc-400">
-                <Loader2 size={22} className="animate-spin" />
-              </div>
-            ) : projects.filter(p => p.status !== 'archived').length === 0 && projects.filter(p => p.status === 'archived').length === 0 ? (
-              <p className="py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">No projects yet.</p>
-            ) : (
-              <>
-                {projects.filter(p => p.status !== 'archived').map(project => {
-                  const active = project.id === selectedProjectId;
-                  const isRenaming = renamingProjectId === project.id;
-                  const hasMenu = contextMenuProjectId === project.id;
-                  const segCount = active ? segments.length : null;
-                  return (
-                    <div key={project.id} className="relative group">
-                      <div
-                        className={`rounded-lg border transition-colors ${
-                          active
-                            ? 'border-[var(--accent-400)] bg-[var(--accent-50)] dark:border-[var(--accent-600)] dark:bg-zinc-900'
-                            : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                        }`}
-                      >
-                        {isRenaming ? (
-                          <form
-                            onSubmit={e => { e.preventDefault(); handleSaveRename(project); }}
-                            className="p-3"
-                          >
-                            <input
-                              autoFocus
-                              value={renameValue}
-                              onChange={e => setRenameValue(e.target.value)}
-                              onKeyDown={e => { if (e.key === 'Escape') setRenamingProjectId(null); }}
-                              className="w-full rounded border border-[var(--accent-400)] bg-white dark:bg-zinc-900 px-2 py-0.5 text-sm font-semibold text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-[var(--accent-400)]"
-                              disabled={savingRename}
-                            />
-                            <p className="mt-1 text-[10px] text-zinc-400">Enter to save · Esc to cancel</p>
-                          </form>
-                        ) : (
-                          <div className="flex items-start gap-1">
-                            <button
-                              onClick={() => { setContextMenuProjectId(null); selectProject(project.id); }}
-                              className="min-w-0 flex-1 p-3 text-left"
-                              aria-current={active ? 'page' : undefined}
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{project.title}</p>
-                                  <div className="mt-1 flex items-center gap-2">
-                                    <span className="text-xs capitalize text-zinc-500 dark:text-zinc-400">{formatKind(project.kind)}</span>
-                                    {segCount !== null && segCount > 0 && (
-                                      <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
-                                        {segCount} seg
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </button>
-                            <button
-                              aria-label="Project options"
-                              onClick={e => { e.stopPropagation(); setContextMenuProjectId(hasMenu ? null : project.id); }}
-                              className={`mt-2 mr-1.5 shrink-0 rounded p-1 transition-colors ${
-                                hasMenu
-                                  ? 'text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800'
-                                  : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 opacity-0 group-hover:opacity-100 focus:opacity-100'
-                              }`}
-                            >
-                              <MoreHorizontal size={14} />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      {hasMenu && (
-                        <div
-                          className="absolute right-0 top-full z-40 mt-1 min-w-[160px] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xl py-1"
-                          role="menu"
-                        >
-                          <button
-                            role="menuitem"
-                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                            onClick={() => { setContextMenuProjectId(null); setRenamingProjectId(project.id); setRenameValue(project.title); }}
-                          >
-                            <Pencil size={14} />
-                            Rename
-                          </button>
-                          <button
-                            role="menuitem"
-                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-amber-600 dark:text-amber-400 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                            onClick={() => handleArchiveFromMenu(project)}
-                          >
-                            <Archive size={14} />
-                            Archive
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {/* Archived projects toggle */}
-                {(() => {
-                  const archived = projects.filter(p => p.status === 'archived');
-                  if (archived.length === 0) return null;
-                  return (
-                    <div className="pt-2">
-                      <button
-                        onClick={() => setShowArchived(prev => !prev)}
-                        className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
-                      >
-                        <ChevronRight size={12} className={`transition-transform ${showArchived ? 'rotate-90' : ''}`} />
-                        {showArchived ? 'Hide archived' : `Show archived (${archived.length})`}
-                      </button>
-                      {showArchived && archived.map(project => {
-                        const active = project.id === selectedProjectId;
-                        const hasMenu = contextMenuProjectId === project.id;
-                        return (
-                          <div key={project.id} className="relative group mt-1">
-                            <div
-                              className={`flex items-start gap-1 w-full rounded-lg border transition-colors opacity-60 hover:opacity-100 ${
-                                active
-                                  ? 'border-[var(--accent-400)] bg-[var(--accent-50)] dark:border-[var(--accent-600)] dark:bg-zinc-900'
-                                  : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                              }`}
-                            >
-                              <button
-                                onClick={() => { setContextMenuProjectId(null); selectProject(project.id); }}
-                                className="min-w-0 flex-1 p-3 text-left"
-                              >
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{project.title}</p>
-                                    <p className="mt-1 text-xs capitalize text-zinc-500 dark:text-zinc-400">{formatKind(project.kind)}</p>
-                                  </div>
-                                  <span className="shrink-0 rounded-full bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
-                                    archived
-                                  </span>
-                                </div>
-                              </button>
-                              <button
-                                aria-label="Project options"
-                                onClick={e => { e.stopPropagation(); setContextMenuProjectId(hasMenu ? null : project.id); }}
-                                className={`mt-2 mr-1.5 shrink-0 rounded p-1 transition-colors ${
-                                  hasMenu
-                                    ? 'text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800'
-                                    : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 opacity-0 group-hover:opacity-100 focus:opacity-100'
-                                }`}
-                              >
-                                <MoreHorizontal size={14} />
-                              </button>
-                            </div>
-                            {hasMenu && (
-                              <div
-                                className="absolute right-0 top-full z-40 mt-1 min-w-[160px] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xl py-1"
-                                role="menu"
-                              >
-                                <button
-                                  role="menuitem"
-                                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                                  onClick={() => { setContextMenuProjectId(null); handleUnarchiveProject(project); }}
-                                >
-                                  <ArchiveRestore size={14} />
-                                  Unarchive
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-              </>
-            )}
-          </div>
+          <ProjectListPanel
+            projects={projects}
+            selectedProjectId={selectedProjectId}
+            clients={clients}
+            projectSummaries={projectSummaries}
+            segmentCounts={sidebarSegmentCounts}
+            loadingProjects={loadingProjects}
+            creating={creating}
+            newTitle={newTitle}
+            newKind={newKind}
+            newDescription={newDescription}
+            newClientId={newClientId}
+            newTemplateId={newTemplateId}
+            showArchived={showArchived}
+            contextMenuProjectId={contextMenuProjectId}
+            renamingProjectId={renamingProjectId}
+            renameValue={renameValue}
+            savingRename={savingRename}
+            onNewTitleChange={setNewTitle}
+            onNewKindChange={setNewKind}
+            onNewDescriptionChange={setNewDescription}
+            onNewClientIdChange={setNewClientId}
+            onNewTemplateIdChange={setNewTemplateId}
+            onCreateProject={handleCreateProject}
+            onSelectProject={selectProject}
+            onArchive={handleArchiveFromMenu}
+            onUnarchive={handleUnarchiveProject}
+            onStartRename={p => { setContextMenuProjectId(null); setRenamingProjectId(p.id); setRenameValue(p.title); }}
+            onRenameValueChange={setRenameValue}
+            onSaveRename={handleSaveRename}
+            onCancelRename={() => setRenamingProjectId(null)}
+            onSetContextMenu={setContextMenuProjectId}
+            onSetShowArchived={setShowArchived}
+          />
         </aside>
 
         {/* Content pane */}
         <main
-          className={`min-h-0 overflow-y-auto ${isPhone ? 'pb-32' : ''} ${isPhone && mobileTab === 'script' ? 'border-t border-zinc-200 dark:border-zinc-800' : ''}`}
+          className={`min-h-0 overflow-y-auto ${isPhone ? 'border-t border-zinc-200 pb-28 dark:border-zinc-800' : ''}`}
           style={isPhone ? { scrollPaddingBottom: 'calc(7rem + env(safe-area-inset-bottom))' } : undefined}
         >
           {error && (
@@ -1104,9 +1010,7 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             </div>
           )}
 
-          {isPhone && mobileTab === 'jobs' ? (
-            renderMobileJobsPanel()
-          ) : showCompactTool ? (
+          {showCompactTool ? (
             <div className="min-h-full">
               <ScriptReaderModal
                 voices={voices}
@@ -1118,87 +1022,77 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             </div>
           ) : selectedProject ? (
             <div className="p-4 sm:p-6 space-y-6">
-              {/* Project title */}
-              <div className="min-w-0">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-zinc-100 dark:bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-600 dark:text-zinc-300">
-                    {formatKind(selectedProject.kind)}
-                  </span>
-                  <span className="rounded-full bg-zinc-100 dark:bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-600 dark:text-zinc-300">
-                    {selectedProject.status}
-                  </span>
-                </div>
-                <h3 className="text-2xl font-serif font-medium text-zinc-900 dark:text-white">{selectedProject.title}</h3>
-                {selectedProject.default_voice_name && (
-                  <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                    Default voice: {selectedProject.default_voice_name}
-                  </p>
-                )}
+              {isPhone && (
+                <MobileProjectSwitcher
+                  project={selectedProject}
+                  client={selectedClient}
+                  kindLabel={selectedProjectKindLabel}
+                  stageSummary={mobileStageSummary}
+                  open={showMobileProjectSwitcher}
+                  onOpenChange={setShowMobileProjectSwitcher}
+                >
+                  <ProjectListPanel
+                    projects={projects}
+                    selectedProjectId={selectedProjectId}
+                    clients={clients}
+                    projectSummaries={projectSummaries}
+                    segmentCounts={sidebarSegmentCounts}
+                    loadingProjects={loadingProjects}
+                    creating={creating}
+                    newTitle={newTitle}
+                    newKind={newKind}
+                    newDescription={newDescription}
+                    newClientId={newClientId}
+                    newTemplateId={newTemplateId}
+                    showArchived={showArchived}
+                    contextMenuProjectId={contextMenuProjectId}
+                    renamingProjectId={renamingProjectId}
+                    renameValue={renameValue}
+                    savingRename={savingRename}
+                    onNewTitleChange={setNewTitle}
+                    onNewKindChange={setNewKind}
+                    onNewDescriptionChange={setNewDescription}
+                    onNewClientIdChange={setNewClientId}
+                    onNewTemplateIdChange={setNewTemplateId}
+                    onCreateProject={handleCreateProject}
+                    onSelectProject={id => {
+                      selectProject(id);
+                      setShowMobileProjectSwitcher(false);
+                    }}
+                    onArchive={handleArchiveFromMenu}
+                    onUnarchive={handleUnarchiveProject}
+                    onStartRename={p => { setContextMenuProjectId(null); setRenamingProjectId(p.id); setRenameValue(p.title); }}
+                    onRenameValueChange={setRenameValue}
+                    onSaveRename={handleSaveRename}
+                    onCancelRename={() => setRenamingProjectId(null)}
+                    onSetContextMenu={setContextMenuProjectId}
+                    onSetShowArchived={setShowArchived}
+                  />
+                </MobileProjectSwitcher>
+              )}
 
-                {/* Production stage indicator */}
-                {segments.length > 0 && (
-                  <div className="mt-3 flex items-center gap-1 overflow-x-auto pb-0.5">
-                    {[
-                      {
-                        label: 'Scripted',
-                        detail: `${segments.length} seg${segments.length !== 1 ? 's' : ''}`,
-                        done: true,
-                        active: false,
-                      },
-                      {
-                        label: 'Cast',
-                        detail: castProfiles.length > 0 ? `${castProfiles.length}` : null,
-                        done: castProfiles.length > 0,
-                        active: false,
-                      },
-                      {
-                        label: 'Rendered',
-                        detail: `${renderedCount}/${segments.length}`,
-                        done: renderedCount === segments.length,
-                        active: renderedCount > 0 && renderedCount < segments.length,
-                      },
-                      {
-                        label: 'Reviewed',
-                        detail: approvedCount > 0 ? `${approvedCount}/${renderedCount}` : null,
-                        done: approvedCount > 0 && approvedCount === renderedCount,
-                        active: approvedCount > 0 && approvedCount < renderedCount,
-                      },
-                      {
-                        label: 'Export ready',
-                        detail: null,
-                        done: draftCount === 0 && segments.length > 0,
-                        active: false,
-                      },
-                    ].map((stage, i, arr) => (
-                      <React.Fragment key={stage.label}>
-                        {i > 0 && (
-                          <ChevronRight size={10} className="shrink-0 text-zinc-300 dark:text-zinc-600" aria-hidden="true" />
-                        )}
-                        <span
-                          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-                            stage.done
-                              ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
-                              : stage.active
-                              ? 'bg-[var(--accent-100)] dark:bg-[var(--accent-900)]/40 text-[var(--accent-700)] dark:text-[var(--accent-300)]'
-                              : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500'
-                          }`}
-                        >
-                          {stage.done && <Check size={8} aria-hidden="true" />}
-                          {stage.label}
-                          {stage.detail && (
-                            <span className="opacity-60">{stage.detail}</span>
-                          )}
-                        </span>
-                      </React.Fragment>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {/* Project header */}
+              <ProjectHeader
+                project={selectedProject}
+                client={selectedClient}
+                segments={segments}
+                castProfiles={castProfiles}
+                qcIssues={qcIssues}
+                renderedCount={renderedCount}
+                approvedCount={approvedCount}
+                draftCount={draftCount}
+                compactStage={isPhone}
+                hideTitle={isPhone}
+              />
 
               {/* Content tab bar */}
               <div className="-mx-4 sm:-mx-6 px-4 sm:px-6 border-b border-zinc-200 dark:border-zinc-800">
-                <div className="flex items-center justify-between gap-2">
-                  <nav className="flex -mb-px" role="tablist" aria-label="Project workspace">
+                <div className={isPhone ? 'space-y-3 py-3' : 'flex items-center justify-between gap-2'}>
+                  <nav
+                    className={isPhone ? 'grid w-full grid-cols-5 gap-1 rounded-lg border border-zinc-200 bg-zinc-50 p-1 dark:border-zinc-800 dark:bg-zinc-900/50' : 'flex -mb-px'}
+                    role="tablist"
+                    aria-label="Project workspace"
+                  >
                     {WORKSPACE_TABS.map(tab => (
                       <button
                         key={tab.id}
@@ -1209,133 +1103,71 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                         aria-controls={workspacePanelId(tab.id)}
                         tabIndex={activeWorkspaceTab === tab.id ? 0 : -1}
                         onClick={() => setActiveWorkspaceTab(tab.id)}
-                        className={`inline-flex h-9 items-center gap-1.5 border-b-2 px-3 text-xs font-semibold transition-colors ${
-                          activeWorkspaceTab === tab.id
-                            ? 'border-[var(--accent-500)] text-[var(--accent-700)] dark:text-[var(--accent-300)]'
-                            : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-600'
-                        }`}
+                        className={isPhone
+                          ? `inline-flex h-10 min-w-0 items-center justify-center gap-1 rounded-md px-1 text-[11px] font-semibold transition-colors ${
+                              activeWorkspaceTab === tab.id
+                                ? 'bg-white text-[var(--accent-700)] shadow-sm dark:bg-zinc-950 dark:text-[var(--accent-300)]'
+                                : 'text-zinc-500 dark:text-zinc-400'
+                            }`
+                          : `inline-flex h-9 items-center gap-1.5 border-b-2 px-3 text-xs font-semibold transition-colors ${
+                              activeWorkspaceTab === tab.id
+                                ? 'border-[var(--accent-500)] text-[var(--accent-700)] dark:text-[var(--accent-300)]'
+                                : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-600'
+                            }`
+                        }
                       >
                         {tab.icon}
-                        <span className="hidden sm:inline">{tab.label}</span>
+                        <span className={isPhone ? 'min-w-0 truncate' : 'hidden sm:inline'}>{tab.label}</span>
                       </button>
                     ))}
                   </nav>
-                  <div className="flex items-center gap-1.5 pb-1">
-                    {activeWorkspaceTab === 'script' && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setShowScriptPrep(true)}
-                          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 px-2.5 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
-                          title="AI script prep"
-                        >
-                          <Sparkles size={13} />
-                          <span className="hidden sm:inline">Prep</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setShowImport(prev => !prev); setImportText(''); }}
-                          className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors ${
-                            showImport
-                              ? 'border-[var(--accent-400)] bg-[var(--accent-50)] dark:border-[var(--accent-600)] dark:bg-zinc-900 text-[var(--accent-700)] dark:text-[var(--accent-200)]'
-                              : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                          }`}
-                        >
-                          <Upload size={13} />
-                          <span className="hidden sm:inline">Import</span>
-                        </button>
-                        <button
-                          type="button"
-                          disabled={batchRendering}
-                          onClick={async () => {
-                            if (!selectedProject) return;
-                            setBatchRendering(true);
-                            try {
-                              const res = await batchRenderProject(selectedProject.id);
-                              showToast(`Rendering ${res.segment_count} segment${res.segment_count === 1 ? '' : 's'} (job ${res.job_id})`, 'success');
-                            } catch (err: any) {
-                              showToast(err?.message ?? 'Batch render failed.', 'error');
-                            } finally {
-                              setBatchRendering(false);
-                            }
-                          }}
-                          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-[var(--accent-600)] px-2.5 text-xs font-semibold text-white hover:bg-zinc-800 dark:hover:bg-[var(--accent-500)] transition-colors disabled:opacity-50"
-                        >
-                          {batchRendering ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
-                          <span className="hidden sm:inline">Render all</span>
-                        </button>
-                      </>
-                    )}
-                    {/* Overflow menu */}
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setShowOverflowMenu(prev => !prev)}
-                        aria-label="More actions"
-                        aria-haspopup="true"
-                        aria-expanded={showOverflowMenu}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
-                      >
-                        <MoreHorizontal size={15} />
-                      </button>
-                      {showOverflowMenu && (
-                        <>
-                          <div className="fixed inset-0 z-10" onClick={() => setShowOverflowMenu(false)} />
-                          <div className="absolute right-0 top-full mt-1 z-20 w-48 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-lg py-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSettingsVoice(selectedProject.default_voice_name ?? '');
-                                setSettingsLang(selectedProject.default_language_code ?? '');
-                                setSettingsProvider(selectedProject.default_provider ?? '');
-                                setSettingsModel(selectedProject.default_model ?? '');
-                                setSettingsFallbackProvider(selectedProject.fallback_provider ?? '');
-                                setSettingsFallbackModel(selectedProject.fallback_model ?? '');
-                                setSettingsStyleId(selectedProject.default_style_id ?? null);
-                                setShowProjectSettings(prev => !prev);
-                                setShowPronunciation(false);
-                                setActiveWorkspaceTab('script');
-                                setShowOverflowMenu(false);
-                              }}
-                              className={`flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold transition-colors ${
-                                showProjectSettings
-                                  ? 'text-[var(--accent-700)] dark:text-[var(--accent-300)] bg-[var(--accent-50)] dark:bg-zinc-900'
-                                  : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                              }`}
-                            >
-                              <Settings size={13} /> Project Settings
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowPronunciation(prev => !prev);
-                                setShowProjectSettings(false);
-                                setActiveWorkspaceTab('script');
-                                setShowOverflowMenu(false);
-                              }}
-                              className={`flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold transition-colors ${
-                                showPronunciation
-                                  ? 'text-[var(--accent-700)] dark:text-[var(--accent-300)] bg-[var(--accent-50)] dark:bg-zinc-900'
-                                  : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                              }`}
-                            >
-                              <BookOpen size={13} /> Dictionaries
-                            </button>
-                            <div className="my-1 border-t border-zinc-100 dark:border-zinc-800" />
-                            <button
-                              type="button"
-                              onClick={() => { setShowOverflowMenu(false); handleArchiveProject(); }}
-                              disabled={archiving || selectedProject.status === 'archived'}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-40"
-                            >
-                              {archiving ? <Loader2 size={13} className="animate-spin" /> : <Archive size={13} />}
-                              Archive Project
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
+                  <ProjectActionBar
+                    activeTab={activeWorkspaceTab}
+                    selectedProject={selectedProject}
+                    archiving={archiving}
+                    batchRendering={batchRendering}
+                    showImport={showImport}
+                    showProjectSettings={showProjectSettings}
+                    showPronunciation={showPronunciation}
+                    showOverflowMenu={showOverflowMenu}
+                    mobile={isPhone}
+                    onPrep={() => setShowScriptPrep(true)}
+                    onToggleImport={() => {
+                      setShowImport(prev => !prev);
+                      setImportText('');
+                      setImportPreview(null);
+                      setImportPreviewSource('');
+                      setImportPreviewError(null);
+                    }}
+                    onRenderAll={async () => {
+                      if (!selectedProject) return;
+                      setBatchRendering(true);
+                      try {
+                        const res = await batchRenderProject(selectedProject.id);
+                        showToast(`Rendering ${res.segment_count} segment${res.segment_count === 1 ? '' : 's'} (job ${res.job_id})`, 'success');
+                      } catch (err: any) {
+                        showToast(err?.message ?? 'Batch render failed.', 'error');
+                      } finally {
+                        setBatchRendering(false);
+                      }
+                    }}
+                    onToggleSettings={() => {
+                      setSettingsVoice(selectedProject.default_voice_name ?? '');
+                      setSettingsLang(selectedProject.default_language_code ?? '');
+                      setSettingsModel(selectedProject.default_model ?? 'gemini-3.1-flash-tts-preview');
+                      setSettingsStyleId(selectedProject.default_style_id ?? null);
+                      setShowProjectSettings(prev => !prev);
+                      setShowPronunciation(false);
+                      setShowOverflowMenu(false);
+                    }}
+                    onTogglePronunciation={() => {
+                      setShowPronunciation(prev => !prev);
+                      setShowProjectSettings(false);
+                      setShowOverflowMenu(false);
+                    }}
+                    onArchiveProject={() => { setShowOverflowMenu(false); handleArchiveProject(); }}
+                    onSetShowOverflowMenu={setShowOverflowMenu}
+                  />
                 </div>
               </div>
 
@@ -1348,33 +1180,6 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                 {/* ── Script tab ─────────────────────────────────────── */}
                 {activeWorkspaceTab === 'script' && (
                   <>
-                  {/* Project settings panel */}
-                  {showProjectSettings && selectedProject && (
-                    <ProjectSettingsPanel
-                      selectedProject={selectedProject}
-                      voices={voices}
-                      styles={styles}
-                      settingsVoice={settingsVoice}
-                      settingsLang={settingsLang}
-                      settingsProvider={settingsProvider}
-                      settingsModel={settingsModel}
-                      settingsFallbackProvider={settingsFallbackProvider}
-                      settingsFallbackModel={settingsFallbackModel}
-                      settingsStyleId={settingsStyleId}
-                      savingSettings={savingSettings}
-                      onChangeVoice={setSettingsVoice}
-                      onChangeLang={setSettingsLang}
-                      onChangeProvider={setSettingsProvider}
-                      onChangeModel={setSettingsModel}
-                      onChangeFallbackProvider={setSettingsFallbackProvider}
-                      onChangeFallbackModel={setSettingsFallbackModel}
-                      onChangeStyleId={setSettingsStyleId}
-                      onStyleCreated={s => setStyles(prev => [...prev, s])}
-                      onSave={handleSaveProjectSettings}
-                      onClose={() => setShowProjectSettings(false)}
-                    />
-                  )}
-
                   {/* Pronunciation editor panel */}
                   {showPronunciation && selectedProject && (
                     <PronunciationEditor
@@ -1403,10 +1208,22 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                     <ProjectImportPanel
                       importText={importText}
                       importing={importing}
-                      onChangeText={setImportText}
+                      previewing={previewingImport}
+                      preview={importPreview}
+                      previewStale={importPreviewStale}
+                      previewError={importPreviewError}
+                      mobile={isPhone}
+                      onChangeText={handleImportTextChange}
+                      onPreview={handlePreviewImport}
                       onSubmit={handleImport}
                       onFileImport={handleFileImport}
-                      onClose={() => { setShowImport(false); setImportText(''); }}
+                      onClose={() => {
+                        setShowImport(false);
+                        setImportText('');
+                        setImportPreview(null);
+                        setImportPreviewSource('');
+                        setImportPreviewError(null);
+                      }}
                     />
                   )}
 
@@ -1625,6 +1442,10 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                     projectId={selectedProject.id}
                     sections={sections}
                     segments={segments}
+                    qcIssues={qcIssues}
+                    renderingMissingAudio={batchRendering}
+                    onRenderMissingAudio={handleRenderMissingAudio}
+                    onGoToReview={() => setActiveWorkspaceTab('review')}
                   />
                 )}
 
@@ -1634,6 +1455,11 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                     projectId={selectedProject.id}
                     totalSegments={segments.length}
                     renderedSegments={renderedCount}
+                    segments={segments}
+                    qcIssues={qcIssues}
+                    renderingMissingAudio={batchRendering}
+                    onRenderMissingAudio={handleRenderMissingAudio}
+                    onGoToReview={() => setActiveWorkspaceTab('review')}
                     inline
                   />
                 )}
@@ -1649,7 +1475,30 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
           )}
         </main>
       </div>
-      {renderMobileTabs()}
+
+      {/* Project settings drawer — rendered outside the main grid so it doesn't shift layout */}
+      {selectedProject && (
+        <ProjectSettingsDrawer
+          open={showProjectSettings}
+          project={selectedProject}
+          voices={voices}
+          customPresets={customPresets}
+          styles={styles}
+          settingsVoice={settingsVoice}
+          settingsLang={settingsLang}
+          settingsModel={settingsModel}
+          settingsStyleId={settingsStyleId}
+          savingSettings={savingSettings}
+          onChangeVoice={setSettingsVoice}
+          onChangeLang={setSettingsLang}
+          onChangeModel={setSettingsModel}
+          onChangeStyleId={setSettingsStyleId}
+          onStyleCreated={s => setStyles(prev => [...prev, s])}
+          onSave={handleSaveProjectSettings}
+          onClose={() => setShowProjectSettings(false)}
+          mobile={isPhone}
+        />
+      )}
     </div>
   );
 };

@@ -91,8 +91,11 @@ const SegmentTakeList: React.FC<SegmentTakeListProps> = ({
   onTakesChanged,
 }) => {
   const { showToast } = useToast();
-  const isMounted = useRef(true);
-  useEffect(() => () => { isMounted.current = false; }, []);
+  const isMounted = useRef(false);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
 
   const [expanded, setExpanded] = useState(false);
   const [takes, setTakes] = useState<SegmentTake[]>([]);

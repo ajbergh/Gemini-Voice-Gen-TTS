@@ -16,6 +16,7 @@ import {
   approveTake,
   createQcIssue,
   flagTake,
+  getTakeAudio,
   listProjectQcIssues,
   listProjectSegments,
   listSegmentTakes,
@@ -43,7 +44,7 @@ interface ReviewModeProps {
 
 /** Render the modal review workflow for approving, flagging, and annotating takes. */
 export default function ReviewMode({ project, onClose, isDarkMode = false, inline = false }: ReviewModeProps) {
-  const { playUrl, stop, isPlaying } = useAudio();
+  const { playPcm, stop, isPlaying } = useAudio();
 
   // ── Data ────────────────────────────────────────────────────────────────────
   const [segments, setSegments] = useState<ScriptSegment[]>([]);
@@ -121,13 +122,16 @@ export default function ReviewMode({ project, onClose, isDarkMode = false, inlin
   }, [project.id]);
 
   // ── Playback ─────────────────────────────────────────────────────────────────
-  const playCurrentTake = useCallback(() => {
+  const playCurrentTake = useCallback(async () => {
     if (!selectedTake?.audio_path) return;
-    playUrl(`/api/audio/${encodeURIComponent(selectedTake.audio_path)}`, {
-      label: selectedSegment?.speaker_label ?? 'Take',
-      source: 'history',
-    });
-  }, [selectedTake, selectedSegment, playUrl]);
+    try {
+      const base64 = await getTakeAudio(selectedTake.project_id, selectedTake.segment_id, selectedTake.id);
+      await playPcm(base64, {
+        label: selectedSegment?.speaker_label ?? 'Take',
+        source: 'history',
+      });
+    } catch { /* ignore playback errors */ }
+  }, [selectedTake, selectedSegment, playPcm]);
 
   const handlePause = useCallback(() => stop(), [stop]);
 

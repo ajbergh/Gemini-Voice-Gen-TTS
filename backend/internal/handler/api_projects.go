@@ -20,6 +20,23 @@ type ProjectsHandler struct {
 	Store *store.Store
 }
 
+type importPreviewSegment struct {
+	ScriptText string `json:"script_text"`
+}
+
+type importPreviewSection struct {
+	Title    string                 `json:"title"`
+	Kind     string                 `json:"kind"`
+	Segments []importPreviewSegment `json:"segments"`
+}
+
+type importPreviewResponse struct {
+	Sections            []importPreviewSection `json:"sections"`
+	UnsectionedSegments []importPreviewSegment `json:"unsectioned_segments"`
+	SectionCount        int                    `json:"section_count"`
+	SegmentCount        int                    `json:"segment_count"`
+}
+
 // ListProjects returns all script projects.
 func (h *ProjectsHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
 	projects, err := h.Store.ListProjects()
@@ -31,6 +48,19 @@ func (h *ProjectsHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
 		projects = []store.ScriptProject{}
 	}
 	writeJSON(w, http.StatusOK, projects)
+}
+
+// ListProjectSummaries returns list-level counts for every script project.
+func (h *ProjectsHandler) ListProjectSummaries(w http.ResponseWriter, r *http.Request) {
+	summaries, err := h.Store.ListProjectSummaries()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list project summaries")
+		return
+	}
+	if summaries == nil {
+		summaries = []store.ScriptProjectSummary{}
+	}
+	writeJSON(w, http.StatusOK, summaries)
 }
 
 // CreateProject creates a new script project.
@@ -272,6 +302,28 @@ func (h *ProjectsHandler) DeleteSegment(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
+// PreviewProjectImport parses import text without writing sections or segments.
+func (h *ProjectsHandler) PreviewProjectImport(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireProject(w, r); !ok {
+		return
+	}
+
+	var req struct {
+		Text     string `json:"text"`
+		Filename string `json:"filename"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if strings.TrimSpace(req.Text) == "" {
+		writeError(w, http.StatusBadRequest, "text is required")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, parseProjectImport(req.Text))
+}
+
 // ImportProject parses a plain-text or Markdown document into sections and
 // segments and appends them to the project.
 //
@@ -305,15 +357,13 @@ func (h *ProjectsHandler) ImportProject(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Split into paragraphs on one or more blank lines.
-	rawParagraphs := splitParagraphs(req.Text)
+	preview := parseProjectImport(req.Text)
 
 	var (
-		currentSectionID *int64
-		sectionOrder     int
-		segmentOrder     int
-		sectionsCreated  int
-		segmentsCreated  int
+		sectionOrder    int
+		segmentOrder    int
+		sectionsCreated int
+		segmentsCreated int
 	)
 
 	// Fetch current max sort orders so new items are appended after existing ones.
@@ -332,46 +382,48 @@ func (h *ProjectsHandler) ImportProject(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	for _, para := range rawParagraphs {
-		para = strings.TrimSpace(para)
-		if para == "" {
-			continue
+	createSegment := func(sectionID *int64, segment importPreviewSegment) bool {
+		seg := store.ScriptSegment{
+			ProjectID:  projectID,
+			SectionID:  sectionID,
+			ScriptText: segment.ScriptText,
+			Status:     "draft",
+			SortOrder:  segmentOrder,
 		}
-		firstLine := strings.SplitN(para, "\n", 2)[0]
-		if strings.HasPrefix(firstLine, "#") {
-			// Heading → new section.
-			title := strings.TrimSpace(strings.TrimLeft(firstLine, "#"))
-			if title == "" {
-				title = "Untitled Section"
-			}
-			id, err := h.Store.CreateSection(store.ScriptSection{
-				ProjectID: projectID,
-				Kind:      "chapter",
-				Title:     title,
-				SortOrder: sectionOrder,
-			})
-			if err != nil {
-				writeError(w, http.StatusInternalServerError, "failed to create section")
+		if _, err := h.Store.CreateSegment(seg); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to create segment")
+			return false
+		}
+		segmentOrder++
+		segmentsCreated++
+		return true
+	}
+
+	for _, segment := range preview.UnsectionedSegments {
+		if !createSegment(nil, segment) {
+			return
+		}
+	}
+
+	for _, section := range preview.Sections {
+		id, err := h.Store.CreateSection(store.ScriptSection{
+			ProjectID: projectID,
+			Kind:      section.Kind,
+			Title:     section.Title,
+			SortOrder: sectionOrder,
+		})
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to create section")
+			return
+		}
+		sectionOrder++
+		sectionsCreated++
+
+		sectionID := id
+		for _, segment := range section.Segments {
+			if !createSegment(&sectionID, segment) {
 				return
 			}
-			sectionOrder++
-			sectionsCreated++
-			currentSectionID = &id
-		} else {
-			// Body text → new segment.
-			seg := store.ScriptSegment{
-				ProjectID:  projectID,
-				SectionID:  currentSectionID,
-				ScriptText: para,
-				Status:     "draft",
-				SortOrder:  segmentOrder,
-			}
-			if _, err := h.Store.CreateSegment(seg); err != nil {
-				writeError(w, http.StatusInternalServerError, "failed to create segment")
-				return
-			}
-			segmentOrder++
-			segmentsCreated++
 		}
 	}
 
@@ -379,6 +431,48 @@ func (h *ProjectsHandler) ImportProject(w http.ResponseWriter, r *http.Request) 
 		"sections_created": sectionsCreated,
 		"segments_created": segmentsCreated,
 	})
+}
+
+// parseProjectImport converts Markdown/plain-text import content into previewable structure.
+func parseProjectImport(text string) importPreviewResponse {
+	preview := importPreviewResponse{
+		Sections:            []importPreviewSection{},
+		UnsectionedSegments: []importPreviewSegment{},
+	}
+	rawParagraphs := splitParagraphs(text)
+	currentSectionIndex := -1
+
+	for _, para := range rawParagraphs {
+		para = strings.TrimSpace(para)
+		if para == "" {
+			continue
+		}
+		firstLine := strings.SplitN(para, "\n", 2)[0]
+		if strings.HasPrefix(firstLine, "#") {
+			title := strings.TrimSpace(strings.TrimLeft(firstLine, "#"))
+			if title == "" {
+				title = "Untitled Section"
+			}
+			preview.Sections = append(preview.Sections, importPreviewSection{
+				Title:    title,
+				Kind:     "chapter",
+				Segments: []importPreviewSegment{},
+			})
+			currentSectionIndex = len(preview.Sections) - 1
+			preview.SectionCount++
+			continue
+		}
+
+		segment := importPreviewSegment{ScriptText: para}
+		if currentSectionIndex >= 0 {
+			preview.Sections[currentSectionIndex].Segments = append(preview.Sections[currentSectionIndex].Segments, segment)
+		} else {
+			preview.UnsectionedSegments = append(preview.UnsectionedSegments, segment)
+		}
+		preview.SegmentCount++
+	}
+
+	return preview
 }
 
 // splitParagraphs splits text on one or more blank lines.

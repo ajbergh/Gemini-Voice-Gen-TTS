@@ -32,6 +32,7 @@ import {
 } from '../api';
 import { decodePcmBase64ToFloat32 } from '../audio/pcm';
 import {
+  QcIssue,
   ScriptSection,
   ScriptSegment,
   SegmentTake,
@@ -40,11 +41,17 @@ import { useAudio } from './AudioProvider';
 import ExportProfilePicker from './ExportProfilePicker';
 import WaveformCanvas from './WaveformCanvas';
 import { useToast } from './ToastProvider';
+import ExportReadinessChecklist from './projects/ExportReadinessChecklist';
+import { getExportReadiness } from './projects/exportReadiness';
 
 interface TimelineReviewProps {
   projectId: number;
   sections: ScriptSection[];
   segments: ScriptSegment[];
+  qcIssues?: QcIssue[];
+  renderingMissingAudio?: boolean;
+  onRenderMissingAudio?: () => void;
+  onGoToReview?: () => void;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -58,7 +65,15 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 /** Render the stitched-project timeline review and waveform download workflow. */
-export default function TimelineReview({ projectId, sections, segments }: TimelineReviewProps) {
+export default function TimelineReview({
+  projectId,
+  sections,
+  segments,
+  qcIssues = [],
+  renderingMissingAudio = false,
+  onRenderMissingAudio,
+  onGoToReview,
+}: TimelineReviewProps) {
   const { playPcm, stop, isPlaying, currentTrack, progress } = useAudio();
   const { showToast } = useToast();
 
@@ -205,6 +220,11 @@ export default function TimelineReview({ projectId, sections, segments }: Timeli
   }
 
   const renderedCount = Object.values(bestTakes).filter(t => t?.audio_path).length;
+  const readiness = getExportReadiness({
+    segments,
+    qcIssues,
+    exportProfileSelected: profileId != null,
+  });
 
   return (
     <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
@@ -224,7 +244,7 @@ export default function TimelineReview({ projectId, sections, segments }: Timeli
           />
           <button
             type="button"
-            disabled={stitching || renderedCount === 0}
+            disabled={stitching || !readiness.canExport}
             onClick={handleStitch}
             className="inline-flex h-9 items-center gap-2 rounded-lg bg-zinc-900 dark:bg-[var(--accent-600)] px-4 text-xs font-semibold text-white hover:bg-zinc-700 dark:hover:bg-[var(--accent-500)] transition-colors disabled:opacity-50"
           >
@@ -235,6 +255,16 @@ export default function TimelineReview({ projectId, sections, segments }: Timeli
             Stitch & Export WAV
           </button>
         </div>
+      </div>
+
+      <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+        <ExportReadinessChecklist
+          readiness={readiness}
+          renderingMissingAudio={renderingMissingAudio}
+          onRenderMissingAudio={onRenderMissingAudio}
+          onGoToReview={onGoToReview}
+          onOpenQcIssues={onGoToReview}
+        />
       </div>
 
       {/* Segment rows */}

@@ -76,3 +76,106 @@ func TestSplitParagraphs(t *testing.T) {
 		})
 	}
 }
+
+func TestParseProjectImport(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		want  importPreviewResponse
+	}{
+		{
+			name:  "markdown headings",
+			input: "# Chapter One\n\nThe story begins.\n\n# Chapter Two\n\nThe adventure continues.",
+			want: importPreviewResponse{
+				Sections: []importPreviewSection{
+					{
+						Title: "Chapter One",
+						Kind:  "chapter",
+						Segments: []importPreviewSegment{
+							{ScriptText: "The story begins."},
+						},
+					},
+					{
+						Title: "Chapter Two",
+						Kind:  "chapter",
+						Segments: []importPreviewSegment{
+							{ScriptText: "The adventure continues."},
+						},
+					},
+				},
+				UnsectionedSegments: []importPreviewSegment{},
+				SectionCount:        2,
+				SegmentCount:        2,
+			},
+		},
+		{
+			name:  "plain text without headings",
+			input: "First paragraph.\n\nSecond paragraph.",
+			want: importPreviewResponse{
+				Sections: []importPreviewSection{},
+				UnsectionedSegments: []importPreviewSegment{
+					{ScriptText: "First paragraph."},
+					{ScriptText: "Second paragraph."},
+				},
+				SectionCount: 0,
+				SegmentCount: 2,
+			},
+		},
+		{
+			name:  "empty input",
+			input: "",
+			want: importPreviewResponse{
+				Sections:            []importPreviewSection{},
+				UnsectionedSegments: []importPreviewSegment{},
+				SectionCount:        0,
+				SegmentCount:        0,
+			},
+		},
+		{
+			name:  "multiple blank lines",
+			input: "# Chapter\n\n\n\nLine one.\n\n\nLine two.",
+			want: importPreviewResponse{
+				Sections: []importPreviewSection{
+					{
+						Title: "Chapter",
+						Kind:  "chapter",
+						Segments: []importPreviewSegment{
+							{ScriptText: "Line one."},
+							{ScriptText: "Line two."},
+						},
+					},
+				},
+				UnsectionedSegments: []importPreviewSegment{},
+				SectionCount:        1,
+				SegmentCount:        2,
+			},
+		},
+		{
+			name:  "empty heading fallback",
+			input: "###\n\nBody.",
+			want: importPreviewResponse{
+				Sections: []importPreviewSection{
+					{
+						Title: "Untitled Section",
+						Kind:  "chapter",
+						Segments: []importPreviewSegment{
+							{ScriptText: "Body."},
+						},
+					},
+				},
+				UnsectionedSegments: []importPreviewSegment{},
+				SectionCount:        1,
+				SegmentCount:        1,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseProjectImport(tc.input)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("parseProjectImport(%q)\n got  %#v\n want %#v", tc.input, got, tc.want)
+			}
+		})
+	}
+}

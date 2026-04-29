@@ -136,6 +136,17 @@ export interface ScriptProject {
   updated_at: string;
 }
 
+/** List-level production counts for a project. */
+export interface ProjectSummary {
+  project_id: number;
+  section_count: number;
+  segment_count: number;
+  rendered_count: number;
+  approved_count: number;
+  open_qc_count: number;
+  updated_at: string;
+}
+
 /** Ordered project section such as a chapter, scene, or folder. */
 export interface ScriptSection {
   id: number;
@@ -181,6 +192,23 @@ export type CreateScriptSectionInput = Partial<Omit<ScriptSection, 'id' | 'proje
 export type UpdateScriptSectionInput = CreateScriptSectionInput;
 export type CreateScriptSegmentInput = Partial<Omit<ScriptSegment, 'id' | 'project_id' | 'content_hash' | 'created_at' | 'updated_at'>>;
 export type UpdateScriptSegmentInput = CreateScriptSegmentInput;
+
+export interface ImportPreviewSegment {
+  script_text: string;
+}
+
+export interface ImportPreviewSection {
+  title: string;
+  kind: ScriptSectionKind | string;
+  segments: ImportPreviewSegment[];
+}
+
+export interface ImportPreview {
+  sections: ImportPreviewSection[];
+  unsectioned_segments: ImportPreviewSegment[];
+  section_count: number;
+  segment_count: number;
+}
 
 /** A single rendered audio take for a script segment. */
 export interface SegmentTake {

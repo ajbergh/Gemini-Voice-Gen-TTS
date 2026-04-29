@@ -564,7 +564,7 @@ func (h *BatchHandler) shouldCreateClippingIssue(metrics audioanalysis.Analysis)
 
 // filterRenderableSegments returns segments eligible for rendering.
 // If segmentIDs is non-empty, only those IDs are considered.
-// Unless force is true, only "draft" and "changed" status segments are included.
+// Unless force is true, only statuses that need audio are included.
 func filterRenderableSegments(segments []store.ScriptSegment, ids []int64, force bool) []store.ScriptSegment {
 	idSet := make(map[int64]bool, len(ids))
 	for _, id := range ids {
@@ -576,7 +576,7 @@ func filterRenderableSegments(segments []store.ScriptSegment, ids []int64, force
 		if len(idSet) > 0 && !idSet[seg.ID] {
 			continue
 		}
-		if !force && seg.Status != "draft" && seg.Status != "changed" {
+		if !force && seg.Status != "draft" && seg.Status != "changed" && seg.Status != "failed" {
 			continue
 		}
 		if seg.ScriptText == "" {

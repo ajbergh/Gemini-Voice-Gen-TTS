@@ -35,6 +35,17 @@ type ScriptProject struct {
 	UpdatedAt           string  `json:"updated_at"`
 }
 
+// ScriptProjectSummary contains list-level production counts for one project.
+type ScriptProjectSummary struct {
+	ProjectID     int64  `json:"project_id"`
+	SectionCount  int    `json:"section_count"`
+	SegmentCount  int    `json:"segment_count"`
+	RenderedCount int    `json:"rendered_count"`
+	ApprovedCount int    `json:"approved_count"`
+	OpenQcCount   int    `json:"open_qc_count"`
+	UpdatedAt     string `json:"updated_at"`
+}
+
 // ScriptSection groups project content into chapters, scenes, or folders.
 type ScriptSection struct {
 	ID           int64   `json:"id"`
@@ -98,6 +109,62 @@ func (s *Store) ListProjects() ([]ScriptProject, error) {
 		projects = append(projects, project)
 	}
 	return projects, rows.Err()
+}
+
+// ListProjectSummaries returns one summary row per project for sidebar and readiness metadata.
+func (s *Store) ListProjectSummaries() ([]ScriptProjectSummary, error) {
+	rows, err := s.db.Query(
+		`SELECT p.id,
+		        COALESCE(sec.section_count, 0) AS section_count,
+		        COALESCE(seg.segment_count, 0) AS segment_count,
+		        COALESCE(seg.rendered_count, 0) AS rendered_count,
+		        COALESCE(seg.approved_count, 0) AS approved_count,
+		        COALESCE(qc.open_qc_count, 0) AS open_qc_count,
+		        p.updated_at
+		   FROM script_projects p
+		   LEFT JOIN (
+		        SELECT project_id, COUNT(*) AS section_count
+		          FROM script_sections
+		         GROUP BY project_id
+		   ) sec ON sec.project_id = p.id
+		   LEFT JOIN (
+		        SELECT project_id,
+		               COUNT(*) AS segment_count,
+		               SUM(CASE WHEN status IN ('rendered', 'approved', 'locked') THEN 1 ELSE 0 END) AS rendered_count,
+		               SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) AS approved_count
+		          FROM script_segments
+		         GROUP BY project_id
+		   ) seg ON seg.project_id = p.id
+		   LEFT JOIN (
+		        SELECT project_id, COUNT(*) AS open_qc_count
+		          FROM qc_issues
+		         WHERE status = 'open'
+		         GROUP BY project_id
+		   ) qc ON qc.project_id = p.id
+		  ORDER BY p.updated_at DESC, p.id DESC`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query project summaries: %w", err)
+	}
+	defer rows.Close()
+
+	var summaries []ScriptProjectSummary
+	for rows.Next() {
+		var summary ScriptProjectSummary
+		if err := rows.Scan(
+			&summary.ProjectID,
+			&summary.SectionCount,
+			&summary.SegmentCount,
+			&summary.RenderedCount,
+			&summary.ApprovedCount,
+			&summary.OpenQcCount,
+			&summary.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan project summary: %w", err)
+		}
+		summaries = append(summaries, summary)
+	}
+	return summaries, rows.Err()
 }
 
 // CreateProject creates a new script project.

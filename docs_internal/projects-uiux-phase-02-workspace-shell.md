@@ -3,6 +3,34 @@
 > Parent plan: `docs_internal/projects-uiux-enhancements-plan.md`  
 > Goal: clarify navigation, project management, and action hierarchy without redesigning creation/import/export workflows yet.
 
+## Status
+
+| Slice | Title | Status |
+|-------|-------|--------|
+| 1 | Extract Shell Subcomponents | ✅ Complete |
+| 2 | Add Project Search And Sort | ✅ Complete |
+| 3 | Add Project List Metadata | ❌ Not started |
+| 4 | Collapse Create Form Behind New Project | ✅ Complete |
+| 5 | Move Project Settings To A Drawer | ✅ Complete |
+| 6 | Implement Tab-Aware Action Bar | ✅ Complete (Script + More only; other tabs deferred — see notes) |
+| 7 | Project Context Menu Expansion | ⏸ Partial (Rename/Archive/Unarchive only; Duplicate/Delete deferred) |
+
+### Incomplete work for Phase 2 sign-off
+
+**Slice 3 — Project List Metadata (backend required):**
+- `GET /api/projects/summary` endpoint not added — no store query, no route, no frontend `listProjectSummaries()`.
+- `segmentCounts` in `ProjectListPanel` is only populated for the currently-selected project (`{ [selectedProjectId]: segments.length }`). All other project cards show no count.
+- This is the only slice that requires backend changes. All frontend plumbing is ready; the prop is wired.
+
+**Slice 6 — Tab-Aware Action Bar (Cast/Review/Timeline/Export actions):**
+- `ProjectActionBar.tsx` currently surfaces Script-tab actions (Prep, Import, Render all) and the More overflow menu (Project Settings, Dictionaries, Archive).
+- Per the original plan, Cast/Review/Timeline/Export tabs each have their own primary actions. These are **not yet wired** in the action bar. Each tab's embedded panel still owns its own controls.
+- This is deferred per the plan note: "Do not duplicate controls if a child panel already owns complex behavior; expose callbacks gradually."
+
+**Slice 7 — Duplicate / Delete:**
+- Requires backend store tests + cascading cleanup before UI can expose them.
+- Deferred to Phase 3.
+
 ## Scope
 
 Phase 2 turns the current large `ProjectWorkspace.tsx` surface into a cleaner workspace shell. It adds better project list controls, a tab-aware action bar, and a drawer-based project settings experience.
@@ -47,7 +75,7 @@ The shell should answer:
 
 ## Implementation Slices
 
-### 1. Extract Shell Subcomponents
+### 1. Extract Shell Subcomponents ✅ Complete
 
 Files:
 - `components/ProjectWorkspace.tsx`
@@ -73,7 +101,7 @@ Acceptance criteria:
 - Behavior remains unchanged except for planned UX improvements.
 - New components receive typed props and do not directly call APIs unless needed.
 
-### 2. Add Project Search And Sort
+### 2. Add Project Search And Sort ✅ Complete
 
 Files:
 - `ProjectWorkspace.tsx`
@@ -97,7 +125,7 @@ Acceptance criteria:
 - With 10+ projects, users can find a project by title without scrolling.
 - Sorting is deterministic and does not mutate source `projects`.
 
-### 3. Add Project List Metadata
+### 3. Add Project List Metadata ❌ Not started
 
 Files:
 - Frontend: `components/projects/ProjectListPanel.tsx`
@@ -123,7 +151,7 @@ Acceptance criteria:
 - Project list shows segment count for every loaded project, not only the selected one.
 - Render/review readiness indicators are not stale after import/render/review actions.
 
-### 4. Collapse Create Form Behind New Project
+### 4. Collapse Create Form Behind New Project ✅ Complete
 
 Files:
 - `components/projects/ProjectListPanel.tsx`
@@ -147,7 +175,7 @@ Acceptance criteria:
 - Existing project list starts higher in the sidebar.
 - New project creation remains fast.
 
-### 5. Move Project Settings To A Drawer
+### 5. Move Project Settings To A Drawer ✅ Complete
 
 Files:
 - `components/ProjectSettingsPanel.tsx`
@@ -170,7 +198,7 @@ Acceptance criteria:
 - Opening project settings preserves the user's scroll position in the active tab.
 - Settings are clearly project-specific, not global app settings.
 
-### 6. Implement Tab-Aware Action Bar
+### 6. Implement Tab-Aware Action Bar ✅ Complete (Script + More only; Cast/Review/Timeline/Export deferred)
 
 Files:
 - `components/projects/ProjectActionBar.tsx`
@@ -207,7 +235,7 @@ Acceptance criteria:
 - Disabled actions explain why they are disabled.
 - More menu contains secondary project-level actions only.
 
-### 7. Project Context Menu Expansion
+### 7. Project Context Menu Expansion ⏸ Partial (Rename/Archive/Unarchive done; Duplicate/Delete deferred)
 
 Files:
 - `ProjectListPanel.tsx`
@@ -263,3 +291,14 @@ Manual checks:
 ## Done Definition
 
 Phase 2 is done when Projects has a stable shell, a searchable project list, a settings drawer, and a tab-aware action bar with no major workflow changes deferred into hidden child panels.
+
+### Current Phase 2 Completion Assessment
+
+**Complete** — The workspace shell is extracted, the settings drawer is live, search/sort/create form are all in `ProjectListPanel`, and the Script tab action bar is wired. Build passes, backend tests pass.
+
+**Remaining before full Phase 2 sign-off:**
+1. **Slice 3 (backend)**: Implement `GET /api/projects/summary` so the sidebar shows segment counts for all projects, not just the selected one.
+2. **Slice 6 (partial)**: Wire Cast/Review/Timeline/Export primary actions into `ProjectActionBar` as those tab panels expose appropriate callbacks.
+3. **Slice 7 (partial)**: Add Duplicate and Delete-archived actions once backend store tests cover cascading cleanup.
+
+Items 2 and 3 can ship incrementally without blocking Phase 3 work.

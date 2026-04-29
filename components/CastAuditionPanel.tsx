@@ -34,8 +34,11 @@ const CastAuditionPanel: React.FC<CastAuditionPanelProps> = ({
 }) => {
   const { showToast } = useToast();
   const { playPcm } = useAudio();
-  const isMounted = useRef(true);
-  useEffect(() => () => { isMounted.current = false; }, []);
+  const isMounted = useRef(false);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
 
   // Pre-fill with the first sample line when available
   const defaultSampleText = (() => {

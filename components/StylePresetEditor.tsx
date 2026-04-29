@@ -61,8 +61,11 @@ const StylePresetEditor: React.FC<StylePresetEditorProps> = ({
   onClose,
 }) => {
   const { showToast } = useToast();
-  const isMounted = useRef(true);
-  useEffect(() => () => { isMounted.current = false; }, []);
+  const isMounted = useRef(false);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
 
   const [name, setName]                   = useState(style?.name ?? '');
   const [description, setDescription]     = useState(style?.description ?? '');

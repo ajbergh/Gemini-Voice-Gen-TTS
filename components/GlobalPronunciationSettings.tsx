@@ -27,7 +27,7 @@ import { PronunciationDictionary, PronunciationEntry } from '../types';
 
 /** Render the settings-panel UI for app-wide pronunciation dictionaries. */
 export default function GlobalPronunciationSettings() {
-  const isMounted = useRef(true);
+  const isMounted = useRef(false);
   const [dicts, setDicts] = useState<PronunciationDictionary[]>([]);
   const [selectedDictId, setSelectedDictId] = useState<number | null>(null);
   const [entries, setEntries] = useState<PronunciationEntry[]>([]);
@@ -44,7 +44,10 @@ export default function GlobalPronunciationSettings() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => () => { isMounted.current = false; }, []);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
 
   const loadDicts = useCallback(async () => {
     setLoading(true);
