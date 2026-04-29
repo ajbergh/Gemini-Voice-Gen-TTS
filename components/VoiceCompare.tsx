@@ -45,6 +45,7 @@ async function decodePcm(base64: string, ctx: AudioContext): Promise<AudioBuffer
 
 const MAX_SLOTS = 3;
 
+/** Render the side-by-side voice comparison tray. */
 const VoiceCompare: React.FC<VoiceCompareProps> = ({ text, voices, systemInstruction }) => {
   const [slots, setSlots] = useState<CompareSlot[]>([
     { voiceName: voices[0]?.name || '', audioData: null, isLoading: false, isPlaying: false, error: null },

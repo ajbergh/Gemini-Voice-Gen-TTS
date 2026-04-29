@@ -13,7 +13,6 @@ import (
 
 	"github.com/ajbergh/gemini-voice-gen-tts/backend/internal/crypto"
 	"github.com/ajbergh/gemini-voice-gen-tts/backend/internal/gemini"
-	"github.com/ajbergh/gemini-voice-gen-tts/backend/internal/openai"
 	"github.com/ajbergh/gemini-voice-gen-tts/backend/internal/store"
 )
 
@@ -110,15 +109,7 @@ func (h *KeysHandler) TestKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := gemini.NewClient(string(plaintext))
-	var testErr error
-	switch provider {
-	case "openai":
-		oaiClient := openai.NewClient(string(plaintext))
-		testErr = oaiClient.TestKey()
-	default:
-		testErr = client.TestKey()
-	}
-	if testErr != nil {
+	if testErr := client.TestKey(); testErr != nil {
 		slog.Warn("API key validation failed", "error", testErr)
 		writeJSON(w, http.StatusOK, map[string]any{"valid": false, "message": "API key validation failed. Check your key and try again."})
 		return

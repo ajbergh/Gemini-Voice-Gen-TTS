@@ -1,6 +1,7 @@
 // Copyright 2025 ajbergh
 // SPDX-License-Identifier: Apache-2.0
 
+// Package handler - cache_security.go validates cached media paths before IO.
 package handler
 
 import (
@@ -60,6 +61,7 @@ func normalizedCachedImagePath(cacheDir, storedPath string) (string, bool) {
 	return normalizedCachedFilePath(cacheDir, storedPath, ".png", ".jpg", ".jpeg", ".webp")
 }
 
+// readCachedAudioFile reads a cached PCM file only after path validation.
 func readCachedAudioFile(cacheDir, storedPath string) ([]byte, error) {
 	safePath, ok := normalizedCachedAudioPath(cacheDir, storedPath)
 	if !ok {
@@ -68,6 +70,7 @@ func readCachedAudioFile(cacheDir, storedPath string) ([]byte, error) {
 	return os.ReadFile(safePath)
 }
 
+// removeCachedAudioFile deletes a cached PCM file only after path validation.
 func removeCachedAudioFile(cacheDir, storedPath string) error {
 	safePath, ok := normalizedCachedAudioPath(cacheDir, storedPath)
 	if !ok {
@@ -76,6 +79,7 @@ func removeCachedAudioFile(cacheDir, storedPath string) error {
 	return os.Remove(safePath)
 }
 
+// readCachedImageFile reads a cached preset image only after path validation.
 func readCachedImageFile(cacheDir, storedPath string) ([]byte, error) {
 	safePath, ok := normalizedCachedImagePath(cacheDir, storedPath)
 	if !ok {
@@ -84,6 +88,7 @@ func readCachedImageFile(cacheDir, storedPath string) ([]byte, error) {
 	return os.ReadFile(safePath)
 }
 
+// removeCachedImageFile deletes a cached preset image only after path validation.
 func removeCachedImageFile(cacheDir, storedPath string) error {
 	safePath, ok := normalizedCachedImagePath(cacheDir, storedPath)
 	if !ok {

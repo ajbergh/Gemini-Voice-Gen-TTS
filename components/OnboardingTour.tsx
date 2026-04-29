@@ -69,6 +69,7 @@ interface OnboardingTourProps {
   onComplete?: () => void;
 }
 
+/** Render the first-run onboarding tour and completion tracking. */
 const OnboardingTour: React.FC<OnboardingTourProps> = ({ forceShow, onComplete }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);

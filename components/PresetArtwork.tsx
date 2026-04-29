@@ -3,6 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * PresetArtwork.tsx - Resilient image renderer for saved presets.
+ *
+ * Prefers generated preset headshots when available and falls back to the voice
+ * artwork URL without leaving broken image placeholders in preset cards.
+ */
+
 import React, { useEffect, useState } from 'react';
 import { getPresetImageUrl } from '../api';
 
@@ -14,6 +21,7 @@ interface PresetArtworkProps {
   className: string;
 }
 
+/** Render the best available image for a preset and hide it if all sources fail. */
 const PresetArtwork: React.FC<PresetArtworkProps> = ({ presetId, hasHeadshot, fallbackImageUrl, alt, className }) => {
   const preferredHeadshotUrl = hasHeadshot ? getPresetImageUrl(presetId) : null;
   const [headshotFailed, setHeadshotFailed] = useState(false);

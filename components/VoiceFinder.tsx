@@ -25,6 +25,7 @@ interface VoiceFinderProps {
   onClose: () => void;
 }
 
+/** Render the AI voice-finder dialog and recommendation workflow. */
 const VoiceFinder: React.FC<VoiceFinderProps> = ({ voices, onRecommendation, onClose }) => {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);

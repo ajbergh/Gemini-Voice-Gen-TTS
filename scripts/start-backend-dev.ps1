@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Gemini Voice Studio — Backend Dev Launcher (PowerShell)
+=======
+# Gemini Voice Library — Backend Dev Launcher (PowerShell)
+>>>>>>> dc43ce53dd934fdd804b70e1a041bb3ec532174e
 # Starts the Go backend in development mode with debug logging.
 # Usage: .\scripts\start-backend-dev.ps1 [-Port 8080] [-LogLevel debug|info|warn|error] [-OpenBrowser]
 #
@@ -25,7 +29,11 @@ if (-not (Test-Path $BackendDir)) {
 
 $OpenValue = if ($OpenBrowser.IsPresent) { "true" } else { "false" }
 
+<<<<<<< HEAD
 Write-Host "=== Gemini Voice Studio — Backend Dev Server ===" -ForegroundColor Cyan
+=======
+Write-Host "=== Gemini Voice Library — Backend Dev Server ===" -ForegroundColor Cyan
+>>>>>>> dc43ce53dd934fdd804b70e1a041bb3ec532174e
 Write-Host "Project root: $ProjectRoot"
 Write-Host "Backend dir: $BackendDir"
 Write-Host "Port: $Port"
@@ -39,4 +47,8 @@ try {
     go run ./cmd/server --port $Port --log-level $LogLevel --open=$OpenValue
 } finally {
     Pop-Location
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> dc43ce53dd934fdd804b70e1a041bb3ec532174e

@@ -43,6 +43,7 @@ interface AudioContextValue {
 
 const AudioProviderContext = createContext<AudioContextValue | null>(null);
 
+/** Access the shared audio controller from components inside AudioProvider. */
 export function useAudio(): AudioContextValue {
   const ctx = useContext(AudioProviderContext);
   if (!ctx) throw new Error('useAudio must be used within an AudioProvider');
@@ -60,6 +61,7 @@ function decodeBase64(base64: string): Uint8Array {
   return bytes;
 }
 
+/** Provide single-source audio playback state and controls for the app. */
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTrack, setCurrentTrack] = useState<TrackInfo | null>(null);

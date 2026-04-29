@@ -1,6 +1,7 @@
 // Copyright 2025 ajbergh
 // SPDX-License-Identifier: Apache-2.0
 
+// Package handler - api_backup.go exposes database backup and restore endpoints.
 package handler
 
 import (

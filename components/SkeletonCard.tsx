@@ -12,6 +12,7 @@
 
 import React from 'react';
 
+/** Render a placeholder voice card while the grid is loading. */
 const SkeletonCard: React.FC = () => (
   <div className="bg-white dark:bg-zinc-800/80 rounded-2xl border border-zinc-200 dark:border-zinc-700/50 overflow-hidden animate-pulse">
     {/* Image placeholder */}

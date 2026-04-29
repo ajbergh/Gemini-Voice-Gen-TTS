@@ -15,6 +15,7 @@ import React from 'react';
 import { Square, Volume2, Mic, Clock } from 'lucide-react';
 import { useAudio } from './AudioProvider';
 
+/** Render the compact global audio player bound to the shared audio context. */
 const MiniPlayer: React.FC = () => {
   const { isPlaying, currentTrack, progress, duration, stop } = useAudio();
 

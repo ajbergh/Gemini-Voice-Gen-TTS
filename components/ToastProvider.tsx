@@ -29,6 +29,7 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
+/** Access the toast dispatcher from components inside ToastProvider. */
 export function useToast(): ToastContextValue {
   const ctx = useContext(ToastContext);
   if (!ctx) throw new Error('useToast must be used within a ToastProvider');
@@ -56,6 +57,7 @@ const TOAST_STYLES: Record<ToastType, { bg: string; icon: React.ReactNode }> = {
 
 const AUTO_DISMISS_MS = 4000;
 
+/** Provide transient toast notifications for the application. */
 const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextIdRef = useRef(1);

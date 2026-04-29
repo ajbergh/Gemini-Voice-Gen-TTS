@@ -1,6 +1,7 @@
 // Copyright 2025 ajbergh
 // SPDX-License-Identifier: Apache-2.0
 
+// Package handler - api_cache.go exposes audio-cache size and clear endpoints.
 package handler
 
 import (

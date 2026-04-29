@@ -24,4 +24,11 @@ dist-ssr
 *.sw?
 .github/*
 bin/*
+<<<<<<< HEAD
 *.exe
+=======
+*.exe
+.playwright-mcp/*
+docs_internal/*
+/output/*
+>>>>>>> dc43ce53dd934fdd804b70e1a041bb3ec532174e

@@ -1,6 +1,7 @@
 // Copyright 2025 ajbergh
 // SPDX-License-Identifier: Apache-2.0
 
+// Package handler - api_favorites.go exposes voice favorite list/toggle endpoints.
 package handler
 
 import (

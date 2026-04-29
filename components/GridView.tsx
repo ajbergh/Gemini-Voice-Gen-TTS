@@ -34,6 +34,7 @@ const gridClasses: Record<GridDensity, string> = {
   spacious: 'grid-cols-1 sm:grid-cols-2 md:landscape:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-8',
 };
 
+/** Render the responsive stock voice grid. */
 const GridView: React.FC<GridViewProps> = ({ voices, playingVoice, onPlayToggle, favoriteVoices, onFavoriteToggle, onFindSimilar, gridDensity = 'comfortable', voiceBadges, hoverPreview }) => {
   return (
     <div className="w-full h-full overflow-y-auto scrollbar-hide">

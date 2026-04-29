@@ -35,6 +35,7 @@ interface PresetCarousel3DProps {
   disabled?: boolean;
 }
 
+/** Decode cached preset audio from base64 PCM into bytes. */
 function decodeBase64(base64: string): Uint8Array {
   const binaryString = atob(base64);
   const len = binaryString.length;
@@ -45,6 +46,7 @@ function decodeBase64(base64: string): Uint8Array {
   return bytes;
 }
 
+/** Render saved presets in the carousel browsing mode. */
 const PresetCarousel3D: React.FC<PresetCarousel3DProps> = ({
   presets,
   activeIndex,

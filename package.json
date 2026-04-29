@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui"
   },
   "dependencies": {
     "@google/genai": "^1.31.0",
@@ -17,6 +19,7 @@
     "react-markdown": "9"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/node": "^22.19.17",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",

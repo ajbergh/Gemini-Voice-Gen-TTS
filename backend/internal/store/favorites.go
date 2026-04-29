@@ -1,6 +1,7 @@
 // Copyright 2025 ajbergh
 // SPDX-License-Identifier: Apache-2.0
 
+// Package store - favorites.go persists the user's favorite voice names.
 package store
 
 // ListFavorites returns all favorited voice names.

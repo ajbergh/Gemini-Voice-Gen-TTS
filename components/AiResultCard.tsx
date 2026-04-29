@@ -25,6 +25,7 @@ interface AiResultCardProps {
   onSavePreset?: (data: { voiceName: string; text: string; systemInstruction: string; audioBase64: string | null; sourceQuery: string; personDescription?: string }) => void;
 }
 
+/** Render an AI casting result with recommended voices and sample playback. */
 const AiResultCard: React.FC<AiResultCardProps> = ({ result, voices, onClose, onSavePreset }) => {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);

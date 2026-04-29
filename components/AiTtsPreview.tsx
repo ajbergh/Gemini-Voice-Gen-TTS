@@ -212,6 +212,7 @@ function detectLanguageCode(input: string): string {
   return '';
 }
 
+/** Render the AI result TTS preview, playback, download, and preset-save workflow. */
 const AiTtsPreview: React.FC<AiTtsPreviewProps> = ({ text, voices, systemInstruction, sourceQuery, personDescription, hideVoiceSelector, voiceDisplayNames, accentOptions, selectedAccentId, onAccentChange, forceLanguageCode, onVoiceChange, onSavePreset }) => {
   const [selectedVoiceName, setSelectedVoiceName] = useState(voices[0]?.name || '');
   const [languageCode, setLanguageCode] = useState('');

@@ -1,6 +1,10 @@
 # Getting Started
 
+<<<<<<< HEAD
 This guide walks you through installing, configuring, and running Gemini Voice Studio for the first time.
+=======
+This guide walks you through installing, configuring, and running Gemini Voice Library for the first time.
+>>>>>>> dc43ce53dd934fdd804b70e1a041bb3ec532174e
 
 ---
 

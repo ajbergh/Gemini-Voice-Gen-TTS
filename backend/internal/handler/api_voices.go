@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/ajbergh/gemini-voice-gen-tts/backend/internal/gemini"
-	"github.com/ajbergh/gemini-voice-gen-tts/backend/internal/openai"
 	"github.com/ajbergh/gemini-voice-gen-tts/backend/internal/store"
 )
 
@@ -46,12 +45,20 @@ func (h *VoicesHandler) Recommend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	jobID := fmt.Sprintf("recommend_%d", time.Now().UnixMilli())
+	if h.ProgressHub != nil {
+		h.ProgressHub.EmitProgress(jobID, "recommend", "processing", "Finding matching voices...", 10)
+	}
+
 	// Use voices from the request if provided, otherwise load from DB
 	voices := req.Voices
 	if len(voices) == 0 {
 		var err error
 		voices, err = h.getVoiceData()
 		if err != nil {
+			if h.ProgressHub != nil {
+				h.ProgressHub.EmitProgress(jobID, "recommend", "error", "Failed to load voice data", 0)
+			}
 			writeError(w, http.StatusInternalServerError, "failed to load voice data")
 			return
 		}
@@ -60,9 +67,16 @@ func (h *VoicesHandler) Recommend(w http.ResponseWriter, r *http.Request) {
 	client := gemini.NewClient(apiKey)
 	result, err := client.Recommend(req.Query, voices)
 	if err != nil {
+		if h.ProgressHub != nil {
+			h.ProgressHub.EmitProgress(jobID, "recommend", "error", "AI casting failed", 0)
+		}
 		slog.Error("gemini recommend failed", "error", err)
 		writeError(w, http.StatusBadGateway, "AI recommendation failed")
 		return
+	}
+
+	if h.ProgressHub != nil {
+		h.ProgressHub.EmitProgress(jobID, "recommend", "complete", "Voice matches ready", 100)
 	}
 
 	// Save to history
@@ -81,7 +95,7 @@ func (h *VoicesHandler) Recommend(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GenerateTTS proxies TTS requests to Gemini or OpenAI.
+// GenerateTTS proxies TTS requests to Gemini.
 func (h *VoicesHandler) GenerateTTS(w http.ResponseWriter, r *http.Request) {
 	var req gemini.TTSRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -96,34 +110,16 @@ func (h *VoicesHandler) GenerateTTS(w http.ResponseWriter, r *http.Request) {
 
 	jobID := fmt.Sprintf("tts_%d", time.Now().UnixMilli())
 
-	var audioBase64 string
-	var genErr error
-
-	if req.Provider == "openai" {
-		// Use OpenAI TTS
-		apiKey, err := h.KeysHandler.GetDecryptedKey("openai")
-		if err != nil {
-			writeError(w, http.StatusPreconditionFailed, "no OpenAI API key configured — add one via Settings")
-			return
-		}
-		if h.ProgressHub != nil {
-			h.ProgressHub.EmitProgress(jobID, "tts", "processing", "Generating speech via OpenAI...", 10)
-		}
-		client := openai.NewClient(apiKey)
-		audioBase64, genErr = client.GenerateTTS(req.Text, req.VoiceName, req.Model)
-	} else {
-		// Use Gemini TTS (default)
-		apiKey, err := h.KeysHandler.GetDecryptedKey("gemini")
-		if err != nil {
-			writeError(w, http.StatusPreconditionFailed, "no Gemini API key configured — add one via Settings")
-			return
-		}
-		if h.ProgressHub != nil {
-			h.ProgressHub.EmitProgress(jobID, "tts", "processing", "Generating speech for "+req.VoiceName+"...", 10)
-		}
-		client := gemini.NewClient(apiKey)
-		audioBase64, genErr = client.GenerateTTS(req.Text, req.VoiceName, req.SystemInstruction, req.LanguageCode, req.Model)
+	apiKey, err := h.KeysHandler.GetDecryptedKey("gemini")
+	if err != nil {
+		writeError(w, http.StatusPreconditionFailed, "no Gemini API key configured — add one via Settings")
+		return
 	}
+	if h.ProgressHub != nil {
+		h.ProgressHub.EmitProgress(jobID, "tts", "processing", "Generating speech for "+req.VoiceName+"...", 10)
+	}
+	client := gemini.NewClient(apiKey)
+	audioBase64, genErr := client.GenerateTTS(req.Text, req.VoiceName, req.SystemInstruction, req.LanguageCode, req.Model)
 
 	if genErr != nil {
 		if h.ProgressHub != nil {
@@ -198,12 +194,24 @@ func (h *VoicesHandler) GenerateMultiSpeakerTTS(w http.ResponseWriter, r *http.R
 		}
 	}
 
+	jobID := fmt.Sprintf("multi_tts_%d", time.Now().UnixMilli())
+	if h.ProgressHub != nil {
+		h.ProgressHub.EmitProgress(jobID, "multi_tts", "processing", "Generating dialogue audio...", 10)
+	}
+
 	client := gemini.NewClient(apiKey)
 	audioBase64, err := client.GenerateMultiSpeakerTTS(req.Text, req.Speakers, req.LanguageCode, req.Model)
 	if err != nil {
+		if h.ProgressHub != nil {
+			h.ProgressHub.EmitProgress(jobID, "multi_tts", "error", "Dialogue generation failed", 0)
+		}
 		slog.Error("gemini multi-speaker TTS failed", "error", err, "speakerCount", len(req.Speakers))
 		writeError(w, http.StatusBadGateway, "Multi-speaker TTS generation failed: "+err.Error())
 		return
+	}
+
+	if h.ProgressHub != nil {
+		h.ProgressHub.EmitProgress(jobID, "multi_tts", "complete", "Dialogue audio ready", 100)
 	}
 
 	// Save audio to cache and history
@@ -297,6 +305,7 @@ func (h *VoicesHandler) getVoiceData() ([]gemini.VoiceData, error) {
 	return voices, rows.Err()
 }
 
+// strPtr returns a pointer to s for store fields that require nullable strings.
 func strPtr(s string) *string {
 	return &s
 }
@@ -321,12 +330,24 @@ func (h *VoicesHandler) FormatScript(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	jobID := fmt.Sprintf("script_prep_%d", time.Now().UnixMilli())
+	if h.ProgressHub != nil {
+		h.ProgressHub.EmitProgress(jobID, "script_prep", "processing", "Formatting script...", 10)
+	}
+
 	client := gemini.NewClient(apiKey)
 	formatted, err := client.FormatScript(req.Script)
 	if err != nil {
+		if h.ProgressHub != nil {
+			h.ProgressHub.EmitProgress(jobID, "script_prep", "error", "Script formatting failed", 0)
+		}
 		slog.Error("FormatScript failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to format script")
 		return
+	}
+
+	if h.ProgressHub != nil {
+		h.ProgressHub.EmitProgress(jobID, "script_prep", "complete", "Script formatted", 100)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"formatted": formatted})
@@ -350,9 +371,17 @@ func (h *VoicesHandler) GenerateTTSStream(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	jobID := fmt.Sprintf("tts_stream_%d", time.Now().UnixMilli())
+	if h.ProgressHub != nil {
+		h.ProgressHub.EmitProgress(jobID, "tts_stream", "processing", "Streaming speech for "+req.VoiceName+"...", 10)
+	}
+
 	// Set SSE headers
 	flusher, ok := w.(http.Flusher)
 	if !ok {
+		if h.ProgressHub != nil {
+			h.ProgressHub.EmitProgress(jobID, "tts_stream", "error", "Streaming is not supported by this response", 0)
+		}
 		writeError(w, http.StatusInternalServerError, "streaming not supported")
 		return
 	}
@@ -376,9 +405,17 @@ func (h *VoicesHandler) GenerateTTSStream(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := <-errCh; err != nil {
+		if h.ProgressHub != nil {
+			h.ProgressHub.EmitProgress(jobID, "tts_stream", "error", "Streaming speech failed", 0)
+		}
 		slog.Error("streaming TTS failed", "error", err)
 		errData, _ := json.Marshal(map[string]string{"error": err.Error()})
 		fmt.Fprintf(w, "data: %s\n\n", errData)
 		flusher.Flush()
+		return
+	}
+
+	if h.ProgressHub != nil {
+		h.ProgressHub.EmitProgress(jobID, "tts_stream", "complete", "Streaming speech complete", 100)
 	}
 }
