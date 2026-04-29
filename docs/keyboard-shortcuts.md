@@ -1,10 +1,6 @@
 # Keyboard Shortcuts
 
-<<<<<<< HEAD
 A quick reference for all keyboard shortcuts available in Gemini Voice Studio.
-=======
-A quick reference for all keyboard shortcuts available in Gemini Voice Library.
->>>>>>> dc43ce53dd934fdd804b70e1a041bb3ec532174e
 
 ---
 
@@ -19,7 +15,7 @@ A quick reference for all keyboard shortcuts available in Gemini Voice Library.
 
 ---
 
-## Voice Library — Carousel View
+## Voice Studio — Carousel View
 
 | Shortcut | Action |
 |----------|--------|

@@ -14,7 +14,7 @@ Ships as a **single cross-platform binary** (Windows, macOS, Linux) with a pure 
 
 ## Features
 
-### Voice Library
+### Voice Studio
 
 - **Voice Browsing** — Explore 30 pre-loaded voices with detailed metadata (gender, pitch, characteristics) in a 3D carousel or responsive grid with face images
 - **Smart Filtering** — Filter by gender, pitch, or free-text search; AI-recommended voices are highlighted when the Casting Director returns results
@@ -518,7 +518,7 @@ Full usage documentation is available in [`/docs`](docs/):
 | Document | Description |
 |----------|-------------|
 | [Getting Started](docs/getting-started.md) | Installation, first launch, API key setup |
-| [Voice Library](docs/voice-library.md) | Browsing, filtering, favorites, voice comparison |
+| [Voice Studio](docs/voice-library.md) | Browsing, filtering, favorites, voice comparison |
 | [Script Reader](docs/script-reader.md) | Single-speaker, dialogue, audio tags, streaming |
 | [Projects](docs/projects.md) | Project creation, sections, segments, batch render |
 | [Cast Bible](docs/cast-bible.md) | Cast profiles, auditions, continuity warnings |

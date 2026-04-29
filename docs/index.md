@@ -1,12 +1,6 @@
-<<<<<<< HEAD
 # Gemini Voice Studio — Documentation
 
 Welcome to the Gemini Voice Studio wiki. Use the links below to navigate to any section.
-=======
-# Gemini Voice Library — Documentation
-
-Welcome to the Gemini Voice Library wiki. Use the links below to navigate to any section.
->>>>>>> dc43ce53dd934fdd804b70e1a041bb3ec532174e
 
 ---
 
@@ -23,7 +17,7 @@ Welcome to the Gemini Voice Library wiki. Use the links below to navigate to any
 
 | Guide | Description |
 |-------|-------------|
-| [Voice Library](voice-library.md) | Browsing voices, 3D carousel, grid view, filters, favorites, voice comparison |
+| [Voice Studio](voice-library.md) | Browsing voices, 3D carousel, grid view, filters, favorites, voice comparison |
 | [Script Reader](script-reader.md) | Single-speaker TTS, dialogue mode, A/B compare, audio tags, accents, streaming |
 
 ---

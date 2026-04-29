@@ -151,7 +151,7 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
         </div>
         {!collapsed && (
           <h1 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-white font-display whitespace-nowrap overflow-hidden">
-            Gemini Voice
+            Gemini Voice Studio
           </h1>
         )}
       </div>

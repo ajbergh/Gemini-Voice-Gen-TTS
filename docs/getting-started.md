@@ -1,10 +1,6 @@
 # Getting Started
 
-<<<<<<< HEAD
 This guide walks you through installing, configuring, and running Gemini Voice Studio for the first time.
-=======
-This guide walks you through installing, configuring, and running Gemini Voice Library for the first time.
->>>>>>> dc43ce53dd934fdd804b70e1a041bb3ec532174e
 
 ---
 
@@ -200,7 +196,7 @@ curl -X POST http://localhost:8080/api/restore -d @backup.json
 
 | Guide | Description |
 |-------|-------------|
-| [Voice Library](voice-library.md) | Browse and preview voices |
+| [Voice Studio](voice-library.md) | Browse and preview voices |
 | [Script Reader](script-reader.md) | Generate speech from scripts |
 | [Projects](projects.md) | Production workflow for multi-segment audio |
 | [Cast Bible](cast-bible.md) | Manage character voice profiles |

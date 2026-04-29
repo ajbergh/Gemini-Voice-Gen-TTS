@@ -4,7 +4,7 @@
  */
 
 /**
- * constants.ts — Voice Library Data
+ * constants.ts — Voice Studio Data
  *
  * Contains the full catalogue of 30 Gemini TTS voices with metadata including
  * name, pitch, characteristics, audio sample URLs (Google AI Studio hosted WAV),

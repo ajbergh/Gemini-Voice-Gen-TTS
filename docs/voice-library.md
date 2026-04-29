@@ -1,6 +1,6 @@
-# Voice Library
+# Voice Studio
 
-The Voice Library is the main browsing surface for discovering, previewing, and selecting from 30 curated Google Gemini TTS voices.
+The Voice Studio is the main browsing surface for discovering, previewing, and selecting from 30 curated Google Gemini TTS voices.
 
 ---
 
@@ -124,4 +124,4 @@ Described more fully on the [AI Casting](ai-casting.md) page, the Casting Direct
 ## Navigation Tips
 
 - Use **Cmd/Ctrl+K** to open the Command Palette and type a voice name to jump directly to it
-- The **Onboarding Tour** (accessible from **Help** in the sidebar) covers the Voice Library in its first step
+- The **Onboarding Tour** (accessible from **Help** in the sidebar) covers the Voice Studio in its first step
