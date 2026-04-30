@@ -2,6 +2,9 @@
 
 This guide walks you through installing, configuring, and running Gemini Voice Studio for the first time.
 
+![Gemini Voice Studio main interface showing the Voice Library 3D carousel in dark mode](../assets/screenshots/01-voice-library-grid-dark.png)
+*Gemini Voice Studio — browse 30 curated Gemini TTS voices, generate speech, and manage full production projects from a single interface*
+
 ---
 
 ## Prerequisites
@@ -74,6 +77,9 @@ The app never calls Gemini directly from the browser. All AI calls go through th
 1. In the **Settings** modal, paste your Gemini API key.
 2. Click **Test Key** to validate it against the Gemini API.
 3. Click **Save** — the key is encrypted and stored in the local SQLite database.
+
+![Settings modal with API key input and Save Key button](../assets/screenshots/13-settings-dark.png)
+*Open Settings from the gear icon in the sidebar — keys are encrypted with AES-256-GCM before storage*
 
 > **Get a free key:** Visit [Google AI Studio](https://aistudio.google.com/apikey) → Create API Key. The free tier includes access to Gemini 3.1 Flash TTS.
 

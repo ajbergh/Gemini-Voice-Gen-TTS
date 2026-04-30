@@ -12,6 +12,30 @@ Ships as a **single cross-platform binary** (Windows, macOS, Linux) with a pure 
 
 ---
 
+<p align="center">
+  <img src="assets/screenshots/01-voice-library-grid-dark.png" alt="Gemini Voice Studio — Voice Library showing 3D carousel with Zephyr selected in dark mode" width="100%">
+</p>
+<p align="center"><em>Voice Library — browse 30 curated AI voices in an interactive 3D carousel or responsive grid</em></p>
+
+---
+
+## 📚 Documentation
+
+Detailed guides for every feature live in [`/docs`](docs/). Start there for walkthroughs, keyboard shortcuts, and configuration reference.
+
+| Guide | What's covered |
+|-------|----------------|
+| [Getting Started](docs/getting-started.md) | Installation, first launch, API key setup |
+| [Voice Studio](docs/voice-library.md) | Browsing, filtering, favorites, AI Casting Director |
+| [Script Reader](docs/script-reader.md) | Single-speaker, dialogue, A/B compare, audio tags |
+| [Projects](docs/projects.md) | Project creation, sections, segments, batch render |
+| [Cast Bible](docs/cast-bible.md) | Cast profiles, auditions, continuity warnings |
+| [Review & Export](docs/review-export.md) | Take review, QC, timeline, export |
+| [Settings & Administration](docs/settings-administration.md) | API keys, cache, backup, QC rules |
+| [Keyboard Shortcuts](docs/keyboard-shortcuts.md) | All keyboard shortcuts and hotkeys |
+
+---
+
 ## Features
 
 ### Voice Studio
@@ -53,6 +77,11 @@ Ships as a **single cross-platform binary** (Windows, macOS, Linux) with a pure 
 - **Multi-Language** — 70+ language selector or auto-detect
 
 ### Script Projects (Production Workflow)
+
+<p align="center">
+  <img src="assets/screenshots/09-project-script-tab-dark.png" alt="Project workspace showing script tab with sections, segments, and cast profiles in dark mode" width="100%">
+</p>
+<p align="center"><em>Project workspace — manage multi-chapter scripts with per-segment voice assignment, batch rendering, and take history</em></p>
 
 The Projects section provides a full production pipeline for multi-segment voiceover, audiobook, podcast, and training audio:
 
@@ -513,18 +542,7 @@ WS     /api/ws/progress                           Real-time job progress
 
 ## Documentation
 
-Full usage documentation is available in [`/docs`](docs/):
-
-| Document | Description |
-|----------|-------------|
-| [Getting Started](docs/getting-started.md) | Installation, first launch, API key setup |
-| [Voice Studio](docs/voice-library.md) | Browsing, filtering, favorites, voice comparison |
-| [Script Reader](docs/script-reader.md) | Single-speaker, dialogue, audio tags, streaming |
-| [Projects](docs/projects.md) | Project creation, sections, segments, batch render |
-| [Cast Bible](docs/cast-bible.md) | Cast profiles, auditions, continuity warnings |
-| [Review & Export](docs/review-export.md) | Take review, QC, timeline, export |
-| [Settings & Administration](docs/settings-administration.md) | API keys, cache, backup, QC rules |
-| [Keyboard Shortcuts](docs/keyboard-shortcuts.md) | All keyboard shortcuts and hotkeys |
+See [`/docs`](docs/) for detailed guides on every feature → [docs/index.md](docs/index.md)
 
 ---
 

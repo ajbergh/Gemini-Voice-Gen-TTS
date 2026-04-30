@@ -2,6 +2,9 @@
 
 The Voice Studio is the main browsing surface for discovering, previewing, and selecting from 30 curated Google Gemini TTS voices.
 
+![Voice Studio 3D carousel showing Zephyr voice selected in dark mode](../assets/screenshots/01-voice-library-grid-dark.png)
+*Voice Studio 3D carousel — browse all 30 voices with depth-stacked perspective*
+
 ---
 
 ## Browsing Voices
@@ -15,6 +18,9 @@ The default view renders voices as a depth-stacked 3D carousel with perspective 
 - **Click a card** — Jump directly to that voice
 - **Drag** — Swipe/drag horizontally to move through voices
 - **Enter or Space** — Play a sample for the currently focused voice
+
+![3D carousel with Zephyr card centered and adjacent voices receding](../assets/screenshots/03-voice-library-carousel-dark.png)
+*The 3D carousel highlights the selected voice and provides depth-cued navigation*
 
 ### Grid View
 
@@ -84,40 +90,51 @@ Each voice has a **pre-recorded audio sample** hosted by Google. Click the **Pla
 
 ## Voice Comparison
 
-Click **Compare** in the FilterBar (or from a voice card's action menu) to open the **Voice Compare** panel.
+The **Compare A/B** feature lets you hear the same text delivered by two different voices side by side — ideal for making final casting decisions.
 
-1. Select **Voice A** and **Voice B** from the dropdowns
-2. Enter any text you want both voices to read
-3. Click **Generate Both** to run TTS for both voices simultaneously
-4. Listen to each result independently with play/pause controls
-5. Download either result as a WAV file
+Open the Script Reader (sidebar → **Script Reader**) and click the **Compare A/B** tab.
+
+1. Enter text in the script area
+2. Select **Voice A** and **Voice B** from the dropdowns
+3. Click the play button under each voice to generate and listen independently
+4. Click **+ Add voice to compare** to compare a third voice
+5. Download any result as a WAV file
 
 ---
 
 ## AI Casting Director
 
-For situations where you know what you *want* but not which voice fits, the **AI Casting Director** analyzes your description and recommends the top 3 voices from the library.
+For situations where you know what you *want* but not which voice fits, the **AI Casting Director** uses Gemini to analyze your character description and recommends the best-matching voices from the 30-voice library.
 
-See [AI Casting](ai-casting.md) for full documentation.
+![AI Casting Director modal with description textarea and voice suggestions](../assets/screenshots/04-ai-casting-director-dark.png)
+*The AI Casting Director accepts natural language descriptions and returns ranked voice recommendations*
+
+**To open the AI Casting Director:**
+- Click **AI Casting Director** in the top navigation bar, or
+- Click the **AI Casting** button in the left sidebar
+
+**How it works:**
+1. Type a description of your character or narrator in the text area (e.g., *"A world-weary British detective, late 40s, with a dry sense of humour"*)
+2. Try a chip suggestion (e.g., "Irish male", "Singaporean female") to get started quickly
+3. Click **Find Voices** — Gemini analyzes the library and returns the top 3 matches with reasoning
+4. Preview each recommendation with the TTS generator
+5. Save a recommendation as a custom preset via **Save as My Voice**
 
 ---
 
 ## My Voices (Custom Presets)
 
-The **My Voices** tab (accessible from the FilterBar's tab strip) shows your custom voice presets — voices you've saved from AI Casting results with specific persona instructions.
+The **My Voices** tab shows your saved custom voice presets — stock voices combined with specific persona system instructions that shape their character.
 
-Click the **My Voices** tab to switch to the preset browser. Custom presets support the same carousel and grid views as the stock library.
+![My Voices preset browser in dark mode](../assets/screenshots/14-my-presets-dark.png)
+*The My Voices browser uses the same carousel and grid layouts as the stock Voice Library*
 
-See [My Voices](#) for full documentation on creating and managing presets.
+Click **My Voices** in the left sidebar to browse your presets. Custom presets support the same 3D carousel and grid views as the stock library and can be used anywhere a voice selection is required.
 
----
-
-## AI Casting Director
-
-Described more fully on the [AI Casting](ai-casting.md) page, the Casting Director is accessible from:
-
-- The **Find My Voice** button in the FilterBar
-- The **Wand** icon in the top navigation
+To create a preset:
+1. Run the AI Casting Director and find a good recommendation
+2. Click **Save as My Voice** on the result card
+3. Give the preset a name — it appears in the My Voices browser and all voice pickers
 
 ---
 

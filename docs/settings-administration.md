@@ -8,6 +8,9 @@ This guide covers API key management, cache, backup/restore, pronunciation dicti
 
 Click the **Settings** (gear icon) in the left navigation sidebar to open the Settings modal.
 
+![Settings modal showing the API Keys tab with key input and Key Rotation Pool](../assets/screenshots/13-settings-dark.png)
+*The Settings modal provides tabs for Keys, Render defaults, Export profiles, Dictionaries, QC rules, Storage, and Appearance*
+
 ---
 
 ## API Keys

@@ -224,7 +224,8 @@ export async function setupApiMocks(page: Page, options: {
     route.fulfill(json({ audioBase64: Buffer.alloc(480).toString('base64') })),
   );
 
-  // Cast profiles
+  // Cast profiles — both project-scoped list and individual profile endpoints
+  await page.route('**/api/projects/*/cast', route => route.fulfill(json(castProfiles)));
   await page.route('**/api/cast**', route => route.fulfill(json(castProfiles)));
 
   // Pronunciation / dictionaries

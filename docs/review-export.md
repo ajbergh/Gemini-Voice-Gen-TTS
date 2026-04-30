@@ -2,6 +2,9 @@
 
 This guide covers the full quality-control and delivery pipeline: reviewing takes, flagging issues, approving segments, and packaging the final deliverable.
 
+![Review Mode showing the segment queue on the left and take player with Approve/Flag controls on the right](../assets/screenshots/11-review-qc-dark.png)
+*Review Mode — the queue (left) lists all segments by status; the player (right) provides approve, flag, and QC marker controls*
+
 ---
 
 ## Review Mode
@@ -158,6 +161,9 @@ If any segments are in draft or changed state, a **Render Missing** button appea
 ---
 
 ## Export
+
+![Export tab showing readiness checklist with rendered/approved counts and blockers](../assets/screenshots/12-export-dark.png)
+*The Export tab shows the finishing profile picker, audio scope summary, and a readiness checklist before packaging*
 
 ### Starting an Export
 

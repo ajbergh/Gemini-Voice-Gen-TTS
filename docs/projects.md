@@ -2,6 +2,9 @@
 
 The Projects workspace is the full production pipeline for multi-segment voiceover, audiobook, podcast, and training audio. It provides section and segment management, per-segment voice assignment, batch rendering, take history, cast management, pronunciation dictionaries, review/QC workflows, and deliverable export.
 
+![Projects workspace showing project list alongside the open Midnight Archive audiobook project with script tab](../assets/screenshots/09-project-script-tab-dark.png)
+*The Projects workspace splits into a project index (left) and the selected project workspace (right) with Script, Cast, Review, Timeline, and Export tabs*
+
 ---
 
 ## Getting Started with Projects
@@ -26,6 +29,9 @@ The app remembers your last-opened project and restores it automatically on the 
 ## Project Layout
 
 The Projects workspace is split into a project index and the selected project workspace.
+
+![Project list with three projects — audiobook, voiceover, and podcast — in dark mode](../assets/screenshots/07-projects-list-dark.png)
+*The project index shows kind, segment count, rendered/approved progress, open QC issues, and last-updated date*
 
 The project index includes:
 

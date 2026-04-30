@@ -2,6 +2,9 @@
 
 The Cast Bible is a project-level registry of all named character and narrator voice profiles. It ensures consistent voice assignment across segments, tracks character versions, and provides audition tools.
 
+![Cast Bible tab showing Narrator and Protagonist role groups with character cards](../assets/screenshots/10-cast-bible-dark.png)
+*The Cast Bible groups profiles by role — each card shows the assigned voice, age impression, emotional range, and a sample line*
+
 ---
 
 ## Opening the Cast Bible

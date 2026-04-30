@@ -2,6 +2,9 @@
 
 Welcome to the Gemini Voice Studio wiki. Use the links below to navigate to any section.
 
+![Gemini Voice Studio project workspace showing a multi-chapter audiobook with cast profiles and rendered segments](../assets/screenshots/09-project-script-tab-dark.png)
+*The full production workflow — project list, script editor, cast bible, review/QC, and export all in one place*
+
 ---
 
 ## Getting Started
