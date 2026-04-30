@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \"\\\\.\\(md|txt|log|changelog\\)$|CLAUDE\")",
+      "Bash(grep -E \"\\\\.\\(tsx?|go\\)$\")",
+      "Bash(npx playwright *)"
+    ]
+  }
+}

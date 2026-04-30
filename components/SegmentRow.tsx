@@ -238,7 +238,17 @@ const SegmentRow: React.FC<SegmentRowProps> = ({
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusBadge(segment.status)}`}>
             {segment.status}
           </span>
-          {(segment.voice_name || segment.cast_profile_id || defaultVoiceName) && (
+          {(segment.voice_name || segment.cast_profile_id || defaultVoiceName) && ['draft', 'changed', 'failed'].includes(String(segment.status).toLowerCase()) ? (
+            <button
+              type="button"
+              disabled={renderingId === segment.id}
+              onClick={() => onReRender(segment)}
+              className="inline-flex h-7 items-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-[var(--accent-600)] px-2.5 text-xs font-semibold text-white hover:bg-zinc-700 dark:hover:bg-[var(--accent-500)] transition-colors disabled:opacity-50"
+            >
+              {renderingId === segment.id && <Loader2 size={12} className="animate-spin" />}
+              Render
+            </button>
+          ) : (segment.voice_name || segment.cast_profile_id || defaultVoiceName) && (
             <button
               type="button"
               title="Re-render segment"

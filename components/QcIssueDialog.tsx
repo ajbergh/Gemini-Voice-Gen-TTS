@@ -11,7 +11,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { AlertOctagon, AlertTriangle, Info, X } from 'lucide-react';
 import { CONFIG_KEYS, createQcIssue, getConfig, updateQcIssue } from '../api';
 import type {
   CreateQcIssueInput,
@@ -52,6 +52,12 @@ const SEVERITY_OPTIONS: { value: QcIssueSeverity; label: string; color: string }
   { value: 'medium', label: 'Medium', color: 'text-yellow-500' },
   { value: 'high', label: 'High', color: 'text-red-500' },
 ];
+
+const SEVERITY_ICON: Record<QcIssueSeverity, React.ReactNode> = {
+  low: <Info size={13} className="text-blue-500" />,
+  medium: <AlertTriangle size={13} className="text-yellow-500" />,
+  high: <AlertOctagon size={13} className="text-red-500" />,
+};
 
 /** Render a modal form for creating or updating a single QC issue. */
 export default function QcIssueDialog({
@@ -175,12 +181,14 @@ export default function QcIssueDialog({
                   key={o.value}
                   type="button"
                   onClick={() => setSeverity(o.value)}
-                  className={`flex-1 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                  data-testid={`qc-severity-${o.value}`}
+                  className={`flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
                     severity === o.value
                       ? `${o.color} ${isDarkMode ? 'bg-zinc-700 border-zinc-500' : 'bg-zinc-100 border-zinc-400'}`
                       : `${isDarkMode ? 'border-zinc-700 hover:bg-zinc-800' : 'border-zinc-200 hover:bg-zinc-50'} opacity-60`
                   }`}
                 >
+                  {SEVERITY_ICON[o.value]}
                   {o.label}
                 </button>
               ))}

@@ -21,6 +21,7 @@ interface VoiceCompareProps {
   text: string;
   voices: Voice[];
   systemInstruction?: string;
+  initialVoiceNames?: string[];
 }
 
 interface CompareSlot {
@@ -45,12 +46,16 @@ async function decodePcm(base64: string, ctx: AudioContext): Promise<AudioBuffer
 
 const MAX_SLOTS = 3;
 
+function createInitialSlots(voices: Voice[], initialVoiceNames?: string[]): CompareSlot[] {
+  const requested = (initialVoiceNames ?? []).filter(Boolean).slice(0, MAX_SLOTS);
+  const fallback = voices.slice(0, 2).map(voice => voice.name);
+  const names = (requested.length >= 2 ? requested : fallback).slice(0, MAX_SLOTS);
+  return names.map(voiceName => ({ voiceName, audioData: null, isLoading: false, isPlaying: false, error: null }));
+}
+
 /** Render the side-by-side voice comparison tray. */
-const VoiceCompare: React.FC<VoiceCompareProps> = ({ text, voices, systemInstruction }) => {
-  const [slots, setSlots] = useState<CompareSlot[]>([
-    { voiceName: voices[0]?.name || '', audioData: null, isLoading: false, isPlaying: false, error: null },
-    { voiceName: voices[1]?.name || voices[0]?.name || '', audioData: null, isLoading: false, isPlaying: false, error: null },
-  ]);
+const VoiceCompare: React.FC<VoiceCompareProps> = ({ text, voices, systemInstruction, initialVoiceNames }) => {
+  const [slots, setSlots] = useState<CompareSlot[]>(() => createInitialSlots(voices, initialVoiceNames));
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRefs = useRef<(AudioBufferSourceNode | null)[]>([null, null, null]);

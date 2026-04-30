@@ -13,7 +13,7 @@
  * a play/pause button, and an AudioVisualizer when active.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { Voice } from '../types';
 import { Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -28,6 +28,8 @@ interface Carousel3DProps {
   disabled?: boolean;
 }
 
+const HINT_STORAGE_KEY = 'gemini-voice-carousel-hint-seen';
+
 /** Render the interactive 3D-style stock voice carousel. */
 const Carousel3D: React.FC<Carousel3DProps> = ({ 
   voices, 
@@ -40,6 +42,17 @@ const Carousel3D: React.FC<Carousel3DProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const [showNavigationHint, setShowNavigationHint] = useState(() => {
+    try { return localStorage.getItem(HINT_STORAGE_KEY) !== 'true'; } catch { return true; }
+  });
+
+  const dismissNavigationHint = useCallback(() => {
+    setShowNavigationHint(current => {
+      if (!current) return current;
+      try { localStorage.setItem(HINT_STORAGE_KEY, 'true'); } catch {}
+      return false;
+    });
+  }, []);
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -71,8 +84,10 @@ const Carousel3D: React.FC<Carousel3DProps> = ({
         if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
 
         if (e.key === 'ArrowLeft') {
+            dismissNavigationHint();
             handlePrev();
         } else if (e.key === 'ArrowRight') {
+            dismissNavigationHint();
             handleNext();
         } else if (e.key === 'Enter' || e.key === ' ') {
             // Play active
@@ -81,10 +96,17 @@ const Carousel3D: React.FC<Carousel3DProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeIndex, voices, disabled]);
+  }, [activeIndex, voices, disabled, dismissNavigationHint]);
+
+  useEffect(() => {
+    if (!showNavigationHint) return;
+    const timer = window.setTimeout(() => setShowNavigationHint(false), 4000);
+    return () => window.clearTimeout(timer);
+  }, [showNavigationHint]);
 
   const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (disabled) return;
+    dismissNavigationHint();
     const threshold = 50;
     if (info.offset.x > threshold && activeIndex > 0) {
       onChange(activeIndex - 1);
@@ -94,10 +116,12 @@ const Carousel3D: React.FC<Carousel3DProps> = ({
   };
 
   const handlePrev = () => {
+    dismissNavigationHint();
     if (activeIndex > 0) onChange(activeIndex - 1);
   };
 
   const handleNext = () => {
+    dismissNavigationHint();
     if (activeIndex < voices.length - 1) onChange(activeIndex + 1);
   };
 
@@ -266,6 +290,20 @@ const Carousel3D: React.FC<Carousel3DProps> = ({
           </AnimatePresence>
         </div>
       </div>
+
+      <AnimatePresence>
+        {showNavigationHint && !disabled && (
+          <motion.div
+            className="absolute bottom-11 left-1/2 z-50 -translate-x-1/2 rounded-full border border-zinc-200/80 dark:border-zinc-700/80 bg-white/90 dark:bg-zinc-900/90 px-3 py-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-300 shadow-lg backdrop-blur pointer-events-none"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.2 }}
+          >
+            ← → to browse · Drag to jump
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Pagination dots */}
       {voices.length > 1 && (

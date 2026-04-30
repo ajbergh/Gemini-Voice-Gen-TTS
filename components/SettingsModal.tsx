@@ -52,7 +52,7 @@ interface RenderDefaults {
 }
 
 const DEFAULT_RENDER: RenderDefaults = {
-  default_model: 'gemini-2.5-pro-preview-tts',
+  default_model: 'gemini-3.1-flash-tts-preview',
   default_language_code: 'en-US',
   default_batch_concurrency: '3',
   default_retry_count: '2',
@@ -60,9 +60,8 @@ const DEFAULT_RENDER: RenderDefaults = {
 };
 
 const GEMINI_MODELS = [
-  { value: 'gemini-2.5-pro-preview-tts', label: 'Gemini 2.5 Pro Preview TTS' },
-  { value: 'gemini-2.5-flash-preview-tts', label: 'Gemini 2.5 Flash Preview TTS' },
-  { value: 'gemini-2.0-flash-preview-image-generation', label: 'Gemini 2.0 Flash Preview' },
+  { value: 'gemini-3.1-flash-tts-preview', label: 'Gemini 3.1 Flash TTS (Default)' },
+  { value: 'gemini-2.5-flash-preview-tts', label: 'Gemini 2.5 Flash TTS' },
 ];
 
 const ACCENT_COLORS = [

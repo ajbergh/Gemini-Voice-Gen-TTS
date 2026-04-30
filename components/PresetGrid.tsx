@@ -25,6 +25,7 @@ interface PresetGridProps {
   onDelete: (preset: CustomPreset) => void;
   onDuplicate?: (preset: CustomPreset) => void;
   onAiCasting: () => void;
+  onBrowseVoices?: () => void;
   onExport?: () => void;
   onImport?: (file: File) => void;
   onInlineEdit?: (id: number, data: { name?: string; system_instruction?: string }) => Promise<void>;
@@ -39,7 +40,7 @@ const presetGridClasses: Record<GridDensity, string> = {
 };
 
 /** Render the saved-preset grid with playback, import/export, and reorder actions. */
-const PresetGrid: React.FC<PresetGridProps> = ({ presets, playingPresetId, onPlayToggle, onEdit, onDelete, onDuplicate, onAiCasting, onExport, onImport, onInlineEdit, onReorder, gridDensity = 'comfortable' }) => {
+const PresetGrid: React.FC<PresetGridProps> = ({ presets, playingPresetId, onPlayToggle, onEdit, onDelete, onDuplicate, onAiCasting, onBrowseVoices, onExport, onImport, onInlineEdit, onReorder, gridDensity = 'comfortable' }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
   const dragItemRef = useRef<number | null>(null);
@@ -88,16 +89,24 @@ const PresetGrid: React.FC<PresetGridProps> = ({ presets, playingPresetId, onPla
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 mb-6 shadow-sm">
             <Sparkles size={32} className="text-indigo-400 dark:text-indigo-500" />
           </div>
-          <h3 className="text-xl font-serif text-zinc-900 dark:text-white mb-2">No saved presets yet</h3>
+          <h3 className="text-xl font-serif text-zinc-900 dark:text-white mb-2">No custom voices yet</h3>
           <p className="text-zinc-500 dark:text-zinc-400 mb-6 text-sm">
-            Use the AI Casting Director to find your perfect voice, then save it as a preset for quick access.
+            Star voices you want to revisit, or save an AI Casting result to build your collection.
           </p>
-          <button
-            onClick={onAiCasting}
-            className="px-5 py-2.5 bg-zinc-900 dark:bg-indigo-600 text-white rounded-full text-sm font-medium hover:bg-zinc-800 dark:hover:bg-indigo-500 transition-colors shadow-md"
-          >
-            Open AI Casting Director
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              onClick={onBrowseVoices}
+              className="px-5 py-2.5 bg-zinc-900 dark:bg-indigo-600 text-white rounded-full text-sm font-medium hover:bg-zinc-800 dark:hover:bg-indigo-500 transition-colors shadow-md"
+            >
+              Browse voices
+            </button>
+            <button
+              onClick={onAiCasting}
+              className="px-5 py-2.5 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 rounded-full text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors border border-zinc-200 dark:border-zinc-700"
+            >
+              Open AI Casting
+            </button>
+          </div>
         </div>
       </div>
     );

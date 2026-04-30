@@ -13,9 +13,11 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import { Play, Pause, Star, Sparkles, ChevronDown } from 'lucide-react';
+import { Play, Pause, Star, Sparkles, ChevronDown, Loader2 } from 'lucide-react';
 import { Voice } from '../types';
 import AudioVisualizer from './AudioVisualizer';
+import { generateTts } from '../api';
+import { useAudio } from './AudioProvider';
 
 interface VoiceCardProps {
   voice: Voice;
@@ -37,12 +39,17 @@ const defaultBadgeColor = 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:te
 
 /** Render one stock voice card with playback, favorite, and discovery actions. */
 const VoiceCard: React.FC<VoiceCardProps> = ({ voice, isPlaying, onPlayToggle, isFavorite, onFavoriteToggle, onFindSimilar, badges, hoverPreview = false }) => {
+  const { playPcm } = useAudio();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const hoverAudioRef = useRef<HTMLAudioElement | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches;
   const [expanded, setExpanded] = useState(false);
+  const [quickPreviewOpen, setQuickPreviewOpen] = useState(false);
+  const [quickPreviewText, setQuickPreviewText] = useState('This is a quick preview with my own text.');
+  const [quickPreviewLoading, setQuickPreviewLoading] = useState(false);
+  const [quickPreviewError, setQuickPreviewError] = useState<string | null>(null);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -101,8 +108,30 @@ const VoiceCard: React.FC<VoiceCardProps> = ({ voice, isPlaying, onPlayToggle, i
     return () => stopHoverPreview();
   }, [stopHoverPreview]);
 
+  const handleQuickPreview = async (event: React.FormEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const text = quickPreviewText.trim();
+    if (!text || quickPreviewLoading) return;
+    setQuickPreviewLoading(true);
+    setQuickPreviewError(null);
+    try {
+      const audio = await generateTts(text, voice.name);
+      await playPcm(audio, {
+        label: `${voice.name} quick preview`,
+        subtitle: text.slice(0, 80),
+        source: 'tts',
+      });
+    } catch (err: any) {
+      setQuickPreviewError(err?.message ?? 'Preview failed');
+    } finally {
+      setQuickPreviewLoading(false);
+    }
+  };
+
   return (
     <div 
+        data-testid="voice-card"
         className={`group relative bg-white dark:bg-zinc-800 border transition-all duration-200 flex flex-col cursor-pointer rounded-2xl overflow-hidden hover-lift hover:border-zinc-300 dark:hover:border-zinc-600 ${isPlaying ? 'border-blue-200 dark:border-blue-800 ring-2 ring-blue-100 dark:ring-blue-900/30 shadow-md' : 'border-zinc-200 dark:border-zinc-700 shadow-sm hover:shadow-md'}`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={stopHoverPreview}
@@ -194,16 +223,52 @@ const VoiceCard: React.FC<VoiceCardProps> = ({ voice, isPlaying, onPlayToggle, i
             {voice.analysis.characteristics.join(', ')}
         </p>
         {onFindSimilar && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onFindSimilar(voice.name); }}
-            className="mt-1 flex items-center gap-1 text-[10px] font-medium accent-text hover:opacity-80 opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            <Sparkles size={10} />
-            Find similar
-          </button>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); onFindSimilar(voice.name); }}
+              className="flex items-center gap-1 text-[10px] font-medium accent-text hover:opacity-80 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <Sparkles size={10} />
+              Find similar
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setQuickPreviewOpen(v => !v); }}
+              className="rounded-md border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:text-zinc-300 opacity-100 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-700"
+              aria-expanded={quickPreviewOpen}
+            >
+              Quick preview
+            </button>
+          </div>
         )}
       </div>
       </div>
+
+      {quickPreviewOpen && (
+        <form
+          onSubmit={handleQuickPreview}
+          onClick={e => e.stopPropagation()}
+          className="border-t border-zinc-100 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-3 animate-slide-down"
+        >
+          <div className="flex gap-2">
+            <input
+              value={quickPreviewText}
+              onChange={(e) => setQuickPreviewText(e.target.value)}
+              className="min-w-0 flex-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 px-3 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              maxLength={180}
+              aria-label={`Quick preview text for ${voice.name}`}
+            />
+            <button
+              type="submit"
+              disabled={quickPreviewLoading || !quickPreviewText.trim()}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-indigo-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-zinc-800 dark:hover:bg-indigo-500 disabled:opacity-40"
+            >
+              {quickPreviewLoading ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+              Generate
+            </button>
+          </div>
+          {quickPreviewError && <p className="mt-1 text-[10px] text-red-500">{quickPreviewError}</p>}
+        </form>
+      )}
 
       {/* Expanded Detail Panel */}
       {expanded && (

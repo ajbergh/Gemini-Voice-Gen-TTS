@@ -94,10 +94,22 @@ export async function getVoices(): Promise<Voice[]> {
  * Sends the user's query and the full voice catalogue for context.
  */
 export async function recommendVoices(query: string, voices: { name: string; gender: string; pitch: string; characteristics: string[] }[]): Promise<AiRecommendation> {
-  return request<AiRecommendation>('/voices/recommend', {
+  const raw = await request<AiRecommendation | Array<{ voiceName?: string; name?: string; prompt?: string }>>('/voices/recommend', {
     method: 'POST',
     body: JSON.stringify({ query, voices }),
   });
+  if (Array.isArray(raw)) {
+    const voiceNames = raw
+      .map(item => item.voiceName || item.name || '')
+      .filter(Boolean);
+    return {
+      voiceNames,
+      systemInstruction: raw[0]?.prompt || 'Read naturally with the recommended voice style.',
+      sampleText: query,
+      sourceQuery: query,
+    };
+  }
+  return raw;
 }
 
 /**
@@ -456,7 +468,11 @@ export interface BatchRenderOptions {
 
 export interface BatchRenderResponse {
   job_id: string;
-  segment_count: number;
+  segment_count?: number;
+  rendered?: number;
+  failed?: number;
+  skipped?: number;
+  total_ms?: number;
 }
 
 export async function batchRenderProject(projectId: number, options?: BatchRenderOptions): Promise<BatchRenderResponse> {

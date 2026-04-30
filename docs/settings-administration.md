@@ -62,7 +62,7 @@ Global defaults applied to all new segments across all projects (unless overridd
 
 | Setting | Description |
 |---------|-------------|
-| **Default Model** | TTS model: `gemini-3.1-flash-tts-preview` (default), `gemini-2.5-flash-preview-tts`, `gemini-2.5-pro-preview-tts` |
+| **Default Model** | TTS model: `gemini-3.1-flash-tts-preview` (default), `gemini-2.5-flash-preview-tts` |
 | **Default Voice** | Stock voice or custom preset for new segments |
 | **Default Language** | Language code (e.g., `en-US`) or auto-detect |
 

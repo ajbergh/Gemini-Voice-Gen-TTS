@@ -204,6 +204,12 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const notifyKey = `${event.job_id}:${status}`;
       if (!notifiedRef.current.has(notifyKey)) {
         notifiedRef.current.add(notifyKey);
+        if (event.type === 'batch_render') {
+          const rendered = event.completed_items ?? 0;
+          const failed = event.failed_items ?? 0;
+          showToast(`Batch complete - ${rendered} rendered, ${failed} failed`, failed > 0 ? 'warning' : 'success');
+          return;
+        }
         if (FAILED_STATUSES.has(status)) {
           showToast(event.message || `${formatJobType(event.type)} failed`, 'error');
         } else if (COMPLETE_STATUSES.has(status)) {

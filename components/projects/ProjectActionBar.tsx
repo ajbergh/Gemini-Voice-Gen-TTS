@@ -18,10 +18,11 @@
  *   Export  — (tab panel owns export; More menu always visible)
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Archive,
   BookOpen,
+  HelpCircle,
   Loader2,
   MoreHorizontal,
   Play,
@@ -70,6 +71,8 @@ const ProjectActionBar: React.FC<ProjectActionBarProps> = ({
   onArchiveProject,
   onSetShowOverflowMenu,
 }) => {
+  const [showStatusLegend, setShowStatusLegend] = useState(false);
+
   const scriptPrimaryActions = (
     <>
       {!mobile && (
@@ -87,6 +90,7 @@ const ProjectActionBar: React.FC<ProjectActionBarProps> = ({
       <button
         type="button"
         onClick={onToggleImport}
+        data-tour-step="import"
         className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors ${mobile ? 'min-w-0 flex-1' : ''} ${
           showImport
             ? 'border-[var(--accent-400)] bg-[var(--accent-50)] dark:border-[var(--accent-600)] dark:bg-zinc-900 text-[var(--accent-700)] dark:text-[var(--accent-200)]'
@@ -101,6 +105,7 @@ const ProjectActionBar: React.FC<ProjectActionBarProps> = ({
         type="button"
         disabled={batchRendering}
         onClick={onRenderAll}
+        data-tour-step="render-all"
         className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-[var(--accent-600)] px-2.5 text-xs font-semibold text-white hover:bg-zinc-800 dark:hover:bg-[var(--accent-500)] transition-colors disabled:opacity-50 ${mobile ? 'min-w-0 flex-1' : ''}`}
       >
         {batchRendering
@@ -109,6 +114,43 @@ const ProjectActionBar: React.FC<ProjectActionBarProps> = ({
         }
         <span className={mobile ? 'truncate' : 'hidden sm:inline'}>Render all</span>
       </button>
+
+      <div className={mobile ? 'relative shrink-0' : 'relative'}>
+        <button
+          type="button"
+          data-testid="status-legend-toggle"
+          aria-label="Status legend"
+          aria-expanded={showStatusLegend}
+          onClick={() => setShowStatusLegend(prev => !prev)}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+          title="Status legend"
+        >
+          <HelpCircle size={14} />
+        </button>
+        {showStatusLegend && (
+          <div className="absolute right-0 top-full z-30 mt-1 w-64 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-3 text-left shadow-lg">
+            <p className="mb-2 text-xs font-semibold text-zinc-700 dark:text-zinc-200">Segment status legend</p>
+            <div className="space-y-1.5">
+              {[
+                ['Draft', 'Not rendered yet.', 'bg-zinc-300 dark:bg-zinc-600'],
+                ['Rendering', 'Audio generation is in progress.', 'bg-purple-400'],
+                ['Rendered', 'Audio exists and is ready to review.', 'bg-teal-400'],
+                ['Approved', 'Take is accepted for export.', 'bg-emerald-500'],
+                ['Flagged', 'Needs attention before export.', 'bg-red-500'],
+                ['Changed', 'Script changed after rendering.', 'bg-amber-400'],
+              ].map(([label, description, swatch]) => (
+                <div key={label} className="flex items-start gap-2">
+                  <span className={`mt-1 h-2.5 w-2.5 rounded-full ${swatch}`} />
+                  <span className="min-w-0">
+                    <span className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">{label}</span>
+                    <span className="block text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">{description}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </>
   );
 

@@ -29,6 +29,7 @@ import FilterBar from './components/FilterBar';
 import NavigationSidebar, { AppSection } from './components/NavigationSidebar';
 import VoiceFinder from './components/VoiceFinder';
 import AiResultCard from './components/AiResultCard';
+import VoiceCompare from './components/VoiceCompare';
 import ProjectWorkspace from './components/ProjectWorkspace';
 import ScriptReaderModal from './components/ScriptReaderModal';
 import SettingsModal from './components/SettingsModal';
@@ -50,6 +51,12 @@ interface PendingPresetSave {
   audioBase64: string | null;
   sourceQuery: string;
   personDescription?: string;
+}
+
+interface CompareSeed {
+  voiceNames: string[];
+  text: string;
+  systemInstruction?: string;
 }
 
 const PRESET_NAME_STOPWORDS = new Set([
@@ -94,6 +101,7 @@ const App: React.FC = () => {
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
   const [aiResult, setAiResult] = useState<AiRecommendation | null>(null);
   const [isAiCardVisible, setIsAiCardVisible] = useState(false);
+  const [compareSeed, setCompareSeed] = useState<CompareSeed | null>(null);
 
   // --- Modal visibility flags ---
   const [showVoiceFinder, setShowVoiceFinder] = useState(false);
@@ -540,7 +548,7 @@ const App: React.FC = () => {
     }
   };
 
-  const isModalOpen = showVoiceFinder || showSettings || showShortcuts || showCommandPalette || (aiResult && isAiCardVisible) || !!editingPreset || !!pendingPresetSave;
+  const isModalOpen = showVoiceFinder || showSettings || showShortcuts || showCommandPalette || (aiResult && isAiCardVisible) || !!compareSeed || !!editingPreset || !!pendingPresetSave;
 
   /** Handle section change from sidebar. Map presets section to voiceTab='custom'. */
   const handleSectionChange = useCallback((section: AppSection) => {
@@ -702,6 +710,7 @@ const App: React.FC = () => {
                 onDelete={handlePresetDelete}
                 onDuplicate={handlePresetDuplicate}
                 onAiCasting={() => setShowVoiceFinder(true)}
+                onBrowseVoices={() => handleSectionChange('voices')}
                 onExport={handleExportPresets}
                 onImport={handleImportPresets}
                 onInlineEdit={handlePresetInlineEdit}
@@ -720,6 +729,7 @@ const App: React.FC = () => {
               onDelete={handlePresetDelete}
               onDuplicate={handlePresetDuplicate}
               onAiCasting={() => setShowVoiceFinder(true)}
+              onBrowseVoices={() => handleSectionChange('voices')}
               onExport={handleExportPresets}
               onImport={handleImportPresets}
               onInlineEdit={handlePresetInlineEdit}
@@ -763,6 +773,8 @@ const App: React.FC = () => {
         highContrast={highContrast}
         onHighContrastChange={setHighContrast}
         onOpenJobCenter={() => setShowJobCenter(true)}
+        onOpenCommandPalette={() => setShowCommandPalette(true)}
+        ariaHidden={!!isModalOpen}
         jobBadgeCount={jobBadgeCount}
         hasActiveJob={hasActiveJob}
         activeJobPercent={activeJobPercent}
@@ -854,9 +866,50 @@ const App: React.FC = () => {
                     voices={filteredVoices} 
                     onClose={clearAiResult}
                     onSavePreset={handleSavePreset}
+                    onCompareAll={(result) => {
+                      setCompareSeed({
+                        voiceNames: result.voiceNames,
+                        text: result.sampleText || result.sourceQuery || '',
+                        systemInstruction: result.systemInstruction,
+                      });
+                      setIsAiCardVisible(false);
+                    }}
                  />
              </div>
           </div>
+      )}
+
+      {compareSeed && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Voice comparison"
+        >
+          <div className="absolute inset-0" onClick={() => setCompareSeed(null)} />
+          <div className="relative w-full max-w-4xl rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-zinc-900 dark:text-white">Compare recommendations</h2>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">Generate the same line across the recommended voices.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCompareSeed(null)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                aria-label="Close comparison"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <VoiceCompare
+              text={compareSeed.text}
+              voices={VOICE_DATA}
+              systemInstruction={compareSeed.systemInstruction}
+              initialVoiceNames={compareSeed.voiceNames}
+            />
+          </div>
+        </div>
       )}
 
       {editingPreset && (

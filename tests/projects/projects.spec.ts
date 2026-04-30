@@ -150,7 +150,7 @@ test.describe('Project list panel (Phase 2)', () => {
     await loadApp(page);
     await goToProjects(page);
 
-    await page.getByRole('button', { name: 'Blocked' }).click();
+    await page.getByRole('button', { name: 'Blocked', exact: true }).first().click();
 
     await expect(page.getByRole('button', { name: new RegExp(blockedProject.title) }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: new RegExp(FIXTURE_PROJECT.title) }).first()).not.toBeVisible();

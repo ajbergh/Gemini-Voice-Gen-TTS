@@ -15,10 +15,10 @@
  * consistent with the PronunciationEditor and TimelineReview panels.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Plus, Users, X } from 'lucide-react';
 import { deleteCastProfile, listProjectCast } from '../api';
-import { CastProfile, CastRole, CustomPreset, Voice } from '../types';
+import { CastProfile, CastRole, CustomPreset, ScriptSegment, Voice } from '../types';
 import { useToast } from './ToastProvider';
 import CastProfileCard from './CastProfileCard';
 import CastProfileEditor from './CastProfileEditor';
@@ -29,6 +29,7 @@ interface CastBoardProps {
   projectId: number;
   voices: Voice[];
   customPresets?: CustomPreset[];
+  segments?: ScriptSegment[];
   onClose?: () => void;
 }
 
@@ -63,7 +64,7 @@ const ROLE_LABELS: Record<CastRole, string> = {
 const ALWAYS_VISIBLE: Set<CastRole> = new Set(['narrator', 'protagonist']);
 
 /** Render the project cast board for managing character and narrator profiles. */
-const CastBoard: React.FC<CastBoardProps> = ({ projectId, voices, customPresets = [], onClose }) => {
+const CastBoard: React.FC<CastBoardProps> = ({ projectId, voices, customPresets = [], segments = [], onClose }) => {
   const { showToast } = useToast();
   const isMounted = useRef(false);
   useEffect(() => {
@@ -139,6 +140,15 @@ const CastBoard: React.FC<CastBoardProps> = ({ projectId, voices, customPresets 
         .sort((a, b) => a.sort_order - b.sort_order),
     }))
     .filter(g => g.profiles.length > 0 || ALWAYS_VISIBLE.has(g.role));
+
+  const usageMap = useMemo(() => (
+    segments.reduce<Record<number, number>>((acc, segment) => {
+      if (segment.cast_profile_id != null) {
+        acc[segment.cast_profile_id] = (acc[segment.cast_profile_id] ?? 0) + 1;
+      }
+      return acc;
+    }, {})
+  ), [segments]);
 
   return (
     <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
@@ -235,6 +245,7 @@ const CastBoard: React.FC<CastBoardProps> = ({ projectId, voices, customPresets 
                       key={profile.id}
                       profile={profile}
                       customPresets={customPresets}
+                      usageCount={usageMap[profile.id] ?? 0}
                       onEdit={p => { setEditorInitialRole(undefined); setEditingProfile(p); }}
                       onAudition={p => setAuditioningProfile(p)}
                       onDelete={handleDelete}

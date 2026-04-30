@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, ArrowRight, ArrowLeft, Sparkles, Mic, FileText, Settings, Command } from 'lucide-react';
+import { X, ArrowRight, ArrowLeft, Sparkles, Mic, FileText, Settings, Command, FolderOpen, Upload, Play, ClipboardCheck, Package } from 'lucide-react';
 
 const STORAGE_KEY = 'gemini-voice-onboarding-complete';
 
@@ -47,6 +47,42 @@ const STEPS: TourStep[] = [
     title: 'Script Reader',
     description: 'Test voices with your own scripts. Supports single speaker, multi-speaker dialogue, and A/B voice comparison.',
     icon: <FileText size={24} />,
+    position: 'center',
+  },
+  {
+    title: 'Projects pipeline',
+    description: 'Projects give you a production workflow for full scripts, from import through segment rendering, review, and export.',
+    icon: <FolderOpen size={24} />,
+    position: 'center',
+  },
+  {
+    title: 'Import your script',
+    description: 'Bring in manuscript, episode, or voiceover copy and split it into sections and segments for production.',
+    icon: <Upload size={24} />,
+    position: 'center',
+  },
+  {
+    title: 'Each segment gets a voice',
+    description: 'Assign voices or cast profiles per segment so dialogue, narration, and brand reads stay organized.',
+    icon: <Mic size={24} />,
+    position: 'center',
+  },
+  {
+    title: 'Batch render',
+    description: 'Render all ready segments in one batch render job and track progress from the sidebar job center.',
+    icon: <Play size={24} />,
+    position: 'center',
+  },
+  {
+    title: 'Review takes',
+    description: 'Move through rendered segments, approve takes, and resolve QC notes before exporting.',
+    icon: <ClipboardCheck size={24} />,
+    position: 'center',
+  },
+  {
+    title: 'Export finished audio',
+    description: 'When the production workflow is ready, export packaged audio for delivery.',
+    icon: <Package size={24} />,
     position: 'center',
   },
   {
@@ -127,7 +163,7 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ forceShow, onComplete }
   const isFirst = currentStep === 0;
 
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Onboarding tour">
+    <div data-testid="onboarding-tour" className="fixed inset-0 z-[300] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Onboarding tour">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-zinc-900/70 backdrop-blur-sm animate-fade-in" />
 
@@ -206,7 +242,7 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ forceShow, onComplete }
               onClick={handleNext}
               className="flex items-center gap-1.5 px-5 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors shadow-sm"
             >
-              {isLast ? 'Get Started' : 'Next'}
+              {isLast ? 'Get Started' : 'Continue'}
               {!isLast && <ArrowRight size={14} />}
             </button>
           </div>

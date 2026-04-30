@@ -11,7 +11,7 @@
  */
 
 import React, { useState } from 'react';
-import { AlertTriangle, CheckCircle, Edit2, Trash2, XCircle } from 'lucide-react';
+import { AlertOctagon, AlertTriangle, CheckCircle, Edit2, Info, Trash2, XCircle } from 'lucide-react';
 import { deleteQcIssue, resolveQcIssue } from '../api';
 import type { QcIssue, QcIssueSeverity, QcIssueStatus } from '../types';
 import QcIssueDialog from './QcIssueDialog';
@@ -34,6 +34,12 @@ const STATUS_ICON: Record<QcIssueStatus, React.ReactNode> = {
   open: <AlertTriangle size={13} className="text-yellow-500" />,
   resolved: <CheckCircle size={13} className="text-green-500" />,
   wont_fix: <XCircle size={13} className="text-zinc-400" />,
+};
+
+const SEVERITY_ICON: Record<QcIssueSeverity, React.ReactNode> = {
+  low: <Info size={11} className="text-blue-500" />,
+  medium: <AlertTriangle size={11} className="text-yellow-500" />,
+  high: <AlertOctagon size={11} className="text-red-500" />,
 };
 
 /** Render and edit the QC issues associated with one project segment. */
@@ -75,6 +81,7 @@ export default function QcIssueList({
         {issues.map(issue => (
           <div
             key={issue.id}
+            data-testid="qc-issue"
             className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs group transition-colors ${rowBase}`}
           >
             {/* Status icon */}
@@ -83,15 +90,17 @@ export default function QcIssueList({
             {/* Content */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold capitalize ${SEVERITY_COLORS[issue.severity]}`}>
+                <span data-testid={`qc-severity-${issue.severity}`} className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold capitalize ${SEVERITY_COLORS[issue.severity]}`}>
+                  {SEVERITY_ICON[issue.severity]}
                   {issue.severity}
                 </span>
-                <span className="opacity-70 capitalize">{issue.issue_type.replace(/_/g, ' ')}</span>
+                <span className="opacity-70 capitalize">{(issue.issue_type ?? (issue as any).title ?? 'issue').replace(/_/g, ' ')}</span>
                 {issue.time_offset_seconds != null && (
                   <span className="opacity-50">{issue.time_offset_seconds.toFixed(2)}s</span>
                 )}
               </div>
-              {issue.note && <p className="mt-0.5 opacity-80 break-words">{issue.note}</p>}
+              {((issue as any).title && issue.issue_type) && <p className="mt-0.5 font-medium opacity-90 break-words">{(issue as any).title}</p>}
+              {(issue.note || (issue as any).description) && <p className="mt-0.5 opacity-80 break-words">{issue.note || (issue as any).description}</p>}
             </div>
 
             {/* Actions — visible on hover */}

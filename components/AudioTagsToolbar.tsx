@@ -42,18 +42,31 @@ const CATEGORY_META: Record<AudioTagCategory, { label: string; pillBg: string; p
 };
 
 const CATEGORIES: AudioTagCategory[] = ['style', 'emotion', 'action'];
+const TOOLBAR_SEEN_KEY = 'gemini-voice-tags-toolbar-seen';
 
 /** Render quick-insert controls for supported Gemini audio style tags. */
 const AudioTagsToolbar: React.FC<AudioTagsToolbarProps> = ({ onInsertTag }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(() => {
+    try { return localStorage.getItem(TOOLBAR_SEEN_KEY) !== 'true'; } catch { return true; }
+  });
   const [showTooltip, setShowTooltip] = useState(false);
+
+  const toggleExpanded = () => {
+    setExpanded(current => {
+      const next = !current;
+      if (!next) {
+        try { localStorage.setItem(TOOLBAR_SEEN_KEY, 'true'); } catch {}
+      }
+      return next;
+    });
+  };
 
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
         <button
           type="button"
-          onClick={() => setExpanded(!expanded)}
+          onClick={toggleExpanded}
           className="flex items-center gap-1 text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
         >
           {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
@@ -86,9 +99,14 @@ const AudioTagsToolbar: React.FC<AudioTagsToolbarProps> = ({ onInsertTag }) => {
             const tags = AUDIO_TAGS.filter(t => t.category === category);
             return (
               <div key={category} className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 w-12 shrink-0">
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  className="text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 w-12 shrink-0 cursor-default"
+                  aria-label={meta.label}
+                >
                   {meta.label}
-                </span>
+                </button>
                 {tags.map(tag => (
                   <button
                     key={tag.tag}

@@ -17,7 +17,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Voice, CustomPreset } from '../types';
-import { X, FileText, Mic, User, ChevronDown, Users, Play, Square, Loader2, Download, BookOpen, Clock, Wand2 } from 'lucide-react';
+import { X, FileText, Mic, User, ChevronDown, Users, Play, Square, Loader2, Download, BookOpen, Clock, Wand2, Save } from 'lucide-react';
 import { VOICE_DATA } from '../constants';
 import { generateMultiSpeakerTts, formatScript } from '../api';
 import AiTtsPreview from './AiTtsPreview';
@@ -101,6 +101,14 @@ interface ScriptReaderModalProps {
   inline?: boolean;
 }
 
+interface DialogueCast {
+  id: string;
+  name: string;
+  speakers: { label: string; voiceName: string }[];
+}
+
+const DIALOGUE_CASTS_KEY = 'gemini-voice-dialogue-casts';
+
 /** Render a script-input modal for single- or multi-speaker TTS generation. */
 const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPresets = [], initialVoiceName, onClose, inline = false }) => {
   const [script, setScript] = useState('Hello! I am ready to read your script. Type something here and click Listen.');
@@ -118,6 +126,14 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
   const [speaker2Name, setSpeaker2Name] = useState('Speaker2');
   const [speaker1Voice, setSpeaker1Voice] = useState(voices[0]?.name || '');
   const [speaker2Voice, setSpeaker2Voice] = useState(voices[1]?.name || voices[0]?.name || '');
+  const [savedDialogueCasts, setSavedDialogueCasts] = useState<DialogueCast[]>(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(DIALOGUE_CASTS_KEY) || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  });
+  const [newCastName, setNewCastName] = useState('');
+  const [selectedCastId, setSelectedCastId] = useState('');
   const [dialogueLoading, setDialogueLoading] = useState(false);
   const [dialoguePlaying, setDialoguePlaying] = useState(false);
   const [dialogueError, setDialogueError] = useState<string | null>(null);
@@ -128,6 +144,48 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
   const modalRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [highlighterScrollTop, setHighlighterScrollTop] = useState(0);
+
+  const scriptWordCount = useMemo(
+    () => script.trim().split(/\s+/).filter(Boolean).length,
+    [script],
+  );
+  const scriptEstimatedSeconds = Math.max(1, Math.round((scriptWordCount / 150) * 60));
+
+  const persistDialogueCasts = (casts: DialogueCast[]) => {
+    setSavedDialogueCasts(casts);
+    try { localStorage.setItem(DIALOGUE_CASTS_KEY, JSON.stringify(casts)); } catch {}
+  };
+
+  const handleSaveDialogueCast = () => {
+    const name = newCastName.trim();
+    if (!name) return;
+    const cast: DialogueCast = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name,
+      speakers: [
+        { label: speaker1Name.trim() || 'Speaker1', voiceName: speaker1Voice },
+        { label: speaker2Name.trim() || 'Speaker2', voiceName: speaker2Voice },
+      ],
+    };
+    persistDialogueCasts([cast, ...savedDialogueCasts.filter(existing => existing.name.toLowerCase() !== name.toLowerCase())].slice(0, 12));
+    setSelectedCastId(cast.id);
+    setNewCastName('');
+  };
+
+  const handleLoadDialogueCast = (castId: string) => {
+    setSelectedCastId(castId);
+    const cast = savedDialogueCasts.find(item => item.id === castId);
+    if (!cast) return;
+    const [first, second] = cast.speakers;
+    if (first) {
+      setSpeaker1Name(first.label);
+      setSpeaker1Voice(first.voiceName);
+    }
+    if (second) {
+      setSpeaker2Name(second.label);
+      setSpeaker2Voice(second.voiceName);
+    }
+  };
 
   // Auto-resize textarea to fit content up to max-height
   useEffect(() => {
@@ -164,7 +222,9 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
 
   useEffect(() => {
     modalRef.current?.focus();
+  }, []);
 
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
@@ -363,8 +423,10 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
   const sharedContent = (
     <>
       {/* Mode Toggle */}
-      <div className="flex bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700 w-fit">
+      <div className="flex bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700 w-fit" role="tablist" aria-label="Script Reader mode">
         <button
+          role="tab"
+          aria-selected={mode === 'single'}
           onClick={() => setMode('single')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${mode === 'single' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'}`}
             >
@@ -372,6 +434,8 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
               Single Speaker
             </button>
             <button
+              role="tab"
+              aria-selected={mode === 'dialogue'}
               onClick={() => setMode('dialogue')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${mode === 'dialogue' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'}`}
             >
@@ -379,6 +443,8 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
               Dialogue (2 Speakers)
             </button>
             <button
+              role="tab"
+              aria-selected={mode === 'compare'}
               onClick={() => setMode('compare')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${mode === 'compare' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'}`}
             >
@@ -389,46 +455,80 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
 
           {/* Dialogue Speaker Config — shown only in dialogue mode */}
           {mode === 'dialogue' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400">Speaker 1</label>
-                <input
-                  type="text"
-                  value={speaker1Name}
-                  onChange={(e) => setSpeaker1Name(e.target.value)}
-                  className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-                  placeholder="Speaker name"
-                />
-                <div className="relative">
-                  <select
-                    value={speaker1Voice}
-                    onChange={(e) => setSpeaker1Voice(e.target.value)}
-                    className="appearance-none w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 py-1.5 pl-3 pr-8 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer"
-                  >
-                    {voices.map(v => <option key={v.name} value={v.name}>{v.name} ({v.analysis.gender})</option>)}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-400"><ChevronDown size={12} /></div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400">Speaker 1</label>
+                  <input
+                    type="text"
+                    value={speaker1Name}
+                    onChange={(e) => setSpeaker1Name(e.target.value)}
+                    className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                    placeholder="Speaker name"
+                  />
+                  <div className="relative">
+                    <select
+                      value={speaker1Voice}
+                      onChange={(e) => setSpeaker1Voice(e.target.value)}
+                      className="appearance-none w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 py-1.5 pl-3 pr-8 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer"
+                    >
+                      {voices.map(v => <option key={v.name} value={v.name}>{v.name} ({v.analysis.gender})</option>)}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-400"><ChevronDown size={12} /></div>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400">Speaker 2</label>
+                  <input
+                    type="text"
+                    value={speaker2Name}
+                    onChange={(e) => setSpeaker2Name(e.target.value)}
+                    className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                    placeholder="Speaker name"
+                  />
+                  <div className="relative">
+                    <select
+                      value={speaker2Voice}
+                      onChange={(e) => setSpeaker2Voice(e.target.value)}
+                      className="appearance-none w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 py-1.5 pl-3 pr-8 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer"
+                    >
+                      {voices.map(v => <option key={v.name} value={v.name}>{v.name} ({v.analysis.gender})</option>)}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-400"><ChevronDown size={12} /></div>
+                  </div>
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400">Speaker 2</label>
-                <input
-                  type="text"
-                  value={speaker2Name}
-                  onChange={(e) => setSpeaker2Name(e.target.value)}
-                  className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-                  placeholder="Speaker name"
-                />
-                <div className="relative">
+
+              <div className="flex flex-col gap-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/70 dark:bg-zinc-800/30 p-3 sm:flex-row sm:items-center">
+                <div className="relative min-w-0 flex-1">
                   <select
-                    value={speaker2Voice}
-                    onChange={(e) => setSpeaker2Voice(e.target.value)}
-                    className="appearance-none w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 py-1.5 pl-3 pr-8 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer"
+                    value={selectedCastId}
+                    onChange={(e) => handleLoadDialogueCast(e.target.value)}
+                    className="appearance-none w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 py-1.5 pl-3 pr-8 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer"
+                    aria-label="Saved casts"
                   >
-                    {voices.map(v => <option key={v.name} value={v.name}>{v.name} ({v.analysis.gender})</option>)}
+                    <option value="">Saved casts</option>
+                    {savedDialogueCasts.map(cast => <option key={cast.id} value={cast.id}>{cast.name}</option>)}
                   </select>
                   <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-400"><ChevronDown size={12} /></div>
                 </div>
+                <input
+                  type="text"
+                  value={newCastName}
+                  onChange={(e) => setNewCastName(e.target.value)}
+                  className="min-w-0 flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                  placeholder="Cast name"
+                  aria-label="Dialogue cast name"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveDialogueCast}
+                  disabled={!newCastName.trim()}
+                  className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-indigo-600 px-3 text-xs font-semibold text-white hover:bg-zinc-800 dark:hover:bg-indigo-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Save size={12} />
+                  Save cast
+                </button>
               </div>
             </div>
           )}
@@ -542,8 +642,10 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
               />
             </div>
             <div className="flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500 px-1">
-              <span>{script.length.toLocaleString()} character{script.length !== 1 ? 's' : ''}</span>
-              <span>~{Math.max(1, Math.round(script.trim().split(/\s+/).filter(Boolean).length / 150 * 60))}s estimated</span>
+              <span>
+                {scriptWordCount.toLocaleString()} word{scriptWordCount !== 1 ? 's' : ''} · {script.length.toLocaleString()} character{script.length !== 1 ? 's' : ''}
+              </span>
+              <span>~{scriptEstimatedSeconds} sec estimated duration</span>
             </div>
           </div>
 
@@ -661,7 +763,7 @@ const ScriptReaderModal: React.FC<ScriptReaderModalProps> = ({ voices, customPre
   // Inline mode: render as a full-height section without modal overlay
   if (inline) {
     return (
-      <div ref={modalRef} tabIndex={-1} className="flex-1 flex flex-col bg-white dark:bg-zinc-900 overflow-hidden outline-none">
+      <div ref={modalRef} tabIndex={-1} data-testid="script-reader-panel" className="flex-1 flex flex-col bg-white dark:bg-zinc-900 overflow-hidden outline-none">
         <div className="flex items-center justify-between p-4 pr-28 border-b border-zinc-100 dark:border-zinc-800">
           <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
             <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400">

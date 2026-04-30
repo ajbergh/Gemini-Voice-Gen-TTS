@@ -23,10 +23,11 @@ interface AiResultCardProps {
   voices: Voice[];
   onClose: () => void;
   onSavePreset?: (data: { voiceName: string; text: string; systemInstruction: string; audioBase64: string | null; sourceQuery: string; personDescription?: string }) => void;
+  onCompareAll?: (result: AiRecommendation) => void;
 }
 
 /** Render an AI casting result with recommended voices and sample playback. */
-const AiResultCard: React.FC<AiResultCardProps> = ({ result, voices, onClose, onSavePreset }) => {
+const AiResultCard: React.FC<AiResultCardProps> = ({ result, voices, onClose, onSavePreset, onCompareAll }) => {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -161,6 +162,16 @@ const AiResultCard: React.FC<AiResultCardProps> = ({ result, voices, onClose, on
                       onSavePreset={onSavePreset}
                     />
                  </div>
+                 {onCompareAll && result.voiceNames.length >= 2 && (
+                   <button
+                     type="button"
+                     onClick={() => onCompareAll(result)}
+                     className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 text-xs font-semibold text-zinc-700 dark:text-zinc-200 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                   >
+                     <Sparkles size={13} />
+                     Compare all three
+                   </button>
+                 )}
             </div>
         </div>
     </div>

@@ -21,10 +21,11 @@ interface Toast {
   id: number;
   type: ToastType;
   message: string;
+  persistent: boolean;
 }
 
 interface ToastContextValue {
-  showToast: (message: string, type?: ToastType) => void;
+  showToast: (message: string, type?: ToastType, options?: { persistent?: boolean }) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -66,10 +67,13 @@ const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  const showToast = useCallback((message: string, type: ToastType = 'info') => {
+  const showToast = useCallback((message: string, type: ToastType = 'info', options?: { persistent?: boolean }) => {
     const id = nextIdRef.current++;
-    setToasts(prev => [...prev, { id, type, message }]);
-    setTimeout(() => removeToast(id), AUTO_DISMISS_MS);
+    const persistent = options?.persistent ?? (type === 'error' || type === 'warning');
+    setToasts(prev => [...prev, { id, type, message, persistent }]);
+    if (!persistent) {
+      setTimeout(() => removeToast(id), AUTO_DISMISS_MS);
+    }
   }, [removeToast]);
 
   return (
@@ -83,10 +87,11 @@ const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             <div
               key={toast.id}
               className={`pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-lg backdrop-blur-sm text-sm font-medium animate-slide-up max-w-sm ${style.bg}`}
-              role="alert"
+              role={toast.type === 'error' || toast.type === 'warning' ? 'alert' : 'status'}
+              data-testid={toast.type === 'error' ? 'error-toast' : undefined}
             >
               {style.icon}
-              <span className="flex-1 leading-snug">{toast.message}</span>
+              <span className="flex-1 leading-snug" data-testid={toast.message.startsWith('Batch complete') ? 'batch-summary' : undefined}>{toast.message}</span>
               <button
                 onClick={() => removeToast(toast.id)}
                 className="shrink-0 p-0.5 rounded-full opacity-60 hover:opacity-100 transition-opacity"

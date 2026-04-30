@@ -18,6 +18,7 @@ import { CastProfile, CustomPreset } from '../types';
 interface CastProfileCardProps {
   profile: CastProfile;
   customPresets?: CustomPreset[];
+  usageCount?: number;
   onEdit: (profile: CastProfile) => void;
   onAudition: (profile: CastProfile) => void;
   onDelete: (profile: CastProfile) => void;
@@ -57,6 +58,7 @@ function formatRole(role: string): string {
 const CastProfileCard: React.FC<CastProfileCardProps> = ({
   profile,
   customPresets = [],
+  usageCount = 0,
   onEdit,
   onAudition,
   onDelete,
@@ -88,6 +90,13 @@ const CastProfileCard: React.FC<CastProfileCardProps> = ({
                   : profile.voice_name}
               </span>
             )}
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+              usageCount > 0
+                ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300'
+                : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
+            }`}>
+              {usageCount > 0 ? `Used in ${usageCount} segment${usageCount === 1 ? '' : 's'}` : 'Unassigned'}
+            </span>
           </div>
         </div>
 

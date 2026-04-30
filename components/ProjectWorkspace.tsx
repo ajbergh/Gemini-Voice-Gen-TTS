@@ -12,6 +12,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BookOpen,
   Check,
+  CheckCircle,
   ChevronDown,
   ClipboardCheck,
   Film,
@@ -90,7 +91,7 @@ import ProjectSettingsDrawer from './projects/ProjectSettingsDrawer';
 import MobileProjectSwitcher from './projects/MobileProjectSwitcher';
 import NewProjectDrawer from './projects/NewProjectDrawer';
 import { DEFAULT_PROJECT_TEMPLATE_ID, getProjectTemplate } from './projects/projectTemplates';
-import { isSegmentAudioReady } from './projects/exportReadiness';
+import { getExportReadiness, isSegmentAudioReady } from './projects/exportReadiness';
 import { getProjectHealth, ProjectNextAction } from './projects/projectHealth';
 
 interface ProjectWorkspaceProps {
@@ -312,6 +313,27 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     () => segments.filter(s => s.status === 'approved').length,
     [segments],
   );
+
+  const openQcCount = useMemo(
+    () => qcIssues.filter(issue => issue.status === 'open').length,
+    [qcIssues],
+  );
+
+  const exportReadiness = useMemo(
+    () => getExportReadiness({ segments, qcIssues }),
+    [segments, qcIssues],
+  );
+
+  const completedWorkspaceTabs = useMemo<Record<WorkspaceTab, boolean>>(() => {
+    const hasSegments = segments.length > 0;
+    return {
+      script: hasSegments && renderedCount === segments.length,
+      cast: false,
+      review: hasSegments && approvedCount === segments.length && openQcCount === 0,
+      timeline: false,
+      export: exportReadiness.canExport,
+    };
+  }, [segments.length, renderedCount, approvedCount, openQcCount, exportReadiness.canExport]);
 
   // ---------------------------------------------------------------------------
   // Data loading
@@ -911,6 +933,23 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     });
   };
 
+  const showBatchRenderToast = useCallback((res: Awaited<ReturnType<typeof batchRenderProject>>, label: string = 'segment') => {
+    const hasSummary = typeof res.rendered === 'number' || typeof res.failed === 'number';
+    if (hasSummary) {
+      const rendered = res.rendered ?? 0;
+      const failed = res.failed ?? 0;
+      const skipped = res.skipped ?? 0;
+      const duration = typeof res.total_ms === 'number' && res.total_ms > 0
+        ? ` in ${(res.total_ms / 1000).toFixed(1)}s`
+        : '';
+      const skippedText = skipped > 0 ? `, ${skipped} skipped` : '';
+      showToast(`Batch complete - ${rendered} rendered, ${failed} failed${skippedText}${duration}`, failed > 0 ? 'warning' : 'success');
+      return;
+    }
+    const count = res.segment_count ?? 0;
+    showToast(`Rendering ${count} ${label}${count === 1 ? '' : 's'} (job ${res.job_id})`, 'success');
+  }, [showToast]);
+
   const handleRenderMissingAudio = async () => {
     if (!selectedProject) return;
     const missingSegmentIds = segments
@@ -924,7 +963,7 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     setBatchRendering(true);
     try {
       const res = await batchRenderProject(selectedProject.id, { segmentIds: missingSegmentIds });
-      showToast(`Rendering ${res.segment_count} missing segment${res.segment_count === 1 ? '' : 's'} (job ${res.job_id})`, 'success');
+      showBatchRenderToast(res, 'missing segment');
     } catch (err: any) {
       showToast(err?.message ?? 'Render missing audio failed.', 'error');
     } finally {
@@ -1001,6 +1040,31 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   const closeProjectSettings = () => {
     if (settingsDirty && !window.confirm('Discard unsaved project settings?')) return;
     setShowProjectSettings(false);
+  };
+  const emptyStateTemplates = [
+    {
+      id: 'audiobook_chapters',
+      title: 'Audiobook',
+      description: 'Chapter-based narration with room for long-form sections.',
+      icon: <BookOpen size={16} />,
+    },
+    {
+      id: 'podcast_episode',
+      title: 'Podcast',
+      description: 'Episode structure for intro, body, and outro reads.',
+      icon: <Users size={16} />,
+    },
+    {
+      id: 'voiceover_spot',
+      title: 'Voiceover',
+      description: 'Commercial copy with main reads and alternate takes.',
+      icon: <FileText size={16} />,
+    },
+  ];
+  const openProjectTemplate = (templateId: string) => {
+    handleNewProjectTemplateChange(templateId);
+    setNewTitle('');
+    setShowNewProjectDrawer(true);
   };
 
   return (
@@ -1196,6 +1260,7 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                         id={workspaceTabId(tab.id)}
                         type="button"
                         role="tab"
+                        data-tour-step={`project-${tab.id}-tab`}
                         aria-selected={activeWorkspaceTab === tab.id}
                         aria-controls={workspacePanelId(tab.id)}
                         tabIndex={activeWorkspaceTab === tab.id ? 0 : -1}
@@ -1215,6 +1280,11 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                       >
                         {tab.icon}
                         <span className={isPhone ? 'whitespace-nowrap' : 'hidden sm:inline'}>{tab.label}</span>
+                        {completedWorkspaceTabs[tab.id] && (
+                          <span data-testid={`check-${tab.id}-complete`} className="inline-flex items-center" aria-hidden="true">
+                            <CheckCircle size={11} className="text-green-500 dark:text-green-400" />
+                          </span>
+                        )}
                       </button>
                     ))}
                   </nav>
@@ -1241,7 +1311,7 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                       setBatchRendering(true);
                       try {
                         const res = await batchRenderProject(selectedProject.id);
-                        showToast(`Rendering ${res.segment_count} segment${res.segment_count === 1 ? '' : 's'} (job ${res.job_id})`, 'success');
+                        showBatchRenderToast(res);
                       } catch (err: any) {
                         showToast(err?.message ?? 'Batch render failed.', 'error');
                       } finally {
@@ -1521,6 +1591,7 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                     projectId={selectedProject.id}
                     voices={voices}
                     customPresets={customPresets}
+                    segments={segments}
                   />
                 )}
 
@@ -1564,9 +1635,37 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             </div>
           ) : (
             <div className="flex min-h-full items-center justify-center p-6 text-center">
-              <div>
+              <div className="w-full max-w-2xl">
                 <BookOpen size={32} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-700" />
                 <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Create a project to start.</p>
+                <p className="mx-auto mt-1 max-w-md text-sm text-zinc-500 dark:text-zinc-400">
+                  Pick a production template or start from a blank workspace.
+                </p>
+                <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {emptyStateTemplates.map(template => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      data-testid="empty-state-template"
+                      onClick={() => openProjectTemplate(template.id)}
+                      className="template-card flex h-full flex-col items-start rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4 text-left shadow-sm transition-colors hover:border-[var(--accent-300)] dark:hover:border-[var(--accent-600)] hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                    >
+                      <span className="mb-3 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent-50)] dark:bg-zinc-900 text-[var(--accent-600)] dark:text-[var(--accent-200)]">
+                        {template.icon}
+                      </span>
+                      <span className="text-sm font-semibold text-zinc-900 dark:text-white">{template.title}</span>
+                      <span className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">{template.description}</span>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openProjectTemplate(DEFAULT_PROJECT_TEMPLATE_ID)}
+                  className="mt-5 inline-flex h-9 items-center gap-2 rounded-lg bg-zinc-900 dark:bg-[var(--accent-600)] px-3 text-xs font-semibold text-white transition-colors hover:bg-zinc-700 dark:hover:bg-[var(--accent-500)]"
+                >
+                  <Plus size={13} />
+                  Create your first project
+                </button>
               </div>
             </div>
           )}

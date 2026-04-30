@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Mic, User, FolderOpen, FileText, Clock, Settings, Sparkles, Sun, Moon, PanelLeftClose, PanelLeft, Palette, Contrast, Activity, Loader2 } from 'lucide-react';
+import { Mic, User, FolderOpen, FileText, Clock, Settings, Sparkles, Sun, Moon, PanelLeftClose, PanelLeft, Palette, Contrast, Activity, Loader2, Command } from 'lucide-react';
 
 export type AppSection = 'voices' | 'presets' | 'script' | 'scriptreader' | 'history';
 
@@ -29,6 +29,8 @@ interface NavigationSidebarProps {
   highContrast?: boolean;
   onHighContrastChange?: (on: boolean) => void;
   onOpenJobCenter?: () => void;
+  onOpenCommandPalette?: () => void;
+  ariaHidden?: boolean;
   jobBadgeCount?: number;
   hasActiveJob?: boolean;
   activeJobPercent?: number;
@@ -65,18 +67,26 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   highContrast = false,
   onHighContrastChange,
   onOpenJobCenter,
+  onOpenCommandPalette,
+  ariaHidden = false,
   jobBadgeCount = 0,
   hasActiveJob = false,
   activeJobPercent = 0,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [commandModifier, setCommandModifier] = useState('Ctrl+K');
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 1280);
     check();
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
+  }, []);
+
+  useEffect(() => {
+    const platform = navigator.platform || navigator.userAgent;
+    setCommandModifier(/Mac|iPhone|iPad|iPod/i.test(platform) ? '⌘K' : 'Ctrl+K');
   }, []);
 
   const navItems: NavItem[] = [
@@ -90,7 +100,7 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   // --- Mobile: Bottom Tab Bar ---
   if (isMobile) {
     return (
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl border-t border-zinc-200 dark:border-zinc-800 safe-area-bottom" role="navigation" aria-label="Main navigation">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl border-t border-zinc-200 dark:border-zinc-800 safe-area-bottom" role="navigation" aria-label="Main navigation" aria-hidden={ariaHidden || undefined}>
         <div className="flex items-center justify-around h-14 max-w-lg mx-auto px-2">
           {navItems.map(item => {
             const isActive = activeSection === item.id;
@@ -143,6 +153,7 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
       }`}
       role="navigation"
       aria-label="Main navigation"
+      aria-hidden={ariaHidden || undefined}
     >
       {/* Header */}
       <div className={`flex items-center h-16 px-3 border-b border-zinc-100 dark:border-zinc-800 ${collapsed ? 'justify-center' : 'gap-3'}`}>
@@ -298,6 +309,26 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
                   </span>
                 )}
               </div>
+            )}
+          </button>
+        )}
+        {onOpenCommandPalette && (
+          <button
+            onClick={onOpenCommandPalette}
+            className={`w-full flex items-center gap-3 py-2 rounded-xl text-sm text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors ${
+              collapsed ? 'justify-center px-2' : 'px-3'
+            }`}
+            title={`Open command palette (${commandModifier})`}
+            aria-label={`Open command palette (${commandModifier})`}
+          >
+            <Command size={18} />
+            {!collapsed && (
+              <span className="flex flex-1 items-center justify-between gap-2">
+                <span>Command</span>
+                <kbd data-testid="cmd-palette-hint" className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">
+                  {commandModifier}
+                </kbd>
+              </span>
             )}
           </button>
         )}
