@@ -4,48 +4,25 @@
  */
 
 /**
- * ProjectListPanel.tsx — Sidebar panel with project search, sort, new-project
- * sheet, and per-project context menu. State is owned by ProjectWorkspace;
- * this component is purely presentational.
+ * ProjectListPanel.tsx - Sidebar panel with project views, search, sort,
+ * creation, and per-project context menus. State is owned by ProjectWorkspace;
+ * this component owns only local list presentation state.
  */
 
 import React, { useMemo, useState } from 'react';
-import {
-  Archive,
-  ArchiveRestore,
-  ChevronRight,
-  Loader2,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  Search,
-  X,
-} from 'lucide-react';
+import { ChevronRight, Loader2, Plus } from 'lucide-react';
 import { Client, ProjectKind, ProjectSummary, ScriptProject } from '../../types';
-import NewProjectSheet from './NewProjectSheet';
-import { getProjectTemplate } from './projectTemplates';
+import ProjectListRow from './ProjectListRow';
+import ProjectListToolbar from './ProjectListToolbar';
+import {
+  ProjectSort,
+  ProjectView,
+  projectMatchesSearch,
+  projectMatchesView,
+  sortProjects,
+} from './projectListFilters';
 
-export type ProjectSort = 'updated_desc' | 'created_desc' | 'title_asc' | 'kind_asc';
-
-const PROJECT_KINDS: { value: ProjectKind; label: string }[] = [
-  { value: 'audiobook', label: 'Audiobook' },
-  { value: 'voiceover', label: 'Voiceover' },
-  { value: 'podcast', label: 'Podcast' },
-  { value: 'training', label: 'Training' },
-  { value: 'character_reel', label: 'Character Reel' },
-  { value: 'other', label: 'Other' },
-];
-
-const SORT_OPTIONS: { value: ProjectSort; label: string }[] = [
-  { value: 'updated_desc', label: 'Recently updated' },
-  { value: 'created_desc', label: 'Recently created' },
-  { value: 'title_asc', label: 'Title A–Z' },
-  { value: 'kind_asc', label: 'Kind' },
-];
-
-function formatKind(kind: string): string {
-  return PROJECT_KINDS.find(k => k.value === kind)?.label ?? kind.replace(/_/g, ' ');
-}
+export type { ProjectSort } from './projectListFilters';
 
 export interface ProjectListPanelProps {
   projects: ScriptProject[];
@@ -65,12 +42,15 @@ export interface ProjectListPanelProps {
   renamingProjectId: number | null;
   renameValue: string;
   savingRename: boolean;
+  newProjectOpen: boolean;
   onNewTitleChange: (v: string) => void;
   onNewKindChange: (v: ProjectKind) => void;
   onNewDescriptionChange: (v: string) => void;
   onNewClientIdChange: (v: number | null) => void;
   onNewTemplateIdChange: (v: string) => void;
   onCreateProject: (e: React.FormEvent) => void;
+  onOpenNewProject: () => void;
+  onCloseNewProject: () => void;
   onSelectProject: (id: number) => void;
   onArchive: (project: ScriptProject) => void;
   onUnarchive: (project: ScriptProject) => void;
@@ -100,12 +80,15 @@ const ProjectListPanel: React.FC<ProjectListPanelProps> = ({
   renamingProjectId,
   renameValue,
   savingRename,
+  newProjectOpen,
   onNewTitleChange,
-  onNewKindChange,
-  onNewDescriptionChange,
-  onNewClientIdChange,
-  onNewTemplateIdChange,
-  onCreateProject,
+  onNewKindChange: _onNewKindChange,
+  onNewDescriptionChange: _onNewDescriptionChange,
+  onNewClientIdChange: _onNewClientIdChange,
+  onNewTemplateIdChange: _onNewTemplateIdChange,
+  onCreateProject: _onCreateProject,
+  onOpenNewProject,
+  onCloseNewProject,
   onSelectProject,
   onArchive,
   onUnarchive,
@@ -116,134 +99,92 @@ const ProjectListPanel: React.FC<ProjectListPanelProps> = ({
   onSetContextMenu,
   onSetShowArchived,
 }) => {
-  const [showNewProject, setShowNewProject] = useState(false);
   const [projectSearch, setProjectSearch] = useState('');
   const [projectSort, setProjectSort] = useState<ProjectSort>('updated_desc');
+  const [projectView, setProjectView] = useState<ProjectView>('active');
 
   const clientById = useMemo(() => new Map(clients.map(client => [client.id, client])), [clients]);
 
-  const activeProjects = useMemo(() => {
-    let list = projects.filter(p => p.status !== 'archived');
-    const q = projectSearch.trim().toLowerCase();
-    if (q) {
-      list = list.filter(p => {
-        const clientName = p.client_id ? clientById.get(p.client_id)?.name ?? '' : '';
-        return (
-          p.title.toLowerCase().includes(q) ||
-          p.kind.toLowerCase().includes(q) ||
-          ((p.description ?? '').toLowerCase()).includes(q) ||
-          clientName.toLowerCase().includes(q)
-        );
-      });
-    }
-    const sorted = [...list];
-    switch (projectSort) {
-      case 'updated_desc':
-        sorted.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-        break;
-      case 'created_desc':
-        sorted.sort((a, b) => b.created_at.localeCompare(a.created_at));
-        break;
-      case 'title_asc':
-        sorted.sort((a, b) => a.title.localeCompare(b.title));
-        break;
-      case 'kind_asc':
-        sorted.sort((a, b) => a.kind.localeCompare(b.kind) || a.title.localeCompare(b.title));
-        break;
-    }
-    return sorted;
-  }, [projects, projectSearch, projectSort, clientById]);
+  const visibleProjects = useMemo(() => {
+    const filtered = projects.filter(project => {
+      const client = project.client_id ? clientById.get(project.client_id) : undefined;
+      return (
+        projectMatchesView(project, projectView, projectSummaries[project.id]) &&
+        projectMatchesSearch(project, projectSearch, client)
+      );
+    });
+    return sortProjects(filtered, projectView === 'recent' ? 'updated_desc' : projectSort);
+  }, [projects, projectView, projectSearch, projectSort, projectSummaries, clientById]);
 
   const archivedProjects = useMemo(
-    () => projects.filter(p => p.status === 'archived'),
-    [projects],
+    () => sortProjects(projects.filter(project => project.status === 'archived'), projectSort),
+    [projects, projectSort],
   );
 
-  const handleCreateAndClose = (e: React.FormEvent) => {
-    onCreateProject(e);
-    setShowNewProject(false);
-  };
+  const selectedProject = selectedProjectId !== null
+    ? projects.find(project => project.id === selectedProjectId)
+    : null;
+  const selectedProjectVisible = selectedProject
+    ? visibleProjects.some(project => project.id === selectedProject.id)
+    : true;
+  const showHiddenActiveProject = !!selectedProject && !selectedProjectVisible && (projectSearch.trim() || projectView !== 'active');
 
-  const handleTemplateChange = (templateId: string) => {
-    const template = getProjectTemplate(templateId);
-    onNewTemplateIdChange(templateId);
-    onNewKindChange(template.kind);
-    onNewDescriptionChange(template.description);
-  };
+  const renderProjectRow = (project: ScriptProject) => (
+    <ProjectListRow
+      key={project.id}
+      project={project}
+      active={project.id === selectedProjectId}
+      client={project.client_id ? clientById.get(project.client_id) : null}
+      summary={projectSummaries[project.id]}
+      fallbackSegmentCount={segmentCounts[project.id] ?? null}
+      contextMenuOpen={contextMenuProjectId === project.id}
+      renaming={renamingProjectId === project.id}
+      renameValue={renameValue}
+      savingRename={savingRename}
+      onSelect={() => {
+        onSetContextMenu(null);
+        onSelectProject(project.id);
+      }}
+      onSetContextMenu={open => onSetContextMenu(open ? project.id : null)}
+      onStartRename={() => {
+        onSetContextMenu(null);
+        onStartRename(project);
+      }}
+      onRenameValueChange={onRenameValueChange}
+      onSaveRename={() => onSaveRename(project)}
+      onCancelRename={onCancelRename}
+      onArchive={() => {
+        onSetContextMenu(null);
+        onArchive(project);
+      }}
+      onUnarchive={() => {
+        onSetContextMenu(null);
+        onUnarchive(project);
+      }}
+    />
+  );
 
   return (
-    <div data-testid="project-list" className="flex flex-col min-h-0 flex-1">
-      {/* Search row + New Project toggle */}
-      <div className="shrink-0 border-b border-zinc-200 dark:border-zinc-800 p-3 space-y-2">
-        <div className="flex items-center gap-1.5">
-          <div className="relative flex-1 min-w-0">
-            <Search
-              size={13}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"
-              aria-hidden="true"
-            />
-            <input
-              type="search"
-              aria-label="Search projects"
-              value={projectSearch}
-              onChange={e => setProjectSearch(e.target.value)}
-              placeholder="Search projects…"
-              className="h-8 w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 pl-7 pr-2 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-100)]"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setShowNewProject(prev => !prev);
-              if (!showNewProject) onNewTitleChange('');
-            }}
-            aria-expanded={showNewProject}
-            aria-label={showNewProject ? 'Cancel new project' : 'New project'}
-            title={showNewProject ? 'Cancel' : 'New project'}
-            className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors ${
-              showNewProject
-                ? 'border-[var(--accent-400)] bg-[var(--accent-50)] dark:border-[var(--accent-600)] dark:bg-zinc-900 text-[var(--accent-600)]'
-                : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-            }`}
-          >
-            {showNewProject ? <X size={14} /> : <Plus size={14} />}
-          </button>
-        </div>
+    <div data-testid="project-list" className="flex min-h-0 flex-1 flex-col">
+      <ProjectListToolbar
+        search={projectSearch}
+        sort={projectSort}
+        view={projectView}
+        newProjectOpen={newProjectOpen}
+        onSearchChange={setProjectSearch}
+        onSortChange={setProjectSort}
+        onViewChange={setProjectView}
+        onNewProject={() => {
+          if (newProjectOpen) {
+            onCloseNewProject();
+          } else {
+            onNewTitleChange('');
+            onOpenNewProject();
+          }
+        }}
+      />
 
-        {/* Sort selector */}
-        <select
-          aria-label="Sort projects"
-          value={projectSort}
-          onChange={e => setProjectSort(e.target.value as ProjectSort)}
-          className="h-7 w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-2 text-[11px] text-zinc-600 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[var(--accent-100)]"
-        >
-          {SORT_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-
-        {/* Collapsible new-project form */}
-        {showNewProject && (
-          <NewProjectSheet
-            title={newTitle}
-            kind={newKind}
-            description={newDescription}
-            clientId={newClientId}
-            templateId={newTemplateId}
-            clients={clients}
-            creating={creating}
-            onTitleChange={onNewTitleChange}
-            onKindChange={onNewKindChange}
-            onDescriptionChange={onNewDescriptionChange}
-            onClientIdChange={onNewClientIdChange}
-            onTemplateIdChange={handleTemplateChange}
-            onSubmit={handleCreateAndClose}
-          />
-        )}
-      </div>
-
-      {/* Project list */}
-      <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-1">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-2">
         {loadingProjects ? (
           <div className="flex items-center justify-center py-10 text-zinc-400">
             <Loader2 size={22} className="animate-spin" />
@@ -253,134 +194,52 @@ const ProjectListPanel: React.FC<ProjectListPanelProps> = ({
             <p className="text-sm text-zinc-500 dark:text-zinc-400">No projects yet.</p>
             <button
               type="button"
-              onClick={() => setShowNewProject(true)}
-              className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-600)] dark:text-[var(--accent-400)] hover:underline"
+              onClick={onOpenNewProject}
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-600)] hover:underline dark:text-[var(--accent-400)]"
             >
               <Plus size={12} /> Create your first project
             </button>
           </div>
-        ) : activeProjects.length === 0 && projectSearch ? (
-          <p className="py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
-            No projects match &ldquo;{projectSearch}&rdquo;.
-          </p>
         ) : (
           <>
-            {activeProjects.map(project => {
-              const active = project.id === selectedProjectId;
-              const isRenaming = renamingProjectId === project.id;
-              const hasMenu = contextMenuProjectId === project.id;
-              const summary = projectSummaries[project.id];
-              const segCount = summary?.segment_count ?? segmentCounts[project.id] ?? null;
-              const clientName = project.client_id ? clientById.get(project.client_id)?.name : null;
-
-              return (
-                <div key={project.id} className="relative group">
-                  <div
-                    className={`rounded-lg border transition-colors ${
-                      active
-                        ? 'border-[var(--accent-400)] bg-[var(--accent-50)] dark:border-[var(--accent-600)] dark:bg-zinc-900'
-                        : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                    }`}
+            {showHiddenActiveProject && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                <p className="font-semibold">Current project is hidden by filters.</p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProjectSearch('');
+                      setProjectView('active');
+                    }}
+                    className="rounded-md bg-white px-2 py-1 font-semibold text-amber-800 shadow-sm dark:bg-zinc-900 dark:text-amber-200"
                   >
-                    {isRenaming ? (
-                      <form
-                        onSubmit={e => { e.preventDefault(); onSaveRename(project); }}
-                        className="p-3"
-                      >
-                        <input
-                          autoFocus
-                          value={renameValue}
-                          onChange={e => onRenameValueChange(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Escape') onCancelRename(); }}
-                          className="w-full rounded border border-[var(--accent-400)] bg-white dark:bg-zinc-900 px-2 py-0.5 text-sm font-semibold text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-[var(--accent-400)]"
-                          disabled={savingRename}
-                        />
-                        <p className="mt-1 text-[10px] text-zinc-400">Enter to save · Esc to cancel</p>
-                      </form>
-                    ) : (
-                      <div className="flex items-start gap-1">
-                        <button
-                          onClick={() => { onSetContextMenu(null); onSelectProject(project.id); }}
-                          className="min-w-0 flex-1 p-3 text-left"
-                          aria-current={active ? 'page' : undefined}
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">
-                              {project.title}
-                            </p>
-                            <div className="mt-1 flex items-center gap-2">
-                              <span className="text-xs capitalize text-zinc-500 dark:text-zinc-400">
-                                {formatKind(project.kind)}
-                              </span>
-                              {segCount !== null && segCount > 0 && (
-                                <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
-                                  {segCount} seg
-                                </span>
-                              )}
-                              {clientName && (
-                                <span className="truncate text-xs text-zinc-400 dark:text-zinc-500">
-                                  {clientName}
-                                </span>
-                              )}
-                              {summary && summary.open_qc_count > 0 && (
-                                <span className="rounded-full bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
-                                  {summary.open_qc_count} QC
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                        <button
-                          aria-label="Project options"
-                          onClick={e => {
-                            e.stopPropagation();
-                            onSetContextMenu(hasMenu ? null : project.id);
-                          }}
-                          className={`mt-2 mr-1.5 shrink-0 rounded p-1 transition-colors ${
-                            hasMenu
-                              ? 'text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800'
-                              : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 opacity-0 group-hover:opacity-100 focus:opacity-100'
-                          }`}
-                        >
-                          <MoreHorizontal size={14} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {hasMenu && (
-                    <div
-                      className="absolute right-0 top-full z-40 mt-1 min-w-[160px] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xl py-1"
-                      role="menu"
-                    >
-                      <button
-                        role="menuitem"
-                        className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                        onClick={() => { onSetContextMenu(null); onStartRename(project); }}
-                      >
-                        <Pencil size={14} />
-                        Rename
-                      </button>
-                      <button
-                        role="menuitem"
-                        className="flex w-full items-center gap-2 px-3 py-2 text-sm text-amber-600 dark:text-amber-400 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                        onClick={() => { onSetContextMenu(null); onArchive(project); }}
-                      >
-                        <Archive size={14} />
-                        Archive
-                      </button>
-                    </div>
-                  )}
+                    Clear filters
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => selectedProject && onSelectProject(selectedProject.id)}
+                    className="rounded-md px-2 py-1 font-semibold text-amber-700 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                  >
+                    Keep browsing
+                  </button>
                 </div>
-              );
-            })}
+              </div>
+            )}
 
-            {/* Archived section */}
-            {archivedProjects.length > 0 && (
-              <div className="pt-2">
+            {visibleProjects.length === 0 ? (
+              <p className="py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                No projects match the current filters.
+              </p>
+            ) : (
+              visibleProjects.map(renderProjectRow)
+            )}
+
+            {projectView !== 'archived' && archivedProjects.length > 0 && (
+              <div className="pt-1">
                 <button
                   onClick={() => onSetShowArchived(prev => !prev)}
-                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                 >
                   <ChevronRight
                     size={12}
@@ -388,71 +247,7 @@ const ProjectListPanel: React.FC<ProjectListPanelProps> = ({
                   />
                   {showArchived ? 'Hide archived' : `Show archived (${archivedProjects.length})`}
                 </button>
-
-                {showArchived && archivedProjects.map(project => {
-                  const active = project.id === selectedProjectId;
-                  const hasMenu = contextMenuProjectId === project.id;
-                  return (
-                    <div key={project.id} className="relative group mt-1">
-                      <div
-                        className={`flex items-start gap-1 w-full rounded-lg border transition-colors opacity-60 hover:opacity-100 ${
-                          active
-                            ? 'border-[var(--accent-400)] bg-[var(--accent-50)] dark:border-[var(--accent-600)] dark:bg-zinc-900'
-                            : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                        }`}
-                      >
-                        <button
-                          onClick={() => { onSetContextMenu(null); onSelectProject(project.id); }}
-                          className="min-w-0 flex-1 p-3 text-left"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">
-                              {project.title}
-                            </p>
-                            <div className="mt-1 flex items-center gap-2">
-                              <span className="text-xs capitalize text-zinc-500 dark:text-zinc-400">
-                                {formatKind(project.kind)}
-                              </span>
-                              <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
-                                archived
-                              </span>
-                            </div>
-                          </div>
-                        </button>
-                        <button
-                          aria-label="Project options"
-                          onClick={e => {
-                            e.stopPropagation();
-                            onSetContextMenu(hasMenu ? null : project.id);
-                          }}
-                          className={`mt-2 mr-1.5 shrink-0 rounded p-1 transition-colors ${
-                            hasMenu
-                              ? 'text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800'
-                              : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 opacity-0 group-hover:opacity-100 focus:opacity-100'
-                          }`}
-                        >
-                          <MoreHorizontal size={14} />
-                        </button>
-                      </div>
-
-                      {hasMenu && (
-                        <div
-                          className="absolute right-0 top-full z-40 mt-1 min-w-[160px] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xl py-1"
-                          role="menu"
-                        >
-                          <button
-                            role="menuitem"
-                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                            onClick={() => { onSetContextMenu(null); onUnarchive(project); }}
-                          >
-                            <ArchiveRestore size={14} />
-                            Unarchive
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                {showArchived && archivedProjects.map(renderProjectRow)}
               </div>
             )}
           </>

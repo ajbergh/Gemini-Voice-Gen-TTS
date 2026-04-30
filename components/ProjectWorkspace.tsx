@@ -88,8 +88,10 @@ import ProjectHeader from './projects/ProjectHeader';
 import ProjectActionBar from './projects/ProjectActionBar';
 import ProjectSettingsDrawer from './projects/ProjectSettingsDrawer';
 import MobileProjectSwitcher from './projects/MobileProjectSwitcher';
+import NewProjectDrawer from './projects/NewProjectDrawer';
 import { DEFAULT_PROJECT_TEMPLATE_ID, getProjectTemplate } from './projects/projectTemplates';
 import { isSegmentAudioReady } from './projects/exportReadiness';
+import { getProjectHealth, ProjectNextAction } from './projects/projectHealth';
 
 interface ProjectWorkspaceProps {
   voices: Voice[];
@@ -189,6 +191,9 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   const [newDescription, setNewDescription] = useState(getProjectTemplate(DEFAULT_PROJECT_TEMPLATE_ID).description);
   const [newClientId, setNewClientId] = useState<number | null>(null);
   const [newTemplateId, setNewTemplateId] = useState(DEFAULT_PROJECT_TEMPLATE_ID);
+  const [newDefaultVoice, setNewDefaultVoice] = useState(initialVoiceName);
+  const [newLanguageCode, setNewLanguageCode] = useState(getProjectTemplate(DEFAULT_PROJECT_TEMPLATE_ID).recommendedDefaults?.language_code ?? 'en');
+  const [newModel, setNewModel] = useState('gemini-3.1-flash-tts-preview');
 
   // ---- project contents ----
   const [sections, setSections] = useState<ScriptSection[]>([]);
@@ -201,6 +206,7 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   const [showCompactTool, setShowCompactTool] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
   const [showMobileProjectSwitcher, setShowMobileProjectSwitcher] = useState(false);
+  const [showNewProjectDrawer, setShowNewProjectDrawer] = useState(false);
 
   // ---- add section ----
   const [showAddSection, setShowAddSection] = useState(false);
@@ -486,10 +492,9 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   // Project CRUD
   // ---------------------------------------------------------------------------
 
-  const handleCreateProject = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const createProjectFromState = async (options: { openImport?: boolean } = {}) => {
     const title = newTitle.trim();
-    if (!title) return;
+    if (!title) return false;
     setCreating(true);
     setError(null);
     try {
@@ -504,8 +509,9 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
         status: 'active',
         description: newDescription.trim(),
         client_id: newClientId ?? undefined,
-        default_voice_name: initialVoiceName || undefined,
-        default_language_code: template.recommendedDefaults?.language_code,
+        default_voice_name: newDefaultVoice.trim() || undefined,
+        default_language_code: newLanguageCode.trim() || template.recommendedDefaults?.language_code,
+        default_model: newModel,
         default_style_id: template.recommendedDefaults?.style_id,
         metadata_json: JSON.stringify(metadata),
       });
@@ -531,19 +537,45 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       setNewClientId(null);
       setNewTemplateId(DEFAULT_PROJECT_TEMPLATE_ID);
       setNewKind(getProjectTemplate(DEFAULT_PROJECT_TEMPLATE_ID).kind);
+      setNewDefaultVoice(initialVoiceName);
+      setNewLanguageCode(getProjectTemplate(DEFAULT_PROJECT_TEMPLATE_ID).recommendedDefaults?.language_code ?? 'en');
+      setNewModel('gemini-3.1-flash-tts-preview');
+      setShowNewProjectDrawer(false);
+      if (options.openImport) {
+        setShowImport(true);
+      }
       refreshProjectSummaries();
       if (failedSections > 0) {
         showToast('Project created, but some template sections could not be added.', 'warning');
       } else {
         showToast('Project created', 'success');
       }
+      return true;
     } catch (err: any) {
       const msg = err?.message ?? 'Failed to create project.';
       setError(msg);
       showToast(msg, 'error');
+      return false;
     } finally {
       setCreating(false);
     }
+  };
+
+  const handleCreateProject = async (event: React.FormEvent) => {
+    event.preventDefault();
+    await createProjectFromState();
+  };
+
+  const handleCreateProjectFromDrawer = (options: { openImport?: boolean } = {}) => {
+    void createProjectFromState(options);
+  };
+
+  const handleNewProjectTemplateChange = (templateId: string) => {
+    const template = getProjectTemplate(templateId);
+    setNewTemplateId(templateId);
+    setNewKind(template.kind);
+    setNewDescription(template.description);
+    setNewLanguageCode(template.recommendedDefaults?.language_code ?? 'en');
   };
 
   const handleArchiveProject = async () => {
@@ -900,6 +932,37 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     }
   };
 
+  const handleProjectNextAction = (action: ProjectNextAction) => {
+    setShowOverflowMenu(false);
+    setShowProjectSettings(false);
+    setShowPronunciation(false);
+
+    switch (action.id) {
+      case 'import_script':
+        setActiveWorkspaceTab('script');
+        setShowImport(true);
+        setImportText('');
+        setImportPreview(null);
+        setImportPreviewSource('');
+        setImportPreviewError(null);
+        break;
+      case 'open_cast':
+        setActiveWorkspaceTab('cast');
+        break;
+      case 'render_missing':
+        setActiveWorkspaceTab('script');
+        void handleRenderMissingAudio();
+        break;
+      case 'review_takes':
+      case 'resolve_qc':
+        setActiveWorkspaceTab('review');
+        break;
+      case 'start_export':
+        setActiveWorkspaceTab('export');
+        break;
+    }
+  };
+
   // ---------------------------------------------------------------------------
   // Main render
   // ---------------------------------------------------------------------------
@@ -918,6 +981,27 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     : approvedCount < renderedCount
     ? `Reviewed ${approvedCount}/${renderedCount}`
     : 'Export ready';
+  const projectHealth = selectedProject
+    ? getProjectHealth({
+        project: selectedProject,
+        segments,
+        castProfiles,
+        qcIssues,
+        renderedCount,
+        approvedCount,
+        draftCount,
+      })
+    : null;
+  const settingsDirty = !!selectedProject && (
+    settingsVoice.trim() !== (selectedProject.default_voice_name ?? '') ||
+    settingsLang.trim() !== (selectedProject.default_language_code ?? '') ||
+    settingsModel !== (selectedProject.default_model ?? 'gemini-3.1-flash-tts-preview') ||
+    settingsStyleId !== (selectedProject.default_style_id ?? null)
+  );
+  const closeProjectSettings = () => {
+    if (settingsDirty && !window.confirm('Discard unsaved project settings?')) return;
+    setShowProjectSettings(false);
+  };
 
   return (
     <div
@@ -981,12 +1065,15 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             renamingProjectId={renamingProjectId}
             renameValue={renameValue}
             savingRename={savingRename}
+            newProjectOpen={showNewProjectDrawer}
             onNewTitleChange={setNewTitle}
             onNewKindChange={setNewKind}
             onNewDescriptionChange={setNewDescription}
             onNewClientIdChange={setNewClientId}
-            onNewTemplateIdChange={setNewTemplateId}
+            onNewTemplateIdChange={handleNewProjectTemplateChange}
             onCreateProject={handleCreateProject}
+            onOpenNewProject={() => setShowNewProjectDrawer(true)}
+            onCloseNewProject={() => setShowNewProjectDrawer(false)}
             onSelectProject={selectProject}
             onArchive={handleArchiveFromMenu}
             onUnarchive={handleUnarchiveProject}
@@ -1001,8 +1088,8 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
         {/* Content pane */}
         <main
-          className={`min-h-0 overflow-y-auto ${isPhone ? 'border-t border-zinc-200 pb-28 dark:border-zinc-800' : ''}`}
-          style={isPhone ? { scrollPaddingBottom: 'calc(7rem + env(safe-area-inset-bottom))' } : undefined}
+          className={`min-h-0 overflow-y-auto ${isPhone ? 'border-t border-zinc-200 pb-36 dark:border-zinc-800' : ''}`}
+          style={isPhone ? { paddingBottom: 'calc(9rem + env(safe-area-inset-bottom))', scrollPaddingBottom: 'calc(9rem + env(safe-area-inset-bottom))' } : undefined}
         >
           {error && (
             <div className="m-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-sm text-red-700 dark:text-red-300">
@@ -1023,15 +1110,16 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
           ) : selectedProject ? (
             <div className="p-4 sm:p-6 space-y-6">
               {isPhone && (
-                <MobileProjectSwitcher
-                  project={selectedProject}
-                  client={selectedClient}
-                  kindLabel={selectedProjectKindLabel}
-                  stageSummary={mobileStageSummary}
-                  open={showMobileProjectSwitcher}
-                  onOpenChange={setShowMobileProjectSwitcher}
-                >
-                  <ProjectListPanel
+                <div className="sticky top-0 z-30 bg-white/95 pb-2 backdrop-blur dark:bg-zinc-950/95">
+                  <MobileProjectSwitcher
+                    project={selectedProject}
+                    client={selectedClient}
+                    kindLabel={selectedProjectKindLabel}
+                    stageSummary={mobileStageSummary}
+                    open={showMobileProjectSwitcher}
+                    onOpenChange={setShowMobileProjectSwitcher}
+                  >
+                    <ProjectListPanel
                     projects={projects}
                     selectedProjectId={selectedProjectId}
                     clients={clients}
@@ -1049,12 +1137,18 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                     renamingProjectId={renamingProjectId}
                     renameValue={renameValue}
                     savingRename={savingRename}
+                    newProjectOpen={showNewProjectDrawer}
                     onNewTitleChange={setNewTitle}
                     onNewKindChange={setNewKind}
                     onNewDescriptionChange={setNewDescription}
                     onNewClientIdChange={setNewClientId}
-                    onNewTemplateIdChange={setNewTemplateId}
+                    onNewTemplateIdChange={handleNewProjectTemplateChange}
                     onCreateProject={handleCreateProject}
+                    onOpenNewProject={() => {
+                      setShowMobileProjectSwitcher(false);
+                      setShowNewProjectDrawer(true);
+                    }}
+                    onCloseNewProject={() => setShowNewProjectDrawer(false)}
                     onSelectProject={id => {
                       selectProject(id);
                       setShowMobileProjectSwitcher(false);
@@ -1067,8 +1161,9 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                     onCancelRename={() => setRenamingProjectId(null)}
                     onSetContextMenu={setContextMenuProjectId}
                     onSetShowArchived={setShowArchived}
-                  />
-                </MobileProjectSwitcher>
+                    />
+                  </MobileProjectSwitcher>
+                </div>
               )}
 
               {/* Project header */}
@@ -1083,13 +1178,15 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                 draftCount={draftCount}
                 compactStage={isPhone}
                 hideTitle={isPhone}
+                health={projectHealth ?? undefined}
+                onNextAction={handleProjectNextAction}
               />
 
               {/* Content tab bar */}
               <div className="-mx-4 sm:-mx-6 px-4 sm:px-6 border-b border-zinc-200 dark:border-zinc-800">
                 <div className={isPhone ? 'space-y-3 py-3' : 'flex items-center justify-between gap-2'}>
                   <nav
-                    className={isPhone ? 'grid w-full grid-cols-5 gap-1 rounded-lg border border-zinc-200 bg-zinc-50 p-1 dark:border-zinc-800 dark:bg-zinc-900/50' : 'flex -mb-px'}
+                    className={isPhone ? 'flex w-full gap-1 overflow-x-auto rounded-lg border border-zinc-200 bg-zinc-50 p-1 dark:border-zinc-800 dark:bg-zinc-900/50' : 'flex -mb-px'}
                     role="tablist"
                     aria-label="Project workspace"
                   >
@@ -1104,7 +1201,7 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                         tabIndex={activeWorkspaceTab === tab.id ? 0 : -1}
                         onClick={() => setActiveWorkspaceTab(tab.id)}
                         className={isPhone
-                          ? `inline-flex h-10 min-w-0 items-center justify-center gap-1 rounded-md px-1 text-[11px] font-semibold transition-colors ${
+                          ? `inline-flex h-10 min-w-[5.25rem] items-center justify-center gap-1 rounded-md px-2 text-[11px] font-semibold transition-colors ${
                               activeWorkspaceTab === tab.id
                                 ? 'bg-white text-[var(--accent-700)] shadow-sm dark:bg-zinc-950 dark:text-[var(--accent-300)]'
                                 : 'text-zinc-500 dark:text-zinc-400'
@@ -1117,7 +1214,7 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                         }
                       >
                         {tab.icon}
-                        <span className={isPhone ? 'min-w-0 truncate' : 'hidden sm:inline'}>{tab.label}</span>
+                        <span className={isPhone ? 'whitespace-nowrap' : 'hidden sm:inline'}>{tab.label}</span>
                       </button>
                     ))}
                   </nav>
@@ -1476,6 +1573,32 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
         </main>
       </div>
 
+      <NewProjectDrawer
+        open={showNewProjectDrawer}
+        mobile={isPhone}
+        title={newTitle}
+        kind={newKind}
+        description={newDescription}
+        clientId={newClientId}
+        templateId={newTemplateId}
+        defaultVoice={newDefaultVoice}
+        languageCode={newLanguageCode}
+        model={newModel}
+        clients={clients}
+        voices={voices}
+        creating={creating}
+        onTitleChange={setNewTitle}
+        onKindChange={setNewKind}
+        onDescriptionChange={setNewDescription}
+        onClientIdChange={setNewClientId}
+        onTemplateIdChange={handleNewProjectTemplateChange}
+        onDefaultVoiceChange={setNewDefaultVoice}
+        onLanguageCodeChange={setNewLanguageCode}
+        onModelChange={setNewModel}
+        onCreate={handleCreateProjectFromDrawer}
+        onClose={() => setShowNewProjectDrawer(false)}
+      />
+
       {/* Project settings drawer — rendered outside the main grid so it doesn't shift layout */}
       {selectedProject && (
         <ProjectSettingsDrawer
@@ -1489,13 +1612,14 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
           settingsModel={settingsModel}
           settingsStyleId={settingsStyleId}
           savingSettings={savingSettings}
+          dirty={settingsDirty}
           onChangeVoice={setSettingsVoice}
           onChangeLang={setSettingsLang}
           onChangeModel={setSettingsModel}
           onChangeStyleId={setSettingsStyleId}
           onStyleCreated={s => setStyles(prev => [...prev, s])}
           onSave={handleSaveProjectSettings}
-          onClose={() => setShowProjectSettings(false)}
+          onClose={closeProjectSettings}
           mobile={isPhone}
         />
       )}

@@ -220,6 +220,9 @@ export async function setupApiMocks(page: Page, options: {
 
   // Takes for segment 101
   await page.route('**/api/projects/1/segments/101/takes**', route => route.fulfill(json(takes)));
+  await page.route('**/api/projects/1/segments/101/takes/*/audio', route =>
+    route.fulfill(json({ audioBase64: Buffer.alloc(480).toString('base64') })),
+  );
 
   // Cast profiles
   await page.route('**/api/cast**', route => route.fulfill(json(castProfiles)));

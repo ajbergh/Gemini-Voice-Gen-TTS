@@ -195,7 +195,10 @@ export default function ExportDialog({
     >
       <div
         ref={dialogRef}
-        className="relative w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-2xl p-6 flex flex-col gap-5"
+        className={inline
+          ? 'relative mb-8 flex w-full flex-col gap-5 rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950'
+          : 'relative flex w-full max-w-md flex-col gap-5 rounded-lg border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900'
+        }
       >
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -232,6 +235,30 @@ export default function ExportDialog({
             Applies silence trim, normalization, and inter-segment padding to the exported audio.
           </p>
         </div>
+
+        {inline && (
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/40">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Package</p>
+              <p className="mt-1 text-sm font-semibold text-zinc-900 dark:text-white">Project deliverable ZIP</p>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Audio files, timing metadata, and export manifest.</p>
+            </div>
+            <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/40">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Audio scope</p>
+              <p className="mt-1 text-sm font-semibold text-zinc-900 dark:text-white">
+                {hasReadinessData ? `${readiness.renderedCount}/${segments?.length ?? 0} rendered` : `${safeRenderedSegments}/${safeTotalSegments} rendered`}
+              </p>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Only rendered audio can be packaged.</p>
+            </div>
+            <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/40">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Readiness</p>
+              <p className="mt-1 text-sm font-semibold text-zinc-900 dark:text-white">
+                {readiness.canExport ? 'Ready' : `${readiness.blockers.length} blocker${readiness.blockers.length === 1 ? '' : 's'}`}
+              </p>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Resolve blockers before starting export.</p>
+            </div>
+          </div>
+        )}
 
         {/* Segment scope summary */}
         {hasReadinessData ? (

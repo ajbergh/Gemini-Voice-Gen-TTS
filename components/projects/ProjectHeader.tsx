@@ -12,6 +12,8 @@ import React from 'react';
 import { Check, ChevronRight } from 'lucide-react';
 import { CastProfile, Client, QcIssue, ScriptProject, ScriptSegment } from '../../types';
 import { getExportReadiness } from './exportReadiness';
+import ProjectHealthStrip from './ProjectHealthStrip';
+import { ProjectHealth, ProjectNextAction } from './projectHealth';
 
 interface StageInfo {
   label: string;
@@ -31,6 +33,8 @@ export interface ProjectHeaderProps {
   draftCount: number;
   compactStage?: boolean;
   hideTitle?: boolean;
+  health?: ProjectHealth;
+  onNextAction?: (action: ProjectNextAction) => void;
 }
 
 const ProjectHeader: React.FC<ProjectHeaderProps> = ({
@@ -44,6 +48,8 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   draftCount,
   compactStage = false,
   hideTitle = false,
+  health,
+  onNextAction,
 }) => {
   const readiness = getExportReadiness({ segments, qcIssues, exportProfileSelected: true });
   const castRequiredSegments = segments.filter(segment => segment.speaker_label && !segment.voice_name && !segment.cast_profile_id);
@@ -101,7 +107,7 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
       </div>
 
       {!hideTitle && (
-        <h3 className="text-2xl font-serif font-medium text-zinc-900 dark:text-white">
+        <h3 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
           {project.title}
         </h3>
       )}
@@ -115,6 +121,10 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
           Client: {client.name}
         </p>
+      )}
+
+      {health && onNextAction && (
+        <ProjectHealthStrip health={health} compact={compactStage} onNextAction={onNextAction} />
       )}
 
       {/* Stage trail - compact on phones, full trail elsewhere. */}

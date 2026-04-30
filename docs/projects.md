@@ -14,22 +14,29 @@ The app remembers your last-opened project and restores it automatically on the 
 
 ### Creating a Project
 
-1. Click **New Project** in the project picker or header
-2. Enter a **Project Title**
-3. Select a **Project Type**:
-   - **Audiobook** — Long-form narration with chapters
-   - **Voiceover** — Short-form video or ad narration
-   - **Podcast** — Multi-speaker episodic audio
-   - **Training** — E-learning or instructional audio
-   - **Custom** — Freeform structure
-4. Optionally assign the project to a **Client Workspace**
-5. Click **Create**
+1. Click **New** in the project index
+2. Choose a starter template, such as audiobook chapters, voiceover spot, podcast episode, training module, character reel, or blank
+3. Enter a **Project Title**
+4. Optionally assign a client or brand and add a project description
+5. Expand **Production defaults** if you want to set the default voice, language code, or model before creation
+6. Click **Create project**, or click **Create and import script** to open the import sheet immediately after the project is created
 
 ---
 
 ## Project Layout
 
-The Project Workspace has several tabs across the top:
+The Projects workspace is split into a project index and the selected project workspace.
+
+The project index includes:
+
+- Saved views: **Active**, **Review**, **Blocked**, **Recent**, and **Archived**
+- Search and sort controls
+- Project rows with kind, segment count, rendered progress, QC status, client details when available, and last-updated date
+- A banner when the current project is hidden by the active search or view filter
+
+The selected project header includes a health strip with the current production state, rendered/approved progress, open QC count, and the next recommended action.
+
+The Project Workspace has these tabs:
 
 | Tab | Content |
 |-----|---------|
@@ -37,9 +44,9 @@ The Project Workspace has several tabs across the top:
 | **Cast** | Cast bible (character/narrator profiles) |
 | **Review** | Take review, QC, approval workflow |
 | **Timeline** | Waveform timeline and export readiness |
-| **Export** | Package and download deliverable |
+| **Export** | Readiness checklist, package details, and deliverable export |
 
-The **Project Settings** drawer slides in from the right when you click the settings gear icon. The **Project Stats Bar** above the script shows section, segment, and draft counts.
+Use **More actions** to open project settings, dictionaries, archive actions, and other project-level tools. The **Project Stats Bar** above the script shows section, segment, and draft counts.
 
 ---
 
@@ -121,7 +128,7 @@ Each segment represents one individual piece of audio to render — a line of di
 
 ## Batch Render
 
-Click **Batch Render** in the toolbar to render all draft and changed segments at once.
+Click **Render all** in the action bar to render all draft and changed segments at once.
 
 Options:
 - **All draft/changed** — Default; renders only segments that need audio
@@ -142,11 +149,13 @@ How the import works:
 
 You can also paste text directly into the import panel.
 
+On phone-sized screens, Import opens as a focused full-screen sheet. Press **Escape** or use the close button to dismiss it.
+
 ---
 
 ## AI Script Prep
 
-Click **Script Prep** (AI wand icon) to open the AI Script Preparation dialog.
+Click **AI prep** (AI wand icon) to open the AI Script Preparation dialog.
 
 1. Paste raw manuscript text (plain text or Markdown)
 2. Click **Analyze**
@@ -188,7 +197,7 @@ Every time a segment is rendered, a new **take** is created. Segments can have m
 
 ## Project Settings
 
-Click the **Settings gear** in the project toolbar to open the Project Settings drawer.
+Click **More actions** and choose **Project Settings** to open the settings drawer.
 
 | Setting | Description |
 |---------|-------------|
@@ -198,6 +207,22 @@ Click the **Settings gear** in the project toolbar to open the Project Settings 
 | **Default Style** | Performance style preset applied to new segments |
 
 These defaults apply to newly created segments. Individual segments can override any setting.
+
+Settings are grouped by **Voice defaults**, **Language and model**, and **Performance style**. **Save settings** is disabled until a setting changes; closing with unsaved changes prompts for confirmation.
+
+---
+
+## Export
+
+The **Export** tab is a full-width workflow page rather than a small modal. It includes:
+
+- Finishing profile selection
+- Package summary and audio scope
+- Export readiness status
+- A readiness checklist for missing audio, unapproved takes, and open QC issues
+- Recent export jobs when available
+
+The export action remains disabled until the project meets the readiness requirements.
 
 ---
 

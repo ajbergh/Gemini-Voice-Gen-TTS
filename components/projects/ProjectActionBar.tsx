@@ -80,7 +80,7 @@ const ProjectActionBar: React.FC<ProjectActionBarProps> = ({
           className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 px-2.5 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
         >
           <Sparkles size={13} />
-          <span className="hidden sm:inline">Prep</span>
+          <span className="hidden sm:inline">AI prep</span>
         </button>
       )}
 
@@ -171,7 +171,7 @@ const ProjectActionBar: React.FC<ProjectActionBarProps> = ({
     <div
       className={
         mobile
-          ? 'fixed inset-x-0 bottom-14 z-40 flex items-center justify-end gap-2 border-t border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 px-3 py-2 shadow-lg shadow-zinc-900/10 backdrop-blur'
+          ? 'fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-40 flex items-center justify-end gap-2 border-t border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 px-3 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur'
           : 'flex items-center gap-1.5 pb-1'
       }
       data-testid={mobile ? 'mobile-project-action-bar' : undefined}
@@ -203,7 +203,7 @@ const ProjectActionBar: React.FC<ProjectActionBarProps> = ({
               />
               <div
                 role="menu"
-                className="fixed inset-x-3 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-[80] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 py-1 shadow-2xl"
+                className="fixed inset-x-3 bottom-[calc(7.5rem+env(safe-area-inset-bottom))] z-[80] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 py-1 shadow-2xl"
               >
                 {overflowItems}
               </div>

@@ -10,7 +10,7 @@
  * import workflow, where headings become sections and paragraphs become segments.
  */
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { AlertTriangle, Eye, FileText, Loader2, Upload, X } from 'lucide-react';
 import { ImportPreview } from '../types';
 
@@ -47,9 +47,22 @@ const ProjectImportPanel: React.FC<ProjectImportPanelProps> = ({
   const canImport = !!preview && !previewStale && !previewError;
   const previewSections = preview?.sections ?? [];
   const unsectioned = preview?.unsectioned_segments ?? [];
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!mobile) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    dialogRef.current?.focus({ preventScroll: true });
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [mobile, onClose]);
 
   return (
   <div
+    ref={dialogRef}
+    tabIndex={mobile ? -1 : undefined}
     className={
       mobile
         ? 'fixed inset-0 z-[70] flex flex-col bg-white dark:bg-zinc-950'
@@ -71,6 +84,7 @@ const ProjectImportPanel: React.FC<ProjectImportPanelProps> = ({
       <button
         type="button"
         onClick={onClose}
+        aria-label="Close import sheet"
         className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-100 transition-colors"
       >
         <X size={14} />

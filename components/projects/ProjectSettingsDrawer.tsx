@@ -29,6 +29,7 @@ export interface ProjectSettingsDrawerProps {
   settingsModel: string;
   settingsStyleId: number | null;
   savingSettings: boolean;
+  dirty?: boolean;
   onChangeVoice: (v: string) => void;
   onChangeLang: (v: string) => void;
   onChangeModel: (v: string) => void;
@@ -50,6 +51,7 @@ const ProjectSettingsDrawer: React.FC<ProjectSettingsDrawerProps> = ({
   settingsModel,
   settingsStyleId,
   savingSettings,
+  dirty = true,
   onChangeVoice,
   onChangeLang,
   onChangeModel,
@@ -73,7 +75,7 @@ const ProjectSettingsDrawer: React.FC<ProjectSettingsDrawerProps> = ({
 
   // Move focus into drawer when it opens
   useEffect(() => {
-    if (open) drawerRef.current?.focus();
+    if (open) drawerRef.current?.focus({ preventScroll: true });
   }, [open]);
 
   if (!open) return null;
@@ -136,6 +138,8 @@ const ProjectSettingsDrawer: React.FC<ProjectSettingsDrawerProps> = ({
             onSave={onSave}
             onClose={onClose}
             mobile={mobile}
+            showHeaderClose={false}
+            dirty={dirty}
           />
         </div>
       </div>

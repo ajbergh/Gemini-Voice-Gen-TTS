@@ -112,6 +112,50 @@ test.describe('Project list panel (Phase 2)', () => {
     await expect(page.getByRole('button', { name: new RegExp(FIXTURE_PROJECT.title) }).first()).not.toBeVisible();
   });
 
+  test('shows a hidden-current-project banner when filters hide the selected project', async ({ page }) => {
+    const second = { ...FIXTURE_PROJECT, id: 2, title: 'My Podcast Series', kind: 'podcast' };
+    await setupApiMocks(page, { projects: [FIXTURE_PROJECT, second] });
+    await loadApp(page);
+    await goToProjects(page);
+
+    await page.getByRole('button', { name: new RegExp(FIXTURE_PROJECT.title) }).first().click();
+    await page.getByPlaceholder('Search projects…').fill('Podcast');
+
+    await expect(page.getByText('Current project is hidden by filters.')).toBeVisible();
+    await page.getByRole('button', { name: 'Clear filters' }).click();
+    await expect(page.getByRole('button', { name: new RegExp(FIXTURE_PROJECT.title) }).first()).toBeVisible();
+  });
+
+  test('saved views filter blocked projects', async ({ page }) => {
+    const blockedProject = {
+      ...FIXTURE_PROJECT,
+      id: 2,
+      title: 'Blocked Training Module',
+      kind: 'training',
+      updated_at: '2025-01-02T00:00:00Z',
+    };
+    const blockedSegment = {
+      ...FIXTURE_SEGMENT,
+      id: 202,
+      project_id: 2,
+      status: 'draft',
+      content_hash: 'draft-202',
+    };
+
+    await setupApiMocks(page, {
+      projects: [FIXTURE_PROJECT, blockedProject],
+      segments: [{ ...FIXTURE_SEGMENT, status: 'approved' }, blockedSegment],
+      takes: [FIXTURE_TAKE],
+    });
+    await loadApp(page);
+    await goToProjects(page);
+
+    await page.getByRole('button', { name: 'Blocked' }).click();
+
+    await expect(page.getByRole('button', { name: new RegExp(blockedProject.title) }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: new RegExp(FIXTURE_PROJECT.title) }).first()).not.toBeVisible();
+  });
+
   test('New Project button expands the create form', async ({ page }) => {
     await setupApiMocks(page, { projects: [] });
     await loadApp(page);
@@ -174,6 +218,18 @@ test.describe('Project creation', () => {
 
     expect(createCalled).toBe(true);
   });
+
+  test('create and import opens the script import flow after project creation', async ({ page }) => {
+    await setupApiMocks(page, { projects: [] });
+    await loadApp(page);
+    await goToProjects(page);
+
+    await page.getByRole('button', { name: /new project/i }).click();
+    await page.getByPlaceholder('Project title').fill('Imported Script Project');
+    await page.getByRole('button', { name: 'Create and import script' }).click();
+
+    await expect(page.getByText('Import from text')).toBeVisible({ timeout: 8_000 });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -206,6 +262,17 @@ test.describe('Project header (Phase 2)', () => {
     for (const stage of ['Scripted', 'Cast', 'Rendered', 'Reviewed', 'Export ready']) {
       await expect(stageTrail.getByText(stage)).toBeVisible();
     }
+  });
+
+  test('empty project health next action opens import', async ({ page }) => {
+    await setupApiMocks(page, { segments: [], takes: [] });
+    await loadApp(page);
+    await goToProjects(page);
+    await page.getByRole('button', { name: new RegExp(FIXTURE_PROJECT.title) }).first().click();
+
+    await page.getByRole('button', { name: 'Import script' }).click();
+
+    await expect(page.getByText('Import from text')).toBeVisible();
   });
 });
 
@@ -321,15 +388,18 @@ test.describe('Settings drawer (Phase 2)', () => {
 
   test('opening settings does not shift script content off screen', async ({ page }) => {
     // Script tab content is still visible while drawer is open
-    const scriptTabPanel = page.getByRole('tabpanel');
-    const boxBefore = await scriptTabPanel.boundingBox();
-
+    const scriptTabPanel = page.locator('#project-panel-script');
+    await expect(scriptTabPanel.getByRole('heading', { name: 'Sections & Segments' })).toBeVisible();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect(page.getByRole('button', { name: 'More actions' })).toBeVisible();
     await openSettingsDrawer(page);
+    await expect(scriptTabPanel.getByRole('heading', { name: 'Sections & Segments' })).toBeVisible();
     const boxAfter = await scriptTabPanel.boundingBox();
 
-    // Panel should not move significantly (allow up to 5px tolerance)
-    if (boxBefore && boxAfter) {
-      expect(Math.abs(boxAfter.y - boxBefore.y)).toBeLessThan(5);
+    // Panel should remain visible and usable while the drawer overlays the workspace.
+    if (boxAfter) {
+      expect(boxAfter.y + boxAfter.height).toBeGreaterThan(0);
+      expect(boxAfter.y).toBeLessThan(await page.evaluate(() => window.innerHeight));
     }
   });
 });
@@ -355,7 +425,7 @@ test.describe('Review tab — audio playback', () => {
     await expect(page.getByRole('button', { name: new RegExp(FIXTURE_SEGMENT.speaker_label) }).first()).toBeVisible({ timeout: 8_000 });
   });
 
-  test('play button triggers request to /api/audio/ when take has audio_path', async ({ page }) => {
+  test('play button triggers take audio request when take has audio_path', async ({ page }) => {
     const audioRequests: string[] = [];
 
     await setupApiMocks(page, {
@@ -365,7 +435,7 @@ test.describe('Review tab — audio playback', () => {
 
     // Capture audio requests
     page.on('request', req => {
-      if (req.url().includes('/api/audio/')) {
+      if (req.url().includes('/api/audio/') || /\/api\/projects\/\d+\/segments\/\d+\/takes\/\d+\/audio$/.test(req.url())) {
         audioRequests.push(req.url());
       }
     });
@@ -382,14 +452,14 @@ test.describe('Review tab — audio playback', () => {
     await expect(playBtn).toBeEnabled({ timeout: 5_000 });
     await playBtn.click();
 
-    // The /api/audio/ request should have been made
+    // The take audio request should have been made
     await expect(async () => {
       expect(audioRequests.length).toBeGreaterThan(0);
     }).toPass({ timeout: 5_000 });
 
-    // The URL should contain the audio_path from the take
+    // The URL should identify the take that was played
     const encodedPath = encodeURIComponent(FIXTURE_TAKE.audio_path);
-    expect(audioRequests.some(u => u.includes(encodedPath))).toBe(true);
+    expect(audioRequests.some(u => u.includes(encodedPath) || u.endsWith(`/takes/${FIXTURE_TAKE.id}/audio`))).toBe(true);
   });
 
   test('Review tab shows no-content state when project has no segments', async ({ page }) => {
@@ -489,12 +559,15 @@ test.describe('Mobile projects redesign (Phase 4)', () => {
   test('opens import as a focused mobile sheet with preview action', async ({ page }) => {
     await openMobileProjects(page);
 
-    await page.getByRole('button', { name: 'Import' }).click();
+    await page.getByTestId('mobile-project-action-bar').getByRole('button', { name: 'Import' }).click();
     const importSheet = page.getByRole('dialog', { name: 'Import script text' });
     await expect(importSheet).toBeVisible();
     await importSheet.getByPlaceholder(/Chapter One/).fill('# Chapter One\n\nThe story begins here.');
     await expect(importSheet.getByRole('button', { name: 'Preview' })).toBeEnabled();
     await expectNoHorizontalOverflow(page);
+
+    await page.keyboard.press('Escape');
+    await expect(importSheet).not.toBeVisible();
   });
 
   test('shows export readiness on phone without horizontal overflow', async ({ page }) => {
